@@ -1,1 +1,1 @@
-# plarix-scanner
+# plarix-wyatt-scanner
