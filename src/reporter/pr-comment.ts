@@ -1,251 +1,236 @@
 /**
  * PR Comment Reporter
  *
- * Formats AFB04 analysis results as professional, developer-facing
- * GitHub PR comments. Output is structured like a security audit,
- * not a linter warning.
+ * Formats AFB04 findings into professional, developer-facing PR comments.
+ * Structured like a security audit report, not generic linter warnings.
  */
 
 import {
-  AnalysisReport,
   AFBFinding,
+  AnalysisReport,
   Severity,
   ExecutionCategory,
-} from '../types';
+} from "../types";
+import { SCANNER_VERSION } from "../analyzer";
 
 /**
- * Emoji indicators for severity levels.
+ * Severity emoji mapping for visual clarity.
  */
 const SEVERITY_EMOJI: Record<Severity, string> = {
-  [Severity.CRITICAL]: '🔴',
-  [Severity.HIGH]: '🟠',
-  [Severity.MEDIUM]: '🟡',
+  [Severity.CRITICAL]: "\u26A0\uFE0F", // Warning sign
+  [Severity.HIGH]: "\uD83D\uDD34",     // Red circle
+  [Severity.MEDIUM]: "\uD83D\uDFE1",   // Yellow circle
 };
 
 /**
- * Category display names.
+ * Severity label mapping.
  */
-const CATEGORY_NAMES: Record<ExecutionCategory, string> = {
-  [ExecutionCategory.TOOL_CALL]: 'Tool Definition',
-  [ExecutionCategory.SHELL_EXECUTION]: 'Shell Execution',
-  [ExecutionCategory.FILE_OPERATION]: 'File Operation',
-  [ExecutionCategory.API_CALL]: 'API Call',
-  [ExecutionCategory.DATABASE_OPERATION]: 'Database Operation',
-  [ExecutionCategory.CODE_EXECUTION]: 'Code Execution',
+const SEVERITY_LABEL: Record<Severity, string> = {
+  [Severity.CRITICAL]: "CRITICAL",
+  [Severity.HIGH]: "HIGH",
+  [Severity.MEDIUM]: "MEDIUM",
 };
 
 /**
- * Generate the PR comment markdown from an analysis report.
+ * Category description mapping.
+ */
+const CATEGORY_DESCRIPTION: Record<ExecutionCategory, string> = {
+  [ExecutionCategory.TOOL_CALL]: "Agent Tool Definition",
+  [ExecutionCategory.SHELL_EXECUTION]: "Shell Command Execution",
+  [ExecutionCategory.FILE_OPERATION]: "File System Operation",
+  [ExecutionCategory.API_CALL]: "External API Call",
+  [ExecutionCategory.DATABASE_OPERATION]: "Database Operation",
+  [ExecutionCategory.CODE_EXECUTION]: "Dynamic Code Execution",
+};
+
+/**
+ * Format a single finding as a markdown table row.
+ */
+function formatFindingRow(finding: AFBFinding, index: number): string {
+  const emoji = SEVERITY_EMOJI[finding.severity];
+  const severity = SEVERITY_LABEL[finding.severity];
+  const fileLink = `\`${finding.file}:${finding.line}\``;
+  const category = CATEGORY_DESCRIPTION[finding.category];
+
+  return `| ${index} | ${emoji} ${severity} | ${fileLink} | ${category} | ${finding.operation} |`;
+}
+
+/**
+ * Format a finding as a detailed markdown section.
+ */
+function formatFindingDetail(finding: AFBFinding, index: number): string {
+  const emoji = SEVERITY_EMOJI[finding.severity];
+  const severity = SEVERITY_LABEL[finding.severity];
+
+  let detail = `
+### ${emoji} Finding #${index}: ${severity}
+
+- **File:** \`${finding.file}\`
+- **Line:** ${finding.line}, Column: ${finding.column}
+- **Category:** ${CATEGORY_DESCRIPTION[finding.category]}
+- **Operation:** ${finding.operation}
+${finding.context?.isToolDefinition ? "- **Context:** Inside agent tool definition" : ""}
+${finding.context?.framework ? `- **Framework:** ${finding.context.framework}` : ""}
+
+**Explanation:**
+> ${finding.explanation}
+
+**Code:**
+\`\`\`
+${finding.codeSnippet}
+\`\`\`
+`;
+
+  return detail.trim();
+}
+
+/**
+ * Generate the full PR comment report.
  */
 export function generatePRComment(report: AnalysisReport): string {
-  const lines: string[] = [];
+  const { findings, findingsBySeverity, totalFindings, metadata } = report;
 
-  // Header
-  lines.push('## 🛡️ AFB Scanner Report');
-  lines.push('');
-  lines.push('**Agent Failure Boundary Analysis** — Static analysis for unauthorized action execution points.');
-  lines.push('');
+  // If no findings, return a clean pass message
+  if (totalFindings === 0) {
+    return `## AFB Scanner Report
 
-  // Summary section
-  lines.push('### Summary');
-  lines.push('');
-  
-  if (report.totalFindings === 0) {
-    lines.push('✅ **No AFB04 execution points detected** in the analyzed files.');
-    lines.push('');
-    lines.push(`- Files analyzed: ${report.filesAnalyzed.length}`);
-    lines.push(`- Analysis time: ${report.metadata.totalTimeMs}ms`);
-    lines.push('');
-    lines.push(getFooter());
-    return lines.join('\n');
+\u2705 **No AFB04 (Unauthorized Action) boundaries detected.**
+
+---
+<details>
+<summary>Scan Details</summary>
+
+- **Files Analyzed:** ${report.filesAnalyzed.length}
+- **Scanner Version:** ${metadata.scannerVersion}
+- **Analysis Time:** ${metadata.totalTimeMs}ms
+- **Timestamp:** ${metadata.timestamp}
+
+</details>
+
+---
+*AFB Scanner v${SCANNER_VERSION} | [What is AFB?](https://github.com/plarix-security/afb-spec)*
+`;
   }
 
-  // Severity breakdown
-  lines.push('| Severity | Count |');
-  lines.push('|----------|-------|');
-  lines.push(`| ${SEVERITY_EMOJI[Severity.CRITICAL]} Critical | ${report.findingsBySeverity.critical} |`);
-  lines.push(`| ${SEVERITY_EMOJI[Severity.HIGH]} High | ${report.findingsBySeverity.high} |`);
-  lines.push(`| ${SEVERITY_EMOJI[Severity.MEDIUM]} Medium | ${report.findingsBySeverity.medium} |`);
-  lines.push('');
+  // Sort findings by severity (critical first)
+  const sortedFindings = [...findings].sort((a, b) => {
+    const severityOrder = { critical: 0, high: 1, medium: 2 };
+    return severityOrder[a.severity] - severityOrder[b.severity];
+  });
 
-  // Stats
-  lines.push(`**Total findings:** ${report.totalFindings} | **Files analyzed:** ${report.filesAnalyzed.length}`);
-  lines.push('');
+  // Generate summary section
+  const criticalCount = findingsBySeverity.critical;
+  const highCount = findingsBySeverity.high;
+  const mediumCount = findingsBySeverity.medium;
 
-  // Findings section
-  lines.push('---');
-  lines.push('');
-  lines.push('### Findings');
-  lines.push('');
-
-  // Group findings by file
-  const findingsByFile = groupFindingsByFile(report.findings);
-  
-  for (const [file, findings] of findingsByFile) {
-    lines.push(`#### 📄 \`${file}\``);
-    lines.push('');
-    
-    for (const finding of findings) {
-      lines.push(formatFinding(finding));
-      lines.push('');
-    }
+  let summaryEmoji = "\u26A0\uFE0F"; // Warning by default
+  if (criticalCount > 0) {
+    summaryEmoji = "\u2757"; // Exclamation
   }
 
-  // Explanation section
-  lines.push('---');
-  lines.push('');
-  lines.push('<details>');
-  lines.push('<summary><strong>What is AFB04?</strong></summary>');
-  lines.push('');
-  lines.push('**AFB04 (Unauthorized Action)** is an Agent Failure Boundary that identifies execution');
-  lines.push('points where an AI agent can perform actions with real-world effects.');
-  lines.push('');
-  lines.push('These include:');
-  lines.push('- **Tool Definitions**: Agent-callable functions that execute operations');
-  lines.push('- **Shell Execution**: Commands that run on the host system');
-  lines.push('- **File Operations**: Reading, writing, or deleting files');
-  lines.push('- **API Calls**: External HTTP requests that may exfiltrate data');
-  lines.push('- **Database Operations**: Queries that read or modify persistent state');
-  lines.push('- **Code Execution**: Dynamic code evaluation (eval, exec)');
-  lines.push('');
-  lines.push('Each finding represents a point where agent reasoning could trigger');
-  lines.push('an unauthorized action if upstream boundaries (AFB01-03) are compromised.');
-  lines.push('');
-  lines.push('</details>');
-  lines.push('');
+  // Build the summary table
+  const summaryRows = sortedFindings.map((f, i) => formatFindingRow(f, i + 1));
 
-  // Failed files (if any)
-  if (report.metadata.failedFiles.length > 0) {
-    lines.push('<details>');
-    lines.push('<summary><strong>Failed to analyze</strong></summary>');
-    lines.push('');
-    for (const file of report.metadata.failedFiles) {
-      lines.push(`- \`${file}\``);
-    }
-    lines.push('');
-    lines.push('</details>');
-    lines.push('');
-  }
+  // Build detailed findings (only show first 10 to avoid comment size limits)
+  const detailedFindings = sortedFindings
+    .slice(0, 10)
+    .map((f, i) => formatFindingDetail(f, i + 1));
 
-  lines.push(getFooter());
+  const truncatedNote =
+    sortedFindings.length > 10
+      ? `\n> **Note:** Showing 10 of ${sortedFindings.length} findings. Run locally for full report.\n`
+      : "";
 
-  return lines.join('\n');
+  return `## ${summaryEmoji} AFB Scanner Report
+
+**${totalFindings} AFB04 (Unauthorized Action) ${totalFindings === 1 ? "boundary" : "boundaries"} detected.**
+
+| Severity | Count |
+|----------|-------|
+| ${SEVERITY_EMOJI[Severity.CRITICAL]} Critical | ${criticalCount} |
+| ${SEVERITY_EMOJI[Severity.HIGH]} High | ${highCount} |
+| ${SEVERITY_EMOJI[Severity.MEDIUM]} Medium | ${mediumCount} |
+
+---
+
+### Summary
+
+| # | Severity | Location | Category | Operation |
+|---|----------|----------|----------|-----------|
+${summaryRows.join("\n")}
+
+---
+
+### Detailed Findings
+${truncatedNote}
+${detailedFindings.join("\n\n---\n")}
+
+---
+
+<details>
+<summary>About AFB04 (Unauthorized Action)</summary>
+
+**AFB04** represents the **Agent \u2192 Act** boundary - the point where an AI agent 
+attempts to perform an action that affects world state.
+
+This includes:
+- Tool invocations exposed to agent reasoning
+- Shell command execution
+- File system operations
+- External API calls
+- Database operations
+- Dynamic code execution
+
+These execution points require careful authorization and validation to prevent 
+unintended actions driven by adversarial inputs or compromised reasoning.
+
+[Learn more about the AFB Taxonomy](https://github.com/plarix-security/afb-spec)
+
+</details>
+
+<details>
+<summary>Scan Details</summary>
+
+- **Files Analyzed:** ${report.filesAnalyzed.length}
+- **Scanner Version:** ${metadata.scannerVersion}
+- **Analysis Time:** ${metadata.totalTimeMs}ms
+- **Timestamp:** ${metadata.timestamp}
+${metadata.failedFiles.length > 0 ? `- **Failed Files:** ${metadata.failedFiles.length}` : ""}
+
+</details>
+
+---
+*AFB Scanner v${SCANNER_VERSION} | [AFB Spec](https://github.com/plarix-security/afb-spec)*
+`;
 }
 
 /**
- * Format a single finding as markdown.
- */
-function formatFinding(finding: AFBFinding): string {
-  const lines: string[] = [];
-  
-  const severity = finding.severity.toUpperCase();
-  const emoji = SEVERITY_EMOJI[finding.severity];
-  const category = CATEGORY_NAMES[finding.category];
-  
-  // Finding header
-  lines.push(`${emoji} **${severity}** — ${category}`);
-  lines.push('');
-  
-  // Location
-  lines.push(`📍 Line ${finding.line}, Column ${finding.column}`);
-  lines.push('');
-  
-  // Code snippet
-  lines.push('```');
-  lines.push(finding.codeSnippet);
-  lines.push('```');
-  lines.push('');
-  
-  // Operation description
-  lines.push(`**Operation:** ${finding.operation}`);
-  lines.push('');
-  
-  // Explanation (why this is an AFB04)
-  lines.push(`**Why:** ${finding.explanation}`);
-  
-  // Context if available
-  if (finding.context) {
-    const contextParts: string[] = [];
-    
-    if (finding.context.enclosingFunction) {
-      contextParts.push(`function \`${finding.context.enclosingFunction}\``);
-    }
-    if (finding.context.enclosingClass) {
-      contextParts.push(`class \`${finding.context.enclosingClass}\``);
-    }
-    if (finding.context.isToolDefinition) {
-      contextParts.push('**inside tool definition**');
-    }
-    if (finding.context.framework) {
-      contextParts.push(`framework: ${finding.context.framework}`);
-    }
-    
-    if (contextParts.length > 0) {
-      lines.push('');
-      lines.push(`**Context:** ${contextParts.join(' | ')}`);
-    }
-  }
-  
-  // Confidence
-  lines.push('');
-  lines.push(`*Confidence: ${Math.round(finding.confidence * 100)}%*`);
-
-  return lines.join('\n');
-}
-
-/**
- * Group findings by file path.
- */
-function groupFindingsByFile(findings: AFBFinding[]): Map<string, AFBFinding[]> {
-  const grouped = new Map<string, AFBFinding[]>();
-  
-  for (const finding of findings) {
-    const existing = grouped.get(finding.file) || [];
-    existing.push(finding);
-    grouped.set(finding.file, existing);
-  }
-  
-  return grouped;
-}
-
-/**
- * Generate the report footer.
- */
-function getFooter(): string {
-  return `---
-
-*Generated by [AFB Scanner](https://github.com/plarix-security/afb-scanner) v0.1.0*
-
-*AFB Scanner detects AFB04 (Unauthorized Action) boundaries through static analysis.*
-*See the [AFB Specification](https://github.com/plarix-security/afb-spec) for the full taxonomy.*`;
-}
-
-/**
- * Generate a condensed summary for check run output.
- */
-export function generateCheckSummary(report: AnalysisReport): string {
-  if (report.totalFindings === 0) {
-    return `✅ No AFB04 execution points detected (${report.filesAnalyzed.length} files analyzed)`;
-  }
-
-  const parts: string[] = [];
-  
-  if (report.findingsBySeverity.critical > 0) {
-    parts.push(`${report.findingsBySeverity.critical} critical`);
-  }
-  if (report.findingsBySeverity.high > 0) {
-    parts.push(`${report.findingsBySeverity.high} high`);
-  }
-  if (report.findingsBySeverity.medium > 0) {
-    parts.push(`${report.findingsBySeverity.medium} medium`);
-  }
-
-  return `🛡️ Found ${report.totalFindings} AFB04 execution points (${parts.join(', ')})`;
-}
-
-/**
- * Generate JSON output for programmatic consumption.
+ * Generate a JSON report for programmatic consumption.
  */
 export function generateJSONReport(report: AnalysisReport): string {
   return JSON.stringify(report, null, 2);
+}
+
+/**
+ * Generate a concise summary line for commit status.
+ */
+export function generateStatusSummary(report: AnalysisReport): string {
+  const { totalFindings, findingsBySeverity } = report;
+
+  if (totalFindings === 0) {
+    return "AFB Scanner: No AFB04 boundaries detected";
+  }
+
+  const parts: string[] = [];
+  if (findingsBySeverity.critical > 0) {
+    parts.push(`${findingsBySeverity.critical} critical`);
+  }
+  if (findingsBySeverity.high > 0) {
+    parts.push(`${findingsBySeverity.high} high`);
+  }
+  if (findingsBySeverity.medium > 0) {
+    parts.push(`${findingsBySeverity.medium} medium`);
+  }
+
+  return `AFB Scanner: ${totalFindings} AFB04 boundaries (${parts.join(", ")})`;
 }
