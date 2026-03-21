@@ -119,7 +119,11 @@ export async function initParser(): Promise<void> {
   await Parser.init();
   parser = new Parser();
 
-  const wasmPath = path.join(__dirname, '../../../wasm/tree-sitter-python.wasm');
+  // Try dist first, then fall back to source wasm
+  let wasmPath = path.join(__dirname, '../../../wasm/tree-sitter-python.wasm');
+  if (!fs.existsSync(wasmPath)) {
+    wasmPath = path.join(process.cwd(), 'wasm/tree-sitter-python.wasm');
+  }
   if (!fs.existsSync(wasmPath)) {
     throw new Error(`Python WASM not found at ${wasmPath}`);
   }
