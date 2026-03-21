@@ -1,309 +1,121 @@
-/**
- * AFB Scanner - Main Analyzer
- *
- * Orchestrates static analysis across multiple files and languages.
- * Coordinates Python and TypeScript detectors to produce a unified report.
- */
+import * as fs from 'fs';
+import * as path from 'path';
+import { ASTWalker, astWalker } from './ast-walker';
+import { analyzePythonFile } from './python/detector';
+import { analyzeTypeScriptFile } from './typescript/detector';
+import { AFBFinding, AnalysisReport, AnalyzerConfig, FileAnalysisResult, SupportedLanguage, Severity } from '../types';
 
-import * as fs from "fs";
-import * as path from "path";
-import { astWalker } from "./ast-walker";
-import { analyzePythonFile } from "./python/detector";
-import { analyzeTypeScriptFile } from "./typescript/detector";
-import {
-  AFBFinding,
-  FileAnalysisResult,
-  AnalysisReport,
-  AnalyzerConfig,
-  Severity,
-} from "../types";
+const SCANNER_VERSION = '0.1.0';
+const DEFAULT_CONFIG: Required<AnalyzerConfig> = {
+  include: ['**/*.py', '**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
+  exclude: ['**/node_modules/**', '**/.venv/**', '**/venv/**', '**/__pycache__/**', '**/dist/**', '**/build/**', '**/.git/**', '**/test/**', '**/tests/**', '**/*.test.*', '**/*.spec.*'],
+  minConfidence: 0.7,
+  maxFiles: 1000,
+  changedFilesOnly: false,
+};
 
-/** Scanner version */
-export const SCANNER_VERSION = "1.0.0";
+export class AFBAnalyzer {
+  private walker: ASTWalker;
+  private config: Required<AnalyzerConfig>;
+  private initialized = false;
 
-/** Default directories to exclude */
-const DEFAULT_EXCLUDE_DIRS = [
-  "node_modules",
-  ".git",
-  "__pycache__",
-  ".venv",
-  "venv",
-  "env",
-  ".env",
-  "dist",
-  "build",
-  ".next",
-  "coverage",
-  ".tox",
-  ".pytest_cache",
-  ".mypy_cache",
-  "vendor",
-  "third_party",
-];
+  constructor(config?: AnalyzerConfig) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.walker = astWalker;
+  }
 
-/** Default file patterns to exclude */
-const DEFAULT_EXCLUDE_PATTERNS = [
-  "*.min.js",
-  "*.bundle.js",
-  "*.d.ts",
-  "*.map",
-  "*.lock",
-  "*.log",
-];
-
-/**
- * Check if a path should be excluded from analysis.
- */
-function shouldExclude(
-  filePath: string,
-  excludeDirs: string[],
-  excludePatterns: string[]
-): boolean {
-  const parts = filePath.split(path.sep);
-
-  // Check if any directory in the path is excluded
-  for (const part of parts) {
-    if (excludeDirs.includes(part)) {
-      return true;
+  async ensureInitialized() {
+    if (!this.initialized) {
+      await this.walker.initialize();
+      this.initialized = true;
     }
   }
 
-  // Check file patterns
-  const fileName = path.basename(filePath);
-  for (const pattern of excludePatterns) {
-    // Simple glob matching for *.ext patterns
-    if (pattern.startsWith("*")) {
-      const ext = pattern.slice(1);
-      if (fileName.endsWith(ext)) {
-        return true;
+  analyzeFile(filePath: string): FileAnalysisResult {
+    const language = this.walker.getLanguage(filePath);
+    if (!language) return { file: filePath, language: 'python', findings: [], success: false, error: 'Unsupported file type', analysisTimeMs: 0 };
+    const sourceCode = fs.readFileSync(filePath, 'utf-8');
+    return language === 'python' ? analyzePythonFile(filePath, sourceCode) : analyzeTypeScriptFile(filePath, sourceCode);
+  }
+
+  analyzeSource(sourceCode: string, language: SupportedLanguage, virtualPath: string = '<source>'): FileAnalysisResult {
+    return language === 'python' ? analyzePythonFile(virtualPath, sourceCode) : analyzeTypeScriptFile(virtualPath, sourceCode);
+  }
+
+  analyzeDirectory(dirPath: string): AnalysisReport {
+    const startTime = Date.now();
+    const files = this.discoverFiles(dirPath);
+    const results: FileAnalysisResult[] = [];
+    const failedFiles: string[] = [];
+    for (const file of files.slice(0, this.config.maxFiles)) {
+      const result = this.analyzeFile(file);
+      results.push(result);
+      if (!result.success) failedFiles.push(file);
+    }
+    return this.buildReport(dirPath, results, failedFiles, startTime);
+  }
+
+  analyzeFiles(filePaths: string[], repoPath: string): AnalysisReport {
+    const startTime = Date.now();
+    const results: FileAnalysisResult[] = [];
+    const failedFiles: string[] = [];
+    for (const file of filePaths.filter(f => this.walker.isAnalyzable(f))) {
+      const fullPath = path.isAbsolute(file) ? file : path.join(repoPath, file);
+      if (!fs.existsSync(fullPath)) continue;
+      const result = this.analyzeFile(fullPath);
+      result.file = file;
+      results.push(result);
+      if (!result.success) failedFiles.push(file);
+    }
+    return this.buildReport(repoPath, results, failedFiles, startTime);
+  }
+
+  private discoverFiles(dirPath: string): string[] {
+    const files: string[] = [];
+    const walkDir = (currentPath: string) => {
+      for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+        const fullPath = path.join(currentPath, entry.name);
+        const relativePath = path.relative(dirPath, fullPath);
+        if (this.isExcluded(relativePath)) continue;
+        if (entry.isDirectory()) walkDir(fullPath);
+        else if (entry.isFile() && this.walker.isAnalyzable(fullPath)) files.push(fullPath);
       }
-    } else if (pattern === fileName) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
- * Recursively find all analyzable files in a directory.
- */
-function findAnalyzableFiles(
-  dirPath: string,
-  excludeDirs: string[],
-  excludePatterns: string[],
-  maxFiles: number = 1000
-): string[] {
-  const files: string[] = [];
-
-  function walkDir(currentPath: string): void {
-    if (files.length >= maxFiles) return;
-
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(currentPath, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    for (const entry of entries) {
-      if (files.length >= maxFiles) break;
-
-      const fullPath = path.join(currentPath, entry.name);
-      const relativePath = path.relative(dirPath, fullPath);
-
-      if (entry.isDirectory()) {
-        if (!excludeDirs.includes(entry.name)) {
-          walkDir(fullPath);
-        }
-      } else if (entry.isFile()) {
-        if (
-          !shouldExclude(relativePath, excludeDirs, excludePatterns) &&
-          astWalker.isAnalyzable(fullPath)
-        ) {
-          files.push(fullPath);
-        }
-      }
-    }
-  }
-
-  walkDir(dirPath);
-  return files;
-}
-
-/**
- * Analyze a single file based on its language.
- */
-export function analyzeFile(filePath: string): FileAnalysisResult {
-  const language = astWalker.getLanguage(filePath);
-
-  if (!language) {
-    return {
-      file: filePath,
-      language: "python", // Default, won't matter
-      findings: [],
-      success: false,
-      error: `Unsupported file type: ${path.extname(filePath)}`,
-      analysisTimeMs: 0,
     };
+    walkDir(dirPath);
+    return files;
   }
 
-  let sourceCode: string;
-  try {
-    sourceCode = fs.readFileSync(filePath, "utf-8");
-  } catch (error) {
-    return {
-      file: filePath,
-      language,
-      findings: [],
-      success: false,
-      error: `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
-      analysisTimeMs: 0,
-    };
-  }
-
-  if (language === "python") {
-    return analyzePythonFile(filePath, sourceCode);
-  } else {
-    return analyzeTypeScriptFile(filePath, sourceCode);
-  }
-}
-
-/**
- * Analyze multiple files.
- */
-export function analyzeFiles(filePaths: string[]): FileAnalysisResult[] {
-  return filePaths.map((filePath) => analyzeFile(filePath));
-}
-
-/**
- * Analyze a directory recursively.
- */
-export function analyzeDirectory(
-  dirPath: string,
-  config: AnalyzerConfig = {}
-): AnalysisReport {
-  const startTime = Date.now();
-  const {
-    exclude = [],
-    minConfidence = 0.5,
-    maxFiles = 1000,
-  } = config;
-
-  const excludeDirs = [...DEFAULT_EXCLUDE_DIRS, ...exclude];
-  const excludePatterns = DEFAULT_EXCLUDE_PATTERNS;
-
-  // Find all analyzable files
-  const filePaths = findAnalyzableFiles(
-    dirPath,
-    excludeDirs,
-    excludePatterns,
-    maxFiles
-  );
-
-  // Analyze each file
-  const results = analyzeFiles(filePaths);
-
-  // Aggregate findings
-  const allFindings: AFBFinding[] = [];
-  const failedFiles: string[] = [];
-
-  for (const result of results) {
-    if (result.success) {
-      // Filter by confidence threshold
-      const filteredFindings = result.findings.filter(
-        (f) => f.confidence >= minConfidence
-      );
-      allFindings.push(...filteredFindings);
-    } else {
-      failedFiles.push(result.file);
-    }
-  }
-
-  // Calculate summary statistics
-  const findingsBySeverity = {
-    critical: allFindings.filter((f) => f.severity === Severity.CRITICAL).length,
-    high: allFindings.filter((f) => f.severity === Severity.HIGH).length,
-    medium: allFindings.filter((f) => f.severity === Severity.MEDIUM).length,
-  };
-
-  return {
-    repository: path.basename(dirPath),
-    filesAnalyzed: filePaths.map((p) => path.relative(dirPath, p)),
-    totalFindings: allFindings.length,
-    findingsBySeverity,
-    findings: allFindings,
-    metadata: {
-      scannerVersion: SCANNER_VERSION,
-      timestamp: new Date().toISOString(),
-      totalTimeMs: Date.now() - startTime,
-      failedFiles,
-    },
-  };
-}
-
-/**
- * Analyze only specific files (useful for PR analysis).
- */
-export function analyzeSpecificFiles(
-  basePath: string,
-  relativePaths: string[],
-  config: AnalyzerConfig = {}
-): AnalysisReport {
-  const startTime = Date.now();
-  const { minConfidence = 0.5 } = config;
-
-  // Convert relative paths to absolute and filter analyzable files
-  const filePaths = relativePaths
-    .map((p) => path.join(basePath, p))
-    .filter((p) => {
-      try {
-        return fs.existsSync(p) && astWalker.isAnalyzable(p);
-      } catch {
-        return false;
-      }
+  private isExcluded(relativePath: string): boolean {
+    return this.config.exclude.some(pattern => {
+      const regexPattern = pattern.replace(/\*\*/g, '{{DS}}').replace(/\*/g, '[^/]*').replace(/{{DS}}/g, '.*').replace(/\//g, '\\/');
+      return new RegExp(`^${regexPattern}$`).test(relativePath.replace(/\\/g, '/'));
     });
-
-  // Analyze each file
-  const results = analyzeFiles(filePaths);
-
-  // Aggregate findings
-  const allFindings: AFBFinding[] = [];
-  const failedFiles: string[] = [];
-
-  for (const result of results) {
-    if (result.success) {
-      const filteredFindings = result.findings.filter(
-        (f) => f.confidence >= minConfidence
-      );
-      allFindings.push(...filteredFindings);
-    } else {
-      failedFiles.push(result.file);
-    }
   }
 
-  const findingsBySeverity = {
-    critical: allFindings.filter((f) => f.severity === Severity.CRITICAL).length,
-    high: allFindings.filter((f) => f.severity === Severity.HIGH).length,
-    medium: allFindings.filter((f) => f.severity === Severity.MEDIUM).length,
-  };
-
-  return {
-    repository: path.basename(basePath),
-    filesAnalyzed: relativePaths,
-    totalFindings: allFindings.length,
-    findingsBySeverity,
-    findings: allFindings,
-    metadata: {
-      scannerVersion: SCANNER_VERSION,
-      timestamp: new Date().toISOString(),
-      totalTimeMs: Date.now() - startTime,
-      failedFiles,
-    },
-  };
+  private buildReport(repository: string, results: FileAnalysisResult[], failedFiles: string[], startTime: number): AnalysisReport {
+    const allFindings = results.flatMap(r => r.findings).filter(f => f.confidence >= this.config.minConfidence);
+    allFindings.sort((a, b) => {
+      const severityOrder = { critical: 0, high: 1, medium: 2 };
+      const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
+      if (sevDiff !== 0) return sevDiff;
+      const fileDiff = a.file.localeCompare(b.file);
+      if (fileDiff !== 0) return fileDiff;
+      return a.line - b.line;
+    });
+    return {
+      repository: path.basename(repository),
+      filesAnalyzed: results.filter(r => r.success).map(r => r.file),
+      totalFindings: allFindings.length,
+      findingsBySeverity: {
+        critical: allFindings.filter(f => f.severity === Severity.CRITICAL).length,
+        high: allFindings.filter(f => f.severity === Severity.HIGH).length,
+        medium: allFindings.filter(f => f.severity === Severity.MEDIUM).length,
+      },
+      findings: allFindings,
+      metadata: { scannerVersion: SCANNER_VERSION, timestamp: new Date().toISOString(), totalTimeMs: Date.now() - startTime, failedFiles },
+    };
+  }
 }
 
-// Re-export for convenience
-export { astWalker } from "./ast-walker";
-export { analyzePythonFile } from "./python/detector";
-export { analyzeTypeScriptFile } from "./typescript/detector";
+export const analyzer = new AFBAnalyzer();
+export { ASTWalker } from './ast-walker';
