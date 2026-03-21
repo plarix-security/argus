@@ -13,6 +13,11 @@
  * 4. Trace paths to dangerous operations
  * 5. Check for policy gates in call paths
  * 6. Generate findings with severity based on exposure
+ *
+ * IMPORTANT: This detector requires tree-sitter for AST parsing.
+ * If tree-sitter fails to initialize or parse a file, the scan FAILS.
+ * We do NOT fall back to regex. A missed finding is acceptable.
+ * A false finding from pattern matching is not.
  */
 
 import {
@@ -36,17 +41,13 @@ import {
 let parserInitialized = false;
 
 /**
- * Ensure the AST parser is initialized
+ * Ensure the AST parser is initialized.
+ * Throws an error if initialization fails - we do NOT fall back to regex.
  */
 export async function ensureParserInitialized(): Promise<void> {
   if (!parserInitialized) {
-    try {
-      await initParser();
-      parserInitialized = true;
-    } catch {
-      // Fall back to regex-based parsing if tree-sitter fails
-      console.warn('Tree-sitter initialization failed, using regex fallback');
-    }
+    await initParser();
+    parserInitialized = true;
   }
 }
 
@@ -55,6 +56,9 @@ export async function ensureParserInitialized(): Promise<void> {
  *
  * This is the simplified single-file analysis for CLI use.
  * For full call graph analysis across multiple files, use analyzeProject().
+ *
+ * IMPORTANT: If parsing fails, this returns a failure result with an error
+ * message. We do NOT fall back to regex-based detection.
  */
 export function analyzePythonFile(
   filePath: string,
@@ -63,66 +67,71 @@ export function analyzePythonFile(
   const startTime = Date.now();
   const findings: AFBFinding[] = [];
 
-  try {
-    // Parse the file
-    const parsed = parsePythonSource(sourceCode);
+  // Parse the file using tree-sitter
+  const parsed = parsePythonSource(sourceCode);
 
-    if (!parsed.success) {
-      // Fall back to regex-based detection
-      return analyzeWithRegex(filePath, sourceCode, startTime);
-    }
-
-    // Build call graph for this single file
-    const fileMap = new Map<string, ParsedPythonFile>();
-    fileMap.set(filePath, parsed);
-    const callGraph = buildCallGraph(fileMap);
-
-    // Convert exposed paths to findings
-    for (const exposed of callGraph.exposedPaths) {
-      // Skip if there's a policy gate in the path
-      if (exposed.hasGateInPath) {
-        continue;
-      }
-
-      const finding = createFindingFromExposedPath(filePath, exposed, parsed);
-      findings.push(finding);
-    }
-
-    // Also report tool definitions themselves (even if no dangerous ops found)
-    for (const tool of callGraph.toolRegistrations) {
-      // Only report if we haven't already reported it via exposed paths
-      const alreadyReported = findings.some(
-        (f) => f.line === tool.startLine && f.category === ExecutionCategory.TOOL_CALL
-      );
-
-      if (!alreadyReported) {
-        findings.push(createToolDefinitionFinding(filePath, tool, parsed));
-      }
-    }
-
-    // Sort findings by severity, then line
-    findings.sort((a, b) => {
-      const severityOrder = { critical: 0, high: 1, medium: 2 };
-      const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
-      if (sevDiff !== 0) return sevDiff;
-      return a.line - b.line;
-    });
-
+  if (!parsed.success) {
+    // Hard fail - do not fall back to regex
     return {
       file: filePath,
       language: 'python',
-      findings,
-      success: true,
+      findings: [],
+      success: false,
+      error: `Tree-sitter parse failed: ${parsed.error || 'Parser not initialized. Call ensureParserInitialized() first.'}`,
       analysisTimeMs: Date.now() - startTime,
     };
-  } catch (error) {
-    // Fall back to regex analysis on any error
-    return analyzeWithRegex(filePath, sourceCode, startTime);
   }
+
+  // Build call graph for this single file
+  const fileMap = new Map<string, ParsedPythonFile>();
+  fileMap.set(filePath, parsed);
+  const callGraph = buildCallGraph(fileMap);
+
+  // Convert exposed paths to findings
+  for (const exposed of callGraph.exposedPaths) {
+    // Skip if there's a policy gate in the path
+    if (exposed.hasGateInPath) {
+      continue;
+    }
+
+    const finding = createFindingFromExposedPath(filePath, exposed, parsed);
+    findings.push(finding);
+  }
+
+  // Also report tool definitions themselves (even if no dangerous ops found)
+  for (const tool of callGraph.toolRegistrations) {
+    // Only report if we haven't already reported it via exposed paths
+    const alreadyReported = findings.some(
+      (f) => f.line === tool.startLine && f.category === ExecutionCategory.TOOL_CALL
+    );
+
+    if (!alreadyReported) {
+      findings.push(createToolDefinitionFinding(filePath, tool, parsed));
+    }
+  }
+
+  // Sort findings by severity, then line
+  findings.sort((a, b) => {
+    const severityOrder = { critical: 0, high: 1, medium: 2 };
+    const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
+    if (sevDiff !== 0) return sevDiff;
+    return a.line - b.line;
+  });
+
+  return {
+    file: filePath,
+    language: 'python',
+    findings,
+    success: true,
+    analysisTimeMs: Date.now() - startTime,
+  };
 }
 
 /**
  * Analyze multiple Python files with cross-file call graph analysis.
+ *
+ * IMPORTANT: If any file fails to parse, it is recorded as a failed file
+ * in the results. We do NOT fall back to regex-based detection.
  */
 export function analyzeProject(
   files: Map<string, string>
@@ -130,20 +139,26 @@ export function analyzeProject(
   const results = new Map<string, FileAnalysisResult>();
   const startTime = Date.now();
 
-  // Parse all files
+  // Parse all files - track failures separately
   const parsedFiles = new Map<string, ParsedPythonFile>();
   for (const [filePath, sourceCode] of files) {
     const parsed = parsePythonSource(sourceCode);
     if (parsed.success) {
       parsedFiles.set(filePath, parsed);
     } else {
-      // Fall back to regex for this file
-      const regexResult = analyzeWithRegex(filePath, sourceCode, Date.now());
-      results.set(filePath, regexResult);
+      // Record the failure - do NOT fall back to regex
+      results.set(filePath, {
+        file: filePath,
+        language: 'python',
+        findings: [],
+        success: false,
+        error: `Tree-sitter parse failed: ${parsed.error || 'Unknown parse error'}`,
+        analysisTimeMs: Date.now() - startTime,
+      });
     }
   }
 
-  // Build cross-file call graph
+  // Build cross-file call graph from successfully parsed files
   const callGraph = buildCallGraph(parsedFiles);
 
   // Group exposed paths by file
@@ -319,166 +334,6 @@ function getCategoryDescription(category: ExecutionCategory): string {
     [ExecutionCategory.CODE_EXECUTION]: 'Dynamic code execution',
   };
   return descriptions[category] || category;
-}
-
-/**
- * Fallback regex-based analysis when tree-sitter is unavailable
- */
-function analyzeWithRegex(
-  filePath: string,
-  sourceCode: string,
-  startTime: number
-): FileAnalysisResult {
-  const findings: AFBFinding[] = [];
-  const lines = sourceCode.split('\n');
-
-  // Tool decorator patterns
-  const toolDecoratorPatterns = [
-    { regex: /^\s*@tool\b/i, framework: 'langchain' },
-    { regex: /^\s*@task\b/i, framework: 'crewai' },
-    { regex: /^\s*@server\.tool\b/i, framework: 'mcp' },
-    { regex: /^\s*@agent\b/i, framework: 'crewai' },
-  ];
-
-  // Class inheritance patterns for tools
-  const toolClassPatterns = [
-    { regex: /class\s+\w+\s*\(\s*BaseTool\s*\)/i, framework: 'langchain' },
-    { regex: /class\s+\w+\s*\(\s*StructuredTool\s*\)/i, framework: 'langchain' },
-    { regex: /class\s+\w+\s*\(\s*FunctionTool\s*\)/i, framework: 'llamaindex' },
-  ];
-
-  // Track if we're inside a tool definition
-  let inToolDef = false;
-  let toolStartLine = 0;
-  let toolFramework: string | undefined;
-  let toolIndent = 0;
-  let defIndent = -1;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lineNum = i + 1;
-    const currentIndent = line.search(/\S/);
-
-    // Check for tool decorator
-    for (const pattern of toolDecoratorPatterns) {
-      if (pattern.regex.test(line)) {
-        inToolDef = true;
-        toolStartLine = lineNum;
-        toolFramework = pattern.framework;
-        toolIndent = currentIndent;
-        defIndent = -1;
-
-        findings.push({
-          type: AFBType.UNAUTHORIZED_ACTION,
-          severity: Severity.HIGH,
-          category: ExecutionCategory.TOOL_CALL,
-          file: filePath,
-          line: lineNum,
-          column: 1,
-          codeSnippet: line.trim(),
-          operation: 'Tool definition',
-          explanation: `Tool registered with ${pattern.framework}. Agent can invoke this tool. Review capabilities and add policy controls.`,
-          confidence: 0.9,
-          context: { isToolDefinition: true, framework: pattern.framework },
-        });
-        break;
-      }
-    }
-
-    // Check for tool class definitions
-    for (const pattern of toolClassPatterns) {
-      if (pattern.regex.test(line)) {
-        findings.push({
-          type: AFBType.UNAUTHORIZED_ACTION,
-          severity: Severity.HIGH,
-          category: ExecutionCategory.TOOL_CALL,
-          file: filePath,
-          line: lineNum,
-          column: 1,
-          codeSnippet: line.trim(),
-          operation: 'Tool class definition',
-          explanation: `Tool class inherits from ${pattern.framework} tool base. Agent can invoke methods of this tool.`,
-          confidence: 0.9,
-          context: { isToolDefinition: true, framework: pattern.framework },
-        });
-      }
-    }
-
-    // Track function definition after decorator
-    if (inToolDef && (line.match(/^\s*def\s+/) || line.match(/^\s*async\s+def\s+/))) {
-      defIndent = currentIndent;
-    }
-
-    // Check if we've exited the tool definition (dedent after function def)
-    if (inToolDef && defIndent >= 0 && currentIndent >= 0 && currentIndent <= defIndent && lineNum > toolStartLine + 2) {
-      if (!line.trim().startsWith('@') && !line.trim().startsWith('def') && !line.trim().startsWith('async') && line.trim() !== '' && !line.trim().startsWith('#') && !line.trim().startsWith('"""') && !line.trim().startsWith("'''")) {
-        inToolDef = false;
-        defIndent = -1;
-      }
-    }
-
-    // Check for dangerous operations
-    const dangerousPatterns = [
-      { regex: /subprocess\.(run|Popen|call|check_output|check_call)\s*\(/, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, desc: 'Subprocess execution' },
-      { regex: /os\.(system|popen|exec\w*|spawn\w*)\s*\(/, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, desc: 'OS command execution' },
-      { regex: /\beval\s*\(/, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, desc: 'Dynamic code evaluation' },
-      { regex: /\bexec\s*\(/, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, desc: 'Dynamic code execution' },
-      { regex: /requests\.(get|post|put|patch|delete|request)\s*\(/, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, desc: 'HTTP request' },
-      { regex: /httpx\.(get|post|put|patch|delete|request)\s*\(/, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, desc: 'HTTP request' },
-      { regex: /\.execute\s*\(/, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, desc: 'SQL execution' },
-      { regex: /\.executemany\s*\(/, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, desc: 'SQL batch execution' },
-      { regex: /\.write_text\s*\(/, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, desc: 'File write' },
-      { regex: /\.write_bytes\s*\(/, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, desc: 'File write' },
-      { regex: /shutil\.(rmtree|copy|copy2|copytree|move|remove)\s*\(/, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, desc: 'Bulk file operation' },
-      { regex: /os\.(remove|unlink|rmdir|mkdir|makedirs|rename)\s*\(/, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, desc: 'File system operation' },
-    ];
-
-    for (const pattern of dangerousPatterns) {
-      const match = line.match(pattern.regex);
-      if (match) {
-        // Elevate severity if inside tool definition
-        let severity = pattern.severity;
-        if (inToolDef && severity !== Severity.CRITICAL) {
-          severity = severity === Severity.MEDIUM ? Severity.HIGH : Severity.CRITICAL;
-        }
-
-        findings.push({
-          type: AFBType.UNAUTHORIZED_ACTION,
-          severity,
-          category: pattern.category,
-          file: filePath,
-          line: lineNum,
-          column: (match.index || 0) + 1,
-          codeSnippet: line.trim(),
-          operation: pattern.desc,
-          explanation: inToolDef
-            ? `${pattern.desc} inside tool definition. Agent can invoke this without authorization basis.`
-            : `${pattern.desc} detected. Verify it is not reachable from agent tools without policy gates.`,
-          confidence: inToolDef ? 0.95 : 0.7,
-          context: {
-            isToolDefinition: inToolDef,
-            framework: inToolDef ? toolFramework : undefined,
-          },
-        });
-      }
-    }
-  }
-
-  // Sort by severity then line
-  findings.sort((a, b) => {
-    const severityOrder = { critical: 0, high: 1, medium: 2 };
-    const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
-    if (sevDiff !== 0) return sevDiff;
-    return a.line - b.line;
-  });
-
-  return {
-    file: filePath,
-    language: 'python',
-    findings,
-    success: true,
-    analysisTimeMs: Date.now() - startTime,
-  };
 }
 
 /**
