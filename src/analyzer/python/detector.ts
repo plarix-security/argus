@@ -2,291 +2,59 @@
  * Python AFB04 Detector
  *
  * Detects AFB04 (Unauthorized Action) boundaries in Python codebases.
- * Focuses on agent frameworks (LangChain, CrewAI) and dangerous operations
- * (shell commands, file operations, API calls, database operations).
+ * Uses proper AST parsing with tree-sitter and call graph analysis
+ * to find tool definitions that can reach dangerous operations
+ * without policy gates.
  *
  * Detection approach:
- * 1. Walk the AST looking for function calls and decorators
- * 2. Match against known execution patterns
- * 3. Analyze context (is this inside a tool definition?)
- * 4. Generate findings with confidence scores
+ * 1. Parse Python AST using tree-sitter
+ * 2. Identify tool registration points across frameworks
+ * 3. Build call graph from tool definitions
+ * 4. Trace paths to dangerous operations
+ * 5. Check for policy gates in call paths
+ * 6. Generate findings with severity based on exposure
  */
 
-import { ASTWalker, astWalker } from "../ast-walker";
+import {
+  initParser,
+  parsePythonSource,
+  ParsedPythonFile,
+} from './ast-parser';
+import {
+  buildCallGraph,
+  ExposedPath,
+  DangerousOperation,
+} from './call-graph';
 import {
   AFBFinding,
   FileAnalysisResult,
-} from "../../types";
-import {
-  PYTHON_PATTERNS,
-  ExecutionPattern,
-  createFinding,
-} from "../../afb/afb04";
+  AFBType,
+  ExecutionCategory,
+  Severity,
+} from '../../types';
 
-// Type alias for tree-sitter nodes (using any for web-tree-sitter compatibility)
-type SyntaxNode = any;
+let parserInitialized = false;
 
 /**
- * Detects if a call node matches a specific pattern.
- * Returns the pattern if matched, null otherwise.
+ * Ensure the AST parser is initialized
  */
-function matchCallPattern(
-  node: SyntaxNode,
-  sourceCode: string
-): { pattern: ExecutionPattern; patternKey: string } | null {
-  if (node.type !== "call") {
-    return null;
-  }
-
-  const funcNode = node.childForFieldName?.("function");
-  if (!funcNode) {
-    return null;
-  }
-
-  const funcText = funcNode.text;
-
-  // === TOOL CALL PATTERNS ===
-
-  // Tool instantiation: Tool(...), StructuredTool(...), DynamicTool(...)
-  if (
-    funcText === "Tool" ||
-    funcText === "StructuredTool" ||
-    funcText === "DynamicTool" ||
-    funcText === "BaseTool"
-  ) {
-    return { pattern: PYTHON_PATTERNS.tool_instantiation, patternKey: "tool_instantiation" };
-  }
-
-  // === SHELL EXECUTION PATTERNS ===
-
-  // subprocess.run(), subprocess.Popen(), subprocess.call()
-  if (
-    funcText === "subprocess.run" ||
-    funcText.endsWith(".run") && sourceCode.includes("import subprocess")
-  ) {
-    return { pattern: PYTHON_PATTERNS.subprocess_run, patternKey: "subprocess_run" };
-  }
-
-  if (
-    funcText === "subprocess.Popen" ||
-    funcText === "subprocess.call" ||
-    funcText === "subprocess.check_output" ||
-    funcText === "subprocess.check_call"
-  ) {
-    return { pattern: PYTHON_PATTERNS.subprocess_run, patternKey: "subprocess_run" };
-  }
-
-  // os.system(), os.popen()
-  if (funcText === "os.system") {
-    return { pattern: PYTHON_PATTERNS.os_system, patternKey: "os_system" };
-  }
-
-  if (funcText === "os.popen") {
-    return { pattern: PYTHON_PATTERNS.os_popen, patternKey: "os_popen" };
-  }
-
-  // os.exec* family
-  if (
-    funcText.startsWith("os.exec") ||
-    funcText.startsWith("os.spawn")
-  ) {
-    return { pattern: PYTHON_PATTERNS.os_system, patternKey: "os_system" };
-  }
-
-  // === FILE OPERATION PATTERNS ===
-
-  // open() - builtin
-  if (funcText === "open") {
-    return { pattern: PYTHON_PATTERNS.file_open, patternKey: "file_open" };
-  }
-
-  // pathlib write operations
-  if (
-    funcText.endsWith(".write_text") ||
-    funcText.endsWith(".write_bytes")
-  ) {
-    return { pattern: PYTHON_PATTERNS.pathlib_write, patternKey: "pathlib_write" };
-  }
-
-  // shutil operations
-  if (
-    funcText.startsWith("shutil.") &&
-    (funcText.includes("copy") ||
-      funcText.includes("move") ||
-      funcText.includes("rmtree") ||
-      funcText.includes("remove"))
-  ) {
-    return { pattern: PYTHON_PATTERNS.shutil_operation, patternKey: "shutil_operation" };
-  }
-
-  // os file operations
-  if (
-    funcText === "os.remove" ||
-    funcText === "os.unlink" ||
-    funcText === "os.rmdir" ||
-    funcText === "os.mkdir" ||
-    funcText === "os.makedirs"
-  ) {
-    return { pattern: PYTHON_PATTERNS.file_open, patternKey: "file_open" };
-  }
-
-  // === API/HTTP PATTERNS ===
-
-  // requests library
-  if (
-    funcText.startsWith("requests.") &&
-    (funcText.includes("get") ||
-      funcText.includes("post") ||
-      funcText.includes("put") ||
-      funcText.includes("patch") ||
-      funcText.includes("delete") ||
-      funcText.includes("request"))
-  ) {
-    return { pattern: PYTHON_PATTERNS.requests_call, patternKey: "requests_call" };
-  }
-
-  // httpx library
-  if (
-    funcText.startsWith("httpx.") ||
-    (funcText.endsWith(".get") && sourceCode.includes("import httpx")) ||
-    (funcText.endsWith(".post") && sourceCode.includes("import httpx"))
-  ) {
-    return { pattern: PYTHON_PATTERNS.httpx_call, patternKey: "httpx_call" };
-  }
-
-  // aiohttp
-  if (
-    funcText.includes("aiohttp") ||
-    (funcText.includes("session.") &&
-      sourceCode.includes("aiohttp"))
-  ) {
-    return { pattern: PYTHON_PATTERNS.aiohttp_call, patternKey: "aiohttp_call" };
-  }
-
-  // urllib
-  if (
-    funcText.startsWith("urllib.request.") ||
-    funcText === "urlopen"
-  ) {
-    return { pattern: PYTHON_PATTERNS.urllib_call, patternKey: "urllib_call" };
-  }
-
-  // === DATABASE PATTERNS ===
-
-  // cursor.execute(), cursor.executemany()
-  if (
-    funcText.endsWith(".execute") ||
-    funcText.endsWith(".executemany")
-  ) {
-    // Check if it looks like a database cursor context
-    if (
-      sourceCode.includes("cursor") ||
-      sourceCode.includes("connection") ||
-      sourceCode.includes("sqlite") ||
-      sourceCode.includes("psycopg") ||
-      sourceCode.includes("mysql")
-    ) {
-      return { pattern: PYTHON_PATTERNS.cursor_execute, patternKey: "cursor_execute" };
+export async function ensureParserInitialized(): Promise<void> {
+  if (!parserInitialized) {
+    try {
+      await initParser();
+      parserInitialized = true;
+    } catch {
+      // Fall back to regex-based parsing if tree-sitter fails
+      console.warn('Tree-sitter initialization failed, using regex fallback');
     }
   }
-
-  // SQLAlchemy
-  if (
-    funcText.endsWith(".execute") &&
-    (sourceCode.includes("sqlalchemy") || sourceCode.includes("Session"))
-  ) {
-    return { pattern: PYTHON_PATTERNS.sqlalchemy_execute, patternKey: "sqlalchemy_execute" };
-  }
-
-  // === CODE EXECUTION PATTERNS ===
-
-  // eval()
-  if (funcText === "eval") {
-    return { pattern: PYTHON_PATTERNS.eval_call, patternKey: "eval_call" };
-  }
-
-  // exec()
-  if (funcText === "exec") {
-    return { pattern: PYTHON_PATTERNS.exec_call, patternKey: "exec_call" };
-  }
-
-  // compile()
-  if (funcText === "compile") {
-    return { pattern: PYTHON_PATTERNS.compile_call, patternKey: "compile_call" };
-  }
-
-  return null;
-}
-
-/**
- * Detects if a function is decorated with @tool or similar.
- */
-function isToolDecoratedFunction(
-  funcNode: SyntaxNode
-): { isToolDef: boolean; framework?: string } {
-  // Check if parent is decorated_definition
-  if (funcNode.parent?.type !== "decorated_definition") {
-    return { isToolDef: false };
-  }
-
-  // Get all decorators
-  for (const child of funcNode.parent.children) {
-    if (child.type === "decorator") {
-      const decoratorText = child.text.toLowerCase();
-
-      // LangChain @tool decorator
-      if (decoratorText.includes("@tool")) {
-        return { isToolDef: true, framework: "langchain" };
-      }
-
-      // CrewAI tool decorator
-      if (decoratorText.includes("crewai") || decoratorText.includes("@agent")) {
-        return { isToolDef: true, framework: "crewai" };
-      }
-
-      // Generic tool patterns
-      if (
-        decoratorText.includes("tool") ||
-        decoratorText.includes("action") ||
-        decoratorText.includes("capability")
-      ) {
-        return { isToolDef: true, framework: "custom" };
-      }
-    }
-  }
-
-  return { isToolDef: false };
-}
-
-/**
- * Detects if a class inherits from BaseTool or similar.
- */
-function isToolClass(classNode: SyntaxNode): { isToolClass: boolean; framework?: string } {
-  // Look for bases/superclasses
-  const superclassNode = classNode.childForFieldName?.("superclasses");
-  if (!superclassNode) {
-    return { isToolClass: false };
-  }
-
-  const superclassText = superclassNode.text.toLowerCase();
-
-  if (
-    superclassText.includes("basetool") ||
-    superclassText.includes("structuredtool") ||
-    superclassText.includes("tool")
-  ) {
-    return { isToolClass: true, framework: "langchain" };
-  }
-
-  if (superclassText.includes("crewai")) {
-    return { isToolClass: true, framework: "crewai" };
-  }
-
-  return { isToolClass: false };
 }
 
 /**
  * Analyze a single Python file for AFB04 boundaries.
+ *
+ * This is the simplified single-file analysis for CLI use.
+ * For full call graph analysis across multiple files, use analyzeProject().
  */
 export function analyzePythonFile(
   filePath: string,
@@ -296,174 +64,450 @@ export function analyzePythonFile(
   const findings: AFBFinding[] = [];
 
   try {
-    const tree = astWalker.parse(sourceCode, "python");
+    // Parse the file
+    const parsed = parsePythonSource(sourceCode);
 
-    // Track which functions/classes are tool definitions
-    const toolFunctions = new Set<SyntaxNode>();
-    const toolClasses = new Set<SyntaxNode>();
+    if (!parsed.success) {
+      // Fall back to regex-based detection
+      return analyzeWithRegex(filePath, sourceCode, startTime);
+    }
 
-    // First pass: identify tool definitions
-    astWalker.walk(tree, (node) => {
-      // Check function definitions for @tool decorator
-      if (
-        node.type === "function_definition" ||
-        node.type === "async_function_definition"
-      ) {
-        const { isToolDef, framework } = isToolDecoratedFunction(node);
-        if (isToolDef) {
-          toolFunctions.add(node);
+    // Build call graph for this single file
+    const fileMap = new Map<string, ParsedPythonFile>();
+    fileMap.set(filePath, parsed);
+    const callGraph = buildCallGraph(fileMap);
 
-          // Report the tool definition itself as a finding
-          const location = astWalker.getNodeLocation(node);
-          const funcName = astWalker.getFunctionName(node, "python");
-
-          findings.push(
-            createFinding(
-              filePath,
-              location,
-              node.text.split("\n").slice(0, 3).join("\n"),
-              PYTHON_PATTERNS.tool_decorator,
-              funcName || undefined,
-              undefined,
-              true,
-              framework,
-              0.95
-            )
-          );
-        }
+    // Convert exposed paths to findings
+    for (const exposed of callGraph.exposedPaths) {
+      // Skip if there's a policy gate in the path
+      if (exposed.hasGateInPath) {
+        continue;
       }
 
-      // Check class definitions for BaseTool inheritance
-      if (node.type === "class_definition") {
-        const { isToolClass: isTool, framework } = isToolClass(node);
-        if (isTool) {
-          toolClasses.add(node);
+      const finding = createFindingFromExposedPath(filePath, exposed, parsed);
+      findings.push(finding);
+    }
 
-          const location = astWalker.getNodeLocation(node);
-          const className = astWalker.getClassName(node, "python");
-
-          findings.push(
-            createFinding(
-              filePath,
-              location,
-              node.text.split("\n").slice(0, 3).join("\n"),
-              PYTHON_PATTERNS.tool_instantiation,
-              undefined,
-              className || undefined,
-              true,
-              framework,
-              0.9
-            )
-          );
-        }
-      }
-    });
-
-    // Second pass: find all execution points
-    astWalker.walk(tree, (node, ancestors) => {
-      if (node.type !== "call") {
-        return;
-      }
-
-      const match = matchCallPattern(node, sourceCode);
-      if (!match) {
-        return;
-      }
-
-      // Determine if this is inside a tool definition
-      let isInToolDefinition = false;
-      let framework: string | undefined;
-
-      const enclosingFunc = astWalker.getEnclosingFunction(node, "python");
-      if (enclosingFunc && toolFunctions.has(enclosingFunc)) {
-        isInToolDefinition = true;
-      }
-
-      const enclosingClass = astWalker.getEnclosingClass(node, "python");
-      if (enclosingClass && toolClasses.has(enclosingClass)) {
-        isInToolDefinition = true;
-      }
-
-      // Also check ancestors for decorated_definition with @tool
-      for (const ancestor of ancestors) {
-        if (
-          ancestor.type === "function_definition" ||
-          ancestor.type === "async_function_definition"
-        ) {
-          const { isToolDef, framework: detectedFramework } =
-            isToolDecoratedFunction(ancestor);
-          if (isToolDef) {
-            isInToolDefinition = true;
-            framework = detectedFramework;
-            break;
-          }
-        }
-      }
-
-      const location = astWalker.getNodeLocation(node);
-      const funcName = enclosingFunc
-        ? astWalker.getFunctionName(enclosingFunc, "python")
-        : undefined;
-      const className = enclosingClass
-        ? astWalker.getClassName(enclosingClass, "python")
-        : undefined;
-
-      // Calculate confidence based on pattern and context
-      let confidence = 0.8;
-      if (isInToolDefinition) {
-        confidence = 0.95; // Higher confidence when inside a tool
-      }
-
-      findings.push(
-        createFinding(
-          filePath,
-          location,
-          node.text,
-          match.pattern,
-          funcName || undefined,
-          className || undefined,
-          isInToolDefinition,
-          framework,
-          confidence
-        )
+    // Also report tool definitions themselves (even if no dangerous ops found)
+    for (const tool of callGraph.toolRegistrations) {
+      // Only report if we haven't already reported it via exposed paths
+      const alreadyReported = findings.some(
+        (f) => f.line === tool.startLine && f.category === ExecutionCategory.TOOL_CALL
       );
+
+      if (!alreadyReported) {
+        findings.push(createToolDefinitionFinding(filePath, tool, parsed));
+      }
+    }
+
+    // Sort findings by severity, then line
+    findings.sort((a, b) => {
+      const severityOrder = { critical: 0, high: 1, medium: 2 };
+      const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
+      if (sevDiff !== 0) return sevDiff;
+      return a.line - b.line;
     });
 
     return {
       file: filePath,
-      language: "python",
+      language: 'python',
       findings,
       success: true,
       analysisTimeMs: Date.now() - startTime,
     };
   } catch (error) {
-    return {
-      file: filePath,
-      language: "python",
-      findings: [],
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-      analysisTimeMs: Date.now() - startTime,
-    };
+    // Fall back to regex analysis on any error
+    return analyzeWithRegex(filePath, sourceCode, startTime);
   }
 }
 
 /**
+ * Analyze multiple Python files with cross-file call graph analysis.
+ */
+export function analyzeProject(
+  files: Map<string, string>
+): Map<string, FileAnalysisResult> {
+  const results = new Map<string, FileAnalysisResult>();
+  const startTime = Date.now();
+
+  // Parse all files
+  const parsedFiles = new Map<string, ParsedPythonFile>();
+  for (const [filePath, sourceCode] of files) {
+    const parsed = parsePythonSource(sourceCode);
+    if (parsed.success) {
+      parsedFiles.set(filePath, parsed);
+    } else {
+      // Fall back to regex for this file
+      const regexResult = analyzeWithRegex(filePath, sourceCode, Date.now());
+      results.set(filePath, regexResult);
+    }
+  }
+
+  // Build cross-file call graph
+  const callGraph = buildCallGraph(parsedFiles);
+
+  // Group exposed paths by file
+  const pathsByFile = new Map<string, ExposedPath[]>();
+  for (const exposed of callGraph.exposedPaths) {
+    const existing = pathsByFile.get(exposed.file) || [];
+    existing.push(exposed);
+    pathsByFile.set(exposed.file, existing);
+  }
+
+  // Generate findings per file
+  for (const [filePath, parsed] of parsedFiles) {
+    const findings: AFBFinding[] = [];
+    const exposedPaths = pathsByFile.get(filePath) || [];
+
+    for (const exposed of exposedPaths) {
+      if (exposed.hasGateInPath) continue;
+      findings.push(createFindingFromExposedPath(filePath, exposed, parsed));
+    }
+
+    // Add tool definitions
+    const toolsInFile = callGraph.toolRegistrations.filter((t) => {
+      // Find tools defined in this file by checking line ranges
+      for (const func of parsed.functions) {
+        if (func.startLine === t.startLine && func.name === t.name) return true;
+      }
+      for (const cls of parsed.classes) {
+        for (const method of cls.methods) {
+          if (method.startLine === t.startLine && t.id === `${cls.name}.${method.name}`) return true;
+        }
+      }
+      return false;
+    });
+
+    for (const tool of toolsInFile) {
+      const alreadyReported = findings.some(
+        (f) => f.line === tool.startLine && f.category === ExecutionCategory.TOOL_CALL
+      );
+      if (!alreadyReported) {
+        findings.push(createToolDefinitionFinding(filePath, tool, parsed));
+      }
+    }
+
+    findings.sort((a, b) => {
+      const severityOrder = { critical: 0, high: 1, medium: 2 };
+      const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
+      if (sevDiff !== 0) return sevDiff;
+      return a.line - b.line;
+    });
+
+    results.set(filePath, {
+      file: filePath,
+      language: 'python',
+      findings,
+      success: true,
+      analysisTimeMs: Date.now() - startTime,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Create a finding from an exposed path
+ */
+function createFindingFromExposedPath(
+  filePath: string,
+  exposed: ExposedPath,
+  parsed: ParsedPythonFile
+): AFBFinding {
+  const op = exposed.operation;
+
+  // Elevate severity if inside a tool with no policy gate
+  let severity = op.severity;
+  if (!exposed.hasGateInPath && severity !== Severity.CRITICAL) {
+    severity = severity === Severity.MEDIUM ? Severity.HIGH : Severity.CRITICAL;
+  }
+
+  // Find the call that contains this operation
+  const call = parsed.calls.find((c) => c.startLine === op.line && c.callee === op.callee);
+
+  return {
+    type: AFBType.UNAUTHORIZED_ACTION,
+    severity,
+    category: op.category,
+    file: filePath,
+    line: op.line,
+    column: op.column,
+    codeSnippet: op.codeSnippet,
+    operation: `${getCategoryDescription(op.category)}: ${op.callee}`,
+    explanation: buildExplanation(exposed, op),
+    confidence: 0.95,
+    context: {
+      enclosingFunction: call?.enclosingFunction,
+      enclosingClass: call?.enclosingClass,
+      isToolDefinition: true,
+      framework: exposed.tool.framework,
+    },
+  };
+}
+
+/**
+ * Create a finding for a tool definition
+ */
+function createToolDefinitionFinding(
+  filePath: string,
+  tool: { id: string; name: string; className?: string; startLine: number; decorators: string[]; framework?: string },
+  parsed: ParsedPythonFile
+): AFBFinding {
+  // Find the function definition
+  const func = parsed.functions.find(
+    (f) => f.startLine === tool.startLine || (f.className && `${f.className}.${f.name}` === tool.id)
+  );
+
+  const codeSnippet = func
+    ? `@${tool.decorators[0] || 'tool'}\ndef ${func.name}(...)`
+    : `${tool.className ? tool.className + '.' : ''}${tool.name}`;
+
+  return {
+    type: AFBType.UNAUTHORIZED_ACTION,
+    severity: Severity.HIGH,
+    category: ExecutionCategory.TOOL_CALL,
+    file: filePath,
+    line: tool.startLine,
+    column: 1,
+    codeSnippet,
+    operation: `Tool registration: ${tool.name}`,
+    explanation: `Tool "${tool.name}" is registered with ${tool.framework || 'agent framework'}, making it callable by agent reasoning. Review what this tool can do and ensure appropriate policy controls.`,
+    confidence: 0.9,
+    context: {
+      enclosingFunction: tool.name,
+      enclosingClass: tool.className,
+      isToolDefinition: true,
+      framework: tool.framework,
+    },
+  };
+}
+
+/**
+ * Build explanation text for a finding
+ */
+function buildExplanation(exposed: ExposedPath, op: DangerousOperation): string {
+  const toolName = exposed.tool.name;
+  const framework = exposed.tool.framework || 'agent framework';
+  const pathLen = exposed.path.length;
+
+  let explanation = `Tool "${toolName}" (${framework}) can reach ${op.callee}`;
+
+  if (pathLen > 1) {
+    explanation += ` through ${pathLen - 1} call(s)`;
+  }
+
+  explanation += '. ';
+
+  if (!exposed.hasGateInPath) {
+    explanation += 'No policy gate or authorization check detected in call path. ';
+    explanation += 'Agent can execute this operation without authorization basis.';
+  }
+
+  return explanation;
+}
+
+/**
+ * Get human-readable category description
+ */
+function getCategoryDescription(category: ExecutionCategory): string {
+  const descriptions: Record<ExecutionCategory, string> = {
+    [ExecutionCategory.TOOL_CALL]: 'Tool invocation',
+    [ExecutionCategory.SHELL_EXECUTION]: 'Shell command execution',
+    [ExecutionCategory.FILE_OPERATION]: 'File system operation',
+    [ExecutionCategory.API_CALL]: 'External API call',
+    [ExecutionCategory.DATABASE_OPERATION]: 'Database operation',
+    [ExecutionCategory.CODE_EXECUTION]: 'Dynamic code execution',
+  };
+  return descriptions[category] || category;
+}
+
+/**
+ * Fallback regex-based analysis when tree-sitter is unavailable
+ */
+function analyzeWithRegex(
+  filePath: string,
+  sourceCode: string,
+  startTime: number
+): FileAnalysisResult {
+  const findings: AFBFinding[] = [];
+  const lines = sourceCode.split('\n');
+
+  // Tool decorator patterns
+  const toolDecoratorPatterns = [
+    { regex: /^\s*@tool\b/i, framework: 'langchain' },
+    { regex: /^\s*@task\b/i, framework: 'crewai' },
+    { regex: /^\s*@server\.tool\b/i, framework: 'mcp' },
+    { regex: /^\s*@agent\b/i, framework: 'crewai' },
+  ];
+
+  // Class inheritance patterns for tools
+  const toolClassPatterns = [
+    { regex: /class\s+\w+\s*\(\s*BaseTool\s*\)/i, framework: 'langchain' },
+    { regex: /class\s+\w+\s*\(\s*StructuredTool\s*\)/i, framework: 'langchain' },
+    { regex: /class\s+\w+\s*\(\s*FunctionTool\s*\)/i, framework: 'llamaindex' },
+  ];
+
+  // Track if we're inside a tool definition
+  let inToolDef = false;
+  let toolStartLine = 0;
+  let toolFramework: string | undefined;
+  let toolIndent = 0;
+  let defIndent = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
+    const currentIndent = line.search(/\S/);
+
+    // Check for tool decorator
+    for (const pattern of toolDecoratorPatterns) {
+      if (pattern.regex.test(line)) {
+        inToolDef = true;
+        toolStartLine = lineNum;
+        toolFramework = pattern.framework;
+        toolIndent = currentIndent;
+        defIndent = -1;
+
+        findings.push({
+          type: AFBType.UNAUTHORIZED_ACTION,
+          severity: Severity.HIGH,
+          category: ExecutionCategory.TOOL_CALL,
+          file: filePath,
+          line: lineNum,
+          column: 1,
+          codeSnippet: line.trim(),
+          operation: 'Tool definition',
+          explanation: `Tool registered with ${pattern.framework}. Agent can invoke this tool. Review capabilities and add policy controls.`,
+          confidence: 0.9,
+          context: { isToolDefinition: true, framework: pattern.framework },
+        });
+        break;
+      }
+    }
+
+    // Check for tool class definitions
+    for (const pattern of toolClassPatterns) {
+      if (pattern.regex.test(line)) {
+        findings.push({
+          type: AFBType.UNAUTHORIZED_ACTION,
+          severity: Severity.HIGH,
+          category: ExecutionCategory.TOOL_CALL,
+          file: filePath,
+          line: lineNum,
+          column: 1,
+          codeSnippet: line.trim(),
+          operation: 'Tool class definition',
+          explanation: `Tool class inherits from ${pattern.framework} tool base. Agent can invoke methods of this tool.`,
+          confidence: 0.9,
+          context: { isToolDefinition: true, framework: pattern.framework },
+        });
+      }
+    }
+
+    // Track function definition after decorator
+    if (inToolDef && (line.match(/^\s*def\s+/) || line.match(/^\s*async\s+def\s+/))) {
+      defIndent = currentIndent;
+    }
+
+    // Check if we've exited the tool definition (dedent after function def)
+    if (inToolDef && defIndent >= 0 && currentIndent >= 0 && currentIndent <= defIndent && lineNum > toolStartLine + 2) {
+      if (!line.trim().startsWith('@') && !line.trim().startsWith('def') && !line.trim().startsWith('async') && line.trim() !== '' && !line.trim().startsWith('#') && !line.trim().startsWith('"""') && !line.trim().startsWith("'''")) {
+        inToolDef = false;
+        defIndent = -1;
+      }
+    }
+
+    // Check for dangerous operations
+    const dangerousPatterns = [
+      { regex: /subprocess\.(run|Popen|call|check_output|check_call)\s*\(/, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, desc: 'Subprocess execution' },
+      { regex: /os\.(system|popen|exec\w*|spawn\w*)\s*\(/, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, desc: 'OS command execution' },
+      { regex: /\beval\s*\(/, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, desc: 'Dynamic code evaluation' },
+      { regex: /\bexec\s*\(/, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, desc: 'Dynamic code execution' },
+      { regex: /requests\.(get|post|put|patch|delete|request)\s*\(/, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, desc: 'HTTP request' },
+      { regex: /httpx\.(get|post|put|patch|delete|request)\s*\(/, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, desc: 'HTTP request' },
+      { regex: /\.execute\s*\(/, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, desc: 'SQL execution' },
+      { regex: /\.executemany\s*\(/, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, desc: 'SQL batch execution' },
+      { regex: /\.write_text\s*\(/, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, desc: 'File write' },
+      { regex: /\.write_bytes\s*\(/, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, desc: 'File write' },
+      { regex: /shutil\.(rmtree|copy|copy2|copytree|move|remove)\s*\(/, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, desc: 'Bulk file operation' },
+      { regex: /os\.(remove|unlink|rmdir|mkdir|makedirs|rename)\s*\(/, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, desc: 'File system operation' },
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      const match = line.match(pattern.regex);
+      if (match) {
+        // Elevate severity if inside tool definition
+        let severity = pattern.severity;
+        if (inToolDef && severity !== Severity.CRITICAL) {
+          severity = severity === Severity.MEDIUM ? Severity.HIGH : Severity.CRITICAL;
+        }
+
+        findings.push({
+          type: AFBType.UNAUTHORIZED_ACTION,
+          severity,
+          category: pattern.category,
+          file: filePath,
+          line: lineNum,
+          column: (match.index || 0) + 1,
+          codeSnippet: line.trim(),
+          operation: pattern.desc,
+          explanation: inToolDef
+            ? `${pattern.desc} inside tool definition. Agent can invoke this without authorization basis.`
+            : `${pattern.desc} detected. Verify it is not reachable from agent tools without policy gates.`,
+          confidence: inToolDef ? 0.95 : 0.7,
+          context: {
+            isToolDefinition: inToolDef,
+            framework: inToolDef ? toolFramework : undefined,
+          },
+        });
+      }
+    }
+  }
+
+  // Sort by severity then line
+  findings.sort((a, b) => {
+    const severityOrder = { critical: 0, high: 1, medium: 2 };
+    const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
+    if (sevDiff !== 0) return sevDiff;
+    return a.line - b.line;
+  });
+
+  return {
+    file: filePath,
+    language: 'python',
+    findings,
+    success: true,
+    analysisTimeMs: Date.now() - startTime,
+  };
+}
+
+/**
  * Quick check if Python code likely contains agent-related patterns.
- * Used for pre-filtering before full analysis.
  */
 export function likelyContainsAgentCode(sourceCode: string): boolean {
   const agentIndicators = [
-    "langchain",
-    "crewai",
-    "@tool",
-    "BaseTool",
-    "StructuredTool",
-    "DynamicTool",
-    "Agent",
-    "AgentExecutor",
-    "Tool(",
-    "tools=",
+    'langchain',
+    'crewai',
+    'autogen',
+    'llama_index',
+    'llamaindex',
+    '@tool',
+    '@task',
+    '@agent',
+    'BaseTool',
+    'StructuredTool',
+    'DynamicTool',
+    'Agent',
+    'AgentExecutor',
+    'Tool(',
+    'tools=',
+    'FunctionTool',
+    'register_function',
+    'function_map',
+    'mcp.server',
+    '@server.tool',
+    'openai.ChatCompletion',
+    'tool_choice',
   ];
 
   const lowerCode = sourceCode.toLowerCase();
