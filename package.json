@@ -4,12 +4,12 @@
   "description": "Agent Failure Boundary Scanner - Detects AFB04 (Unauthorized Action) boundaries in agentic AI codebases through static analysis",
   "main": "dist/app.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npx tsc",
     "start": "node dist/app.js",
-    "dev": "ts-node src/app.ts",
-    "lint": "eslint src/**/*.ts",
-    "test": "jest",
-    "analyze": "ts-node src/cli.ts"
+    "dev": "npx ts-node src/app.ts",
+    "lint": "npx eslint src/**/*.ts",
+    "test": "npx jest",
+    "analyze": "npx ts-node src/cli.ts"
   },
   "keywords": [
     "security",
@@ -23,12 +23,11 @@
   "author": "Plarix Security",
   "license": "MIT",
   "dependencies": {
+    "@octokit/auth-app": "^6.0.3",
     "@octokit/rest": "^20.0.2",
     "@octokit/webhooks": "^12.0.10",
     "express": "^4.18.2",
-    "tree-sitter": "^0.21.1",
-    "tree-sitter-python": "^0.21.0",
-    "tree-sitter-typescript": "^0.21.2",
+    "web-tree-sitter": "^0.22.6",
     "simple-git": "^3.22.0",
     "dotenv": "^16.3.1"
   },
