@@ -1,1 +1,1 @@
-# plarix-wyatt-scanner
+# Agent Failure Boundary Scanner (AFB-S)
