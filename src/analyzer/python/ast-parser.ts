@@ -31,6 +31,24 @@ export interface ASTNode {
 }
 
 /**
+ * Control flow information for structural policy gate detection
+ */
+export interface ControlFlowInfo {
+  /** Whether the function contains any raise statements */
+  hasRaise: boolean;
+  /** Whether raises are inside conditional branches (can prevent execution) */
+  hasConditionalRaise: boolean;
+  /** Whether the function has early returns that can prevent execution */
+  hasConditionalReturn: boolean;
+  /** Types of exceptions raised (e.g., PermissionError, ValueError) */
+  raiseTypes: string[];
+  /** Whether the function has conditional branches (if statements) */
+  hasConditionalBranches: boolean;
+  /** Whether function parameters are used in conditions */
+  checksParameters: boolean;
+}
+
+/**
  * Function definition with metadata
  */
 export interface FunctionDef {
@@ -42,6 +60,8 @@ export interface FunctionDef {
   isAsync: boolean;
   isMethod: boolean;
   className?: string;
+  /** Control flow information for policy gate detection */
+  controlFlow?: ControlFlowInfo;
 }
 
 /**
@@ -293,6 +313,174 @@ function findAllNodes(
 }
 
 /**
+ * Check if a node is inside a conditional branch (if statement, try block, etc.)
+ */
+function isInsideConditional(node: Parser.SyntaxNode): boolean {
+  let current = node.parent;
+  while (current) {
+    if (
+      current.type === 'if_statement' ||
+      current.type === 'elif_clause' ||
+      current.type === 'else_clause' ||
+      current.type === 'try_statement' ||
+      current.type === 'except_clause' ||
+      current.type === 'with_statement'
+    ) {
+      return true;
+    }
+    // Stop at function boundary
+    if (
+      current.type === 'function_definition' ||
+      current.type === 'async_function_definition'
+    ) {
+      break;
+    }
+    current = current.parent;
+  }
+  return false;
+}
+
+/**
+ * Extract exception type from a raise statement
+ */
+function extractRaiseType(raiseNode: Parser.SyntaxNode): string | null {
+  // raise ExceptionType(...) or raise ExceptionType
+  for (const child of raiseNode.children) {
+    if (child.type === 'call') {
+      const funcNode = child.childForFieldName('function');
+      if (funcNode) {
+        return funcNode.text;
+      }
+    }
+    if (child.type === 'identifier') {
+      return child.text;
+    }
+    if (child.type === 'attribute') {
+      return child.text;
+    }
+  }
+  return null;
+}
+
+/**
+ * Check if an if statement condition uses function parameters
+ */
+function conditionUsesParameters(
+  ifNode: Parser.SyntaxNode,
+  paramNames: Set<string>
+): boolean {
+  const condition = ifNode.childForFieldName('condition');
+  if (!condition) return false;
+
+  // Find all identifiers in the condition
+  const identifiers = findAllNodes(condition, new Set(['identifier']));
+  for (const id of identifiers) {
+    if (paramNames.has(id.text)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Extract parameter names from a function definition
+ */
+function extractParameterNames(funcNode: Parser.SyntaxNode): Set<string> {
+  const params = new Set<string>();
+  const parameters = funcNode.childForFieldName('parameters');
+  if (!parameters) return params;
+
+  for (const child of parameters.children) {
+    if (child.type === 'identifier') {
+      params.add(child.text);
+    } else if (child.type === 'typed_parameter' || child.type === 'default_parameter') {
+      const nameNode = child.childForFieldName('name');
+      if (nameNode) {
+        params.add(nameNode.text);
+      }
+    }
+  }
+  return params;
+}
+
+/**
+ * Analyze a function body for control flow patterns that indicate policy gate behavior.
+ *
+ * A policy gate is STRUCTURAL, not nominal. It must have:
+ * 1. Conditional branches that can prevent execution from continuing
+ * 2. These branches should be able to raise exceptions or return early
+ * 3. The conditions should be based on the input (parameters)
+ *
+ * A function named "check_permission" that always returns True is NOT a gate.
+ * A function named "process_data" that raises PermissionError conditionally IS a gate.
+ */
+function analyzeControlFlow(funcNode: Parser.SyntaxNode): ControlFlowInfo {
+  const body = funcNode.childForFieldName('body');
+  if (!body) {
+    return {
+      hasRaise: false,
+      hasConditionalRaise: false,
+      hasConditionalReturn: false,
+      raiseTypes: [],
+      hasConditionalBranches: false,
+      checksParameters: false,
+    };
+  }
+
+  // Get function parameters
+  const paramNames = extractParameterNames(funcNode);
+
+  // Find all raise statements in the function body
+  const raiseNodes = findAllNodes(body, new Set(['raise_statement']));
+  const hasRaise = raiseNodes.length > 0;
+
+  // Check if any raises are inside conditional branches
+  let hasConditionalRaise = false;
+  const raiseTypes: string[] = [];
+  for (const raise of raiseNodes) {
+    const type = extractRaiseType(raise);
+    if (type && !raiseTypes.includes(type)) {
+      raiseTypes.push(type);
+    }
+    if (isInsideConditional(raise)) {
+      hasConditionalRaise = true;
+    }
+  }
+
+  // Find all return statements and check if any are conditional
+  const returnNodes = findAllNodes(body, new Set(['return_statement']));
+  let hasConditionalReturn = false;
+  for (const ret of returnNodes) {
+    if (isInsideConditional(ret)) {
+      hasConditionalReturn = true;
+      break;
+    }
+  }
+
+  // Find all if statements
+  const ifNodes = findAllNodes(body, new Set(['if_statement']));
+  const hasConditionalBranches = ifNodes.length > 0;
+
+  // Check if any conditions use parameters
+  let checksParameters = false;
+  for (const ifNode of ifNodes) {
+    if (conditionUsesParameters(ifNode, paramNames)) {
+      checksParameters = true;
+      break;
+    }
+  }
+
+  return {
+    hasRaise,
+    hasConditionalRaise,
+    hasConditionalReturn,
+    raiseTypes,
+    hasConditionalBranches,
+    checksParameters,
+  };
+}
+
+/**
  * Parse a Python source file and extract structural information
  */
 export function parsePythonSource(sourceCode: string): ParsedPythonFile {
@@ -358,6 +546,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
           className: enclosingClass
             ? extractClassName(enclosingClass)
             : undefined,
+          controlFlow: analyzeControlFlow(innerDef),
         });
       } else if (innerDef.type === 'class_definition') {
         const classDef: ClassDef = {
@@ -391,6 +580,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
                 isAsync: method.type === 'async_function_definition',
                 isMethod: true,
                 className: classDef.name,
+                controlFlow: analyzeControlFlow(method),
               });
             }
           }
@@ -424,6 +614,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
         isAsync: funcDef.type === 'async_function_definition',
         isMethod: !!enclosingClass,
         className: enclosingClass ? extractClassName(enclosingClass) : undefined,
+        controlFlow: analyzeControlFlow(funcDef),
       });
     }
 
@@ -464,6 +655,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
             isAsync: method.type === 'async_function_definition',
             isMethod: true,
             className: def.name,
+            controlFlow: analyzeControlFlow(method),
           });
         }
       }
