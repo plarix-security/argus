@@ -12,8 +12,7 @@
  * 4. Generate findings with confidence scores
  */
 
-import Parser from "tree-sitter";
-import { astWalker } from "../ast-walker";
+import { ASTWalker, astWalker } from "../ast-walker";
 import {
   AFBFinding,
   FileAnalysisResult,
@@ -24,19 +23,22 @@ import {
   createFinding,
 } from "../../afb/afb04";
 
+// Type alias for tree-sitter nodes (using any for web-tree-sitter compatibility)
+type SyntaxNode = any;
+
 /**
  * Detects if a call node matches a specific pattern.
  * Returns the pattern if matched, null otherwise.
  */
 function matchCallPattern(
-  node: Parser.SyntaxNode,
+  node: SyntaxNode,
   sourceCode: string
 ): { pattern: ExecutionPattern; patternKey: string } | null {
   if (node.type !== "call") {
     return null;
   }
 
-  const funcNode = node.childForFieldName("function");
+  const funcNode = node.childForFieldName?.("function");
   if (!funcNode) {
     return null;
   }
@@ -220,7 +222,7 @@ function matchCallPattern(
  * Detects if a function is decorated with @tool or similar.
  */
 function isToolDecoratedFunction(
-  funcNode: Parser.SyntaxNode
+  funcNode: SyntaxNode
 ): { isToolDef: boolean; framework?: string } {
   // Check if parent is decorated_definition
   if (funcNode.parent?.type !== "decorated_definition") {
@@ -259,9 +261,9 @@ function isToolDecoratedFunction(
 /**
  * Detects if a class inherits from BaseTool or similar.
  */
-function isToolClass(classNode: Parser.SyntaxNode): { isToolClass: boolean; framework?: string } {
+function isToolClass(classNode: SyntaxNode): { isToolClass: boolean; framework?: string } {
   // Look for bases/superclasses
-  const superclassNode = classNode.childForFieldName("superclasses");
+  const superclassNode = classNode.childForFieldName?.("superclasses");
   if (!superclassNode) {
     return { isToolClass: false };
   }
@@ -294,11 +296,11 @@ export function analyzePythonFile(
   const findings: AFBFinding[] = [];
 
   try {
-    const tree = astWalker.parse(sourceCode, "python", filePath);
+    const tree = astWalker.parse(sourceCode, "python");
 
     // Track which functions/classes are tool definitions
-    const toolFunctions = new Set<Parser.SyntaxNode>();
-    const toolClasses = new Set<Parser.SyntaxNode>();
+    const toolFunctions = new Set<SyntaxNode>();
+    const toolClasses = new Set<SyntaxNode>();
 
     // First pass: identify tool definitions
     astWalker.walk(tree, (node) => {

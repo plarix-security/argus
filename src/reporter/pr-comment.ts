@@ -11,7 +11,6 @@ import {
   Severity,
   ExecutionCategory,
 } from "../types";
-import { SCANNER_VERSION } from "../analyzer";
 
 /**
  * Severity emoji mapping for visual clarity.
@@ -108,7 +107,6 @@ export function generatePRComment(report: AnalysisReport): string {
 </details>
 
 ---
-*AFB Scanner v${SCANNER_VERSION} | [What is AFB?](https://github.com/plarix-security/afb-spec)*
 `;
   }
 
@@ -200,7 +198,6 @@ ${metadata.failedFiles.length > 0 ? `- **Failed Files:** ${metadata.failedFiles.
 </details>
 
 ---
-*AFB Scanner v${SCANNER_VERSION} | [AFB Spec](https://github.com/plarix-security/afb-spec)*
 `;
 }
 
