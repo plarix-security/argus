@@ -8,6 +8,10 @@
  *
  * This is the core of AFB04 detection: we need to know if a tool
  * can reach a dangerous operation without passing through authorization.
+ *
+ * IMPORTANT: Policy gate detection is STRUCTURAL, not nominal.
+ * A function named "check_permission" that always returns True is NOT a gate.
+ * A function named "process_data" that raises PermissionError conditionally IS.
  */
 
 import {
@@ -16,6 +20,7 @@ import {
   ClassDef,
   CallSite,
   ImportInfo,
+  ControlFlowInfo,
 } from './ast-parser';
 import { ExecutionCategory, Severity } from '../../types';
 
@@ -45,8 +50,10 @@ export interface CallGraphNode {
   framework?: string;
   /** Dangerous operations directly in this function */
   dangerousOps: DangerousOperation[];
-  /** Whether this function contains a policy gate */
+  /** Whether this function is a structural policy gate */
   hasPolicyGate: boolean;
+  /** Control flow information */
+  controlFlow?: ControlFlowInfo;
 }
 
 /**
@@ -178,39 +185,62 @@ const DANGEROUS_OPERATION_PATTERNS: {
 ];
 
 /**
- * Patterns indicating a policy gate or authorization check
+ * Exception types that indicate authorization/permission denial.
+ * If a function raises these conditionally, it may be a policy gate.
  */
-const POLICY_GATE_PATTERNS: RegExp[] = [
-  // Explicit permission/authorization checks
-  /check_permission/i,
-  /check_auth/i,
-  /authorize/i,
-  /is_allowed/i,
-  /has_permission/i,
-  /verify_access/i,
-  /validate_access/i,
-  /enforce_policy/i,
-
-  // Decorator patterns
-  /@requires_permission/i,
-  /@authorized/i,
-  /@permission_required/i,
-  /@login_required/i,
-  /@access_control/i,
-
-  // Wyatt integration
-  /wyatt/i,
-  /policy_enforcer/i,
-  /BoundaryEnforcer/i,
-  /check_tool_boundary/i,
-  /check_data_boundary/i,
-
-  // Common authorization library patterns
-  /casbin/i,
-  /can_access/i,
-  /rbac/i,
-  /abac/i,
+const AUTHORIZATION_EXCEPTION_TYPES = [
+  'PermissionError',
+  'AuthorizationError',
+  'UnauthorizedError',
+  'AccessDenied',
+  'Forbidden',
+  'PermissionDenied',
+  'NotAuthorized',
+  'SecurityError',
 ];
+
+/**
+ * Determine if a function is a structural policy gate.
+ *
+ * A policy gate is STRUCTURAL, not nominal. It must have:
+ * 1. A conditional branch (if statement) that can prevent execution
+ * 2. That branch should either raise an exception or return early
+ * 3. The condition should be based on input parameters
+ *
+ * A function named "check_permission" that always returns True is NOT a gate.
+ * A function named "process_data" that raises PermissionError conditionally IS.
+ */
+function isStructuralPolicyGate(controlFlow: ControlFlowInfo | undefined): boolean {
+  if (!controlFlow) {
+    return false;
+  }
+
+  // Must have conditional branches
+  if (!controlFlow.hasConditionalBranches) {
+    return false;
+  }
+
+  // Must be able to prevent execution (raise or return early)
+  const canPreventExecution = controlFlow.hasConditionalRaise || controlFlow.hasConditionalReturn;
+  if (!canPreventExecution) {
+    return false;
+  }
+
+  // Higher confidence if it raises authorization-related exceptions
+  const raisesAuthException = controlFlow.raiseTypes.some((type) =>
+    AUTHORIZATION_EXCEPTION_TYPES.some((authType) =>
+      type.toLowerCase().includes(authType.toLowerCase())
+    )
+  );
+
+  // Higher confidence if conditions check parameters
+  const checksInput = controlFlow.checksParameters;
+
+  // A function is a policy gate if:
+  // - It can prevent execution AND
+  // - (It raises auth exceptions OR it checks its parameters)
+  return raisesAuthException || checksInput;
+}
 
 /**
  * Build a call graph from parsed Python files
@@ -241,7 +271,9 @@ export function buildCallGraph(
         callers: new Set(),
         isToolRegistration: false,
         dangerousOps: [],
-        hasPolicyGate: false,
+        // Use structural analysis to determine if this is a policy gate
+        hasPolicyGate: isStructuralPolicyGate(func.controlFlow),
+        controlFlow: func.controlFlow,
       };
 
       // Check if this is a tool registration
@@ -275,7 +307,9 @@ export function buildCallGraph(
           isToolRegistration: toolInfo !== null && (method.name === '_run' || method.name === 'run' || method.name === 'invoke'),
           framework: toolInfo?.framework,
           dangerousOps: [],
-          hasPolicyGate: false,
+          // Use structural analysis to determine if this is a policy gate
+          hasPolicyGate: isStructuralPolicyGate(method.controlFlow),
+          controlFlow: method.controlFlow,
         };
 
         if (node.isToolRegistration) {
@@ -314,11 +348,6 @@ export function buildCallGraph(
         const dangerousOp = detectDangerousOperation(call);
         if (dangerousOp) {
           callerNode.dangerousOps.push(dangerousOp);
-        }
-
-        // Check if this call is a policy gate
-        if (isPolicyGate(call.callee)) {
-          callerNode.hasPolicyGate = true;
         }
       }
     }
@@ -455,18 +484,6 @@ function detectDangerousOperation(call: CallSite): DangerousOperation | null {
 }
 
 /**
- * Check if a callee name represents a policy gate
- */
-function isPolicyGate(callee: string): boolean {
-  for (const pattern of POLICY_GATE_PATTERNS) {
-    if (pattern.test(callee)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
  * Find all dangerous operation paths from a starting node
  */
 function findDangerousPathsFromNode(
@@ -482,7 +499,7 @@ function findDangerousPathsFromNode(
   }
   visited.add(node.id);
 
-  // Track if we've seen a policy gate in this path
+  // Track if we've seen a structural policy gate in this path
   const hasGateInPath = currentPath.some((nodeId) => {
     const n = allNodes.get(nodeId);
     return n?.hasPolicyGate || false;
