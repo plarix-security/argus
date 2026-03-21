@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ASTWalker, astWalker } from './ast-walker';
-import { analyzePythonFile } from './python/detector';
+import { analyzePythonFile, ensureParserInitialized } from './python/detector';
 import { analyzeTypeScriptFile } from './typescript/detector';
 import { AFBFinding, AnalysisReport, AnalyzerConfig, FileAnalysisResult, SupportedLanguage, Severity } from '../types';
 
@@ -27,6 +27,7 @@ export class AFBAnalyzer {
   async ensureInitialized() {
     if (!this.initialized) {
       await this.walker.initialize();
+      await ensureParserInitialized();
       this.initialized = true;
     }
   }
