@@ -16,7 +16,7 @@ describe('scanner sanity-check reporting', () => {
     const report = analyzer.analyzeDirectory(tempDir);
 
     expect(report.metadata.sanityCheck).toBeDefined();
-    expect(report.metadata.sanityCheck.detectsAllCanonicalCEEsAndAllAFBs).toBe(false);
+    expect(report.metadata.sanityCheck.isComprehensiveCoverageScanner).toBe(false);
     expect(report.metadata.sanityCheck.supportedAFBs).toEqual([AFBType.UNAUTHORIZED_ACTION]);
     expect(report.metadata.sanityCheck.unsupportedAFBs).toEqual([
       AFBType.INSTRUCTION,

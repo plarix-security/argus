@@ -3,7 +3,8 @@ import * as path from 'path';
 import { ASTWalker, astWalker } from './ast-walker';
 import { analyzePythonFile } from './python/detector';
 import { analyzeTypeScriptFile } from './typescript/detector';
-import { AFBFinding, AnalysisReport, AnalyzerConfig, FileAnalysisResult, SupportedLanguage, Severity, AFBType, ExecutionCategory } from '../types';
+import { AFBFinding, AnalysisReport, AnalyzerConfig, FileAnalysisResult, SupportedLanguage, Severity } from '../types';
+import { buildScannerSanityCheck } from './sanity-check';
 
 const SCANNER_VERSION = '0.1.0';
 const DEFAULT_CONFIG: Required<AnalyzerConfig> = {
@@ -102,18 +103,7 @@ export class AFBAnalyzer {
       if (fileDiff !== 0) return fileDiff;
       return a.line - b.line;
     });
-    const canonicalCEECategories: ExecutionCategory[] = [
-      ExecutionCategory.TOOL_CALL,
-      ExecutionCategory.SHELL_EXECUTION,
-      ExecutionCategory.FILE_OPERATION,
-      ExecutionCategory.API_CALL,
-      ExecutionCategory.DATABASE_OPERATION,
-      ExecutionCategory.CODE_EXECUTION,
-    ];
     const observedCEECategories = Array.from(new Set(allFindings.map((f) => f.category)));
-    const missingObservedCEECategories = canonicalCEECategories.filter(
-      (category) => !observedCEECategories.includes(category)
-    );
 
     return {
       repository: path.basename(repository),
@@ -130,15 +120,7 @@ export class AFBAnalyzer {
         timestamp: new Date().toISOString(),
         totalTimeMs: Date.now() - startTime,
         failedFiles,
-        sanityCheck: {
-          detectsAllCanonicalCEEsAndAllAFBs: false,
-          supportedAFBs: [AFBType.UNAUTHORIZED_ACTION],
-          unsupportedAFBs: [AFBType.INSTRUCTION, AFBType.CONTEXT, AFBType.CONSTRAINT],
-          canonicalCEECategories,
-          observedCEECategories,
-          missingObservedCEECategories,
-          verdict: 'No. This scanner only statically detects AFB04-style execution patterns and cannot guarantee detection of all canonical execution events or all AFB boundaries in production.',
-        },
+        sanityCheck: buildScannerSanityCheck(observedCEECategories),
       },
     };
   }

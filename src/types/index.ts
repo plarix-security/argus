@@ -153,8 +153,8 @@ export interface AnalysisReport {
  * This is intentionally conservative and does not claim guaranteed coverage.
  */
 export interface ScannerSanityCheck {
-  /** Frank yes/no answer to "will this detect all CEEs and all AFBs?" */
-  detectsAllCanonicalCEEsAndAllAFBs: false;
+  /** Capability flag: false means this scanner is not comprehensive across all CEEs/AFBs */
+  isComprehensiveCoverageScanner: boolean;
   /** Which AFB boundaries are currently in scope */
   supportedAFBs: AFBType[];
   /** Which AFB boundaries are currently out of scope */
