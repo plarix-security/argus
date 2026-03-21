@@ -4,19 +4,15 @@ node_modules/
 # Build output
 dist/
 
-# Environment variables
+# Environment files
 .env
 .env.local
-.env.*.local
 
 # IDE
-.idea/
 .vscode/
-*.swp
-*.swo
-*~
+.idea/
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
@@ -29,5 +25,5 @@ coverage/
 
 # Temporary files
 tmp/
-temp/
+.tmp/
 *.tmp
