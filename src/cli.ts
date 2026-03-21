@@ -2,12 +2,38 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { AFBAnalyzer } from './analyzer';
-import { generatePRComment, generateJSONReport } from './reporter/pr-comment';
+import { generatePRComment, generateJSONReport, generateTerminalReport } from './reporter/pr-comment';
+import { Severity } from './types';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const targetPath = path.resolve(args[0] || '.');
-  
+
+  // Handle help
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(`
+AFB Scanner - Agent Failure Boundary detection through static analysis
+
+Usage: afb-scanner [path] [options]
+
+Arguments:
+  path          Path to analyze (file or directory). Default: current directory
+
+Options:
+  --json        Output JSON report
+  --markdown    Output markdown report (PR comment format)
+  --confidence  Minimum confidence threshold (0.0-1.0). Default: 0.7
+  --help        Show this help message
+
+Examples:
+  afb-scanner ./my-agent-project
+  afb-scanner ./tools.py --json
+  afb-scanner . --markdown
+`);
+    process.exit(0);
+  }
+
+  const targetPath = path.resolve(args.find(a => !a.startsWith('--')) || '.');
+
   if (!fs.existsSync(targetPath)) {
     console.error(`Error: Path does not exist: ${targetPath}`);
     process.exit(1);
@@ -17,31 +43,39 @@ async function main(): Promise<void> {
   await analyzer.ensureInitialized();
 
   const stat = fs.statSync(targetPath);
-  const report = stat.isFile() ? 
-    (() => { const r = analyzer.analyzeFile(targetPath); return { repository: '.', filesAnalyzed: [r.file], totalFindings: r.findings.length, findingsBySeverity: { critical: 0, high: 0, medium: 0 }, findings: r.findings, metadata: { scannerVersion: '0.1.0', timestamp: new Date().toISOString(), totalTimeMs: r.analysisTimeMs, failedFiles: [] } }; })() :
-    analyzer.analyzeDirectory(targetPath);
+  let report;
+
+  if (stat.isFile()) {
+    const result = analyzer.analyzeFile(targetPath);
+    // Count findings by severity
+    const findingsBySeverity = {
+      critical: result.findings.filter(f => f.severity === Severity.CRITICAL).length,
+      high: result.findings.filter(f => f.severity === Severity.HIGH).length,
+      medium: result.findings.filter(f => f.severity === Severity.MEDIUM).length,
+    };
+    report = {
+      repository: path.basename(path.dirname(targetPath)),
+      filesAnalyzed: [result.file],
+      totalFindings: result.findings.length,
+      findingsBySeverity,
+      findings: result.findings,
+      metadata: {
+        scannerVersion: '1.0.0',
+        timestamp: new Date().toISOString(),
+        totalTimeMs: result.analysisTimeMs,
+        failedFiles: result.success ? [] : [result.file],
+      },
+    };
+  } else {
+    report = analyzer.analyzeDirectory(targetPath);
+  }
 
   if (args.includes('--json')) {
     console.log(generateJSONReport(report));
   } else if (args.includes('--markdown') || args.includes('--md')) {
     console.log(generatePRComment(report));
   } else {
-    console.log(`\n🛡️  AFB Scanner Report\n${'='.repeat(50)}\n`);
-    if (report.totalFindings === 0) {
-      console.log(`✓ No AFB04 execution points detected`);
-      console.log(`  Files analyzed: ${report.filesAnalyzed.length}\n`);
-    } else {
-      console.log(`Total findings: ${report.totalFindings}`);
-      console.log(`  Critical: ${report.findingsBySeverity.critical}`);
-      console.log(`  High: ${report.findingsBySeverity.high}`);
-      console.log(`  Medium: ${report.findingsBySeverity.medium}\n`);
-      for (const finding of report.findings.slice(0, 10)) {
-        console.log(`${finding.severity.toUpperCase()} - ${finding.file}:${finding.line}`);
-        console.log(`  ${finding.operation}`);
-        console.log(`  ${finding.codeSnippet}\n`);
-      }
-      if (report.totalFindings > 10) console.log(`... and ${report.totalFindings - 10} more`);
-    }
+    console.log(generateTerminalReport(report));
   }
 
   process.exit(report.findingsBySeverity.critical > 0 ? 2 : report.findingsBySeverity.high > 0 ? 1 : 0);
