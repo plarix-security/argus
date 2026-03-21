@@ -1,571 +1,470 @@
 /**
  * TypeScript/JavaScript AFB04 Detector
  *
- * Detects AFB04 (Unauthorized Action) execution points in TypeScript/JavaScript
- * code through AST analysis. Specifically targets:
+ * Detects AFB04 (Unauthorized Action) boundaries in TypeScript/JavaScript codebases.
+ * Focuses on agent frameworks (LangChain.js) and dangerous operations
+ * (shell commands, file operations, API calls, database operations).
  *
- * 1. Tool definitions (LangChain tool(), DynamicTool)
- * 2. Shell command execution (child_process)
- * 3. File operations (fs module)
- * 4. API calls (fetch, axios, http)
- * 5. Database operations (query, Prisma)
- * 6. Code execution (eval, Function constructor)
+ * Detection approach:
+ * 1. Walk the AST looking for function calls and class definitions
+ * 2. Match against known execution patterns
+ * 3. Analyze context (is this inside a tool definition?)
+ * 4. Generate findings with confidence scores
  */
 
-import Parser from 'tree-sitter';
-import { ASTWalker } from '../ast-walker';
+import Parser from "tree-sitter";
+import { astWalker } from "../ast-walker";
 import {
   AFBFinding,
   FileAnalysisResult,
-} from '../../types';
+} from "../../types";
 import {
   TYPESCRIPT_PATTERNS,
   ExecutionPattern,
   createFinding,
-} from '../../afb/afb04';
+} from "../../afb/afb04";
 
 /**
- * TypeScript/JavaScript-specific detector for AFB04 execution points.
+ * Detects if a call node matches a specific pattern.
+ * Returns the pattern if matched, null otherwise.
  */
-export class TypeScriptDetector {
-  private walker: ASTWalker;
-
-  constructor(walker: ASTWalker) {
-    this.walker = walker;
+function matchCallPattern(
+  node: Parser.SyntaxNode,
+  sourceCode: string
+): { pattern: ExecutionPattern; patternKey: string } | null {
+  if (node.type !== "call_expression") {
+    return null;
   }
 
-  /**
-   * Analyze a TypeScript/JavaScript file for AFB04 execution points.
-   */
-  analyzeFile(filePath: string, sourceCode: string): FileAnalysisResult {
-    const startTime = Date.now();
-    const findings: AFBFinding[] = [];
+  const funcNode = node.childForFieldName("function");
+  if (!funcNode) {
+    return null;
+  }
 
-    try {
-      const tree = this.walker.parse(sourceCode, 'typescript', filePath);
-      
-      // Collect all findings
-      findings.push(...this.detectToolDefinitions(tree, filePath, sourceCode));
-      findings.push(...this.detectShellExecution(tree, filePath, sourceCode));
-      findings.push(...this.detectFileOperations(tree, filePath, sourceCode));
-      findings.push(...this.detectApiCalls(tree, filePath, sourceCode));
-      findings.push(...this.detectDatabaseOperations(tree, filePath, sourceCode));
-      findings.push(...this.detectCodeExecution(tree, filePath, sourceCode));
+  const funcText = funcNode.text;
 
-      return {
-        file: filePath,
-        language: 'typescript',
-        findings,
-        success: true,
-        analysisTimeMs: Date.now() - startTime,
-      };
-    } catch (error) {
-      return {
-        file: filePath,
-        language: 'typescript',
-        findings: [],
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        analysisTimeMs: Date.now() - startTime,
-      };
+  // === TOOL CALL PATTERNS ===
+
+  // LangChain tool() function
+  if (funcText === "tool" || funcText === "DynamicTool" || funcText === "DynamicStructuredTool") {
+    return { pattern: TYPESCRIPT_PATTERNS.tool_function, patternKey: "tool_function" };
+  }
+
+  // new DynamicTool(), new Tool()
+  if (node.parent?.type === "new_expression") {
+    const newText = node.parent.text;
+    if (
+      newText.includes("DynamicTool") ||
+      newText.includes("DynamicStructuredTool") ||
+      newText.includes("Tool(")
+    ) {
+      return { pattern: TYPESCRIPT_PATTERNS.dynamic_tool, patternKey: "dynamic_tool" };
     }
   }
 
-  /**
-   * Detect LangChain.js tool definitions.
-   * Patterns:
-   * - tool() function call
-   * - new DynamicTool()
-   * - new StructuredTool()
-   * - DynamicStructuredTool.fromFunction()
-   */
-  private detectToolDefinitions(
-    tree: Parser.Tree,
-    filePath: string,
-    sourceCode: string
-  ): AFBFinding[] {
-    const findings: AFBFinding[] = [];
+  // === SHELL EXECUTION PATTERNS ===
 
-    // Find call expressions
-    const callExpressions = this.walker.findNodesByType(tree, 'call_expression');
-    
-    for (const call of callExpressions) {
-      const funcNode = call.childForFieldName('function');
-      if (!funcNode) continue;
+  // child_process.exec, execSync, spawn, spawnSync, execFile, fork
+  if (
+    funcText === "exec" ||
+    funcText === "execSync" ||
+    funcText.endsWith(".exec") ||
+    funcText.endsWith(".execSync")
+  ) {
+    if (sourceCode.includes("child_process") || sourceCode.includes("require('child_process')")) {
+      return { pattern: TYPESCRIPT_PATTERNS.child_process_exec, patternKey: "child_process_exec" };
+    }
+  }
 
-      const funcText = funcNode.text;
-      let pattern: ExecutionPattern | null = null;
-      let framework = 'langchain';
+  if (
+    funcText === "spawn" ||
+    funcText === "spawnSync" ||
+    funcText.endsWith(".spawn") ||
+    funcText.endsWith(".spawnSync")
+  ) {
+    return { pattern: TYPESCRIPT_PATTERNS.child_process_spawn, patternKey: "child_process_spawn" };
+  }
 
-      // tool() function call
-      if (funcText === 'tool' || funcText.endsWith('.tool')) {
-        pattern = TYPESCRIPT_PATTERNS.tool_function;
-      }
-      // DynamicTool.fromFunction() or similar factory methods
-      else if (this.matchesPattern(funcText, ['DynamicTool.from', 
-          'StructuredTool.from', 'DynamicStructuredTool.from'])) {
-        pattern = TYPESCRIPT_PATTERNS.dynamic_tool;
-      }
+  if (
+    funcText === "execFile" ||
+    funcText === "execFileSync" ||
+    funcText.endsWith(".execFile") ||
+    funcText.endsWith(".execFileSync")
+  ) {
+    return { pattern: TYPESCRIPT_PATTERNS.child_process_exec, patternKey: "child_process_exec" };
+  }
 
-      if (pattern) {
-        const { enclosingFunc, enclosingClass } = this.getCallContext(call);
-        
-        findings.push(createFinding(
-          filePath,
-          this.walker.getNodeLocation(call),
-          call.text,
-          pattern,
-          enclosingFunc,
-          enclosingClass,
-          true, // Tool definitions
-          framework,
-          0.9
-        ));
+  if (funcText === "fork" || funcText.endsWith(".fork")) {
+    return { pattern: TYPESCRIPT_PATTERNS.child_process_spawn, patternKey: "child_process_spawn" };
+  }
+
+  // === FILE OPERATION PATTERNS ===
+
+  // fs.writeFile, writeFileSync, etc.
+  if (
+    funcText.includes("writeFile") ||
+    funcText.includes("writeSync") ||
+    funcText.endsWith(".write")
+  ) {
+    if (sourceCode.includes("fs") || sourceCode.includes("require('fs')")) {
+      return { pattern: TYPESCRIPT_PATTERNS.fs_writeFile, patternKey: "fs_writeFile" };
+    }
+  }
+
+  // fs.readFile, readFileSync
+  if (funcText.includes("readFile") || funcText.includes("readSync")) {
+    return { pattern: TYPESCRIPT_PATTERNS.fs_readFile, patternKey: "fs_readFile" };
+  }
+
+  // fs.unlink, unlinkSync
+  if (funcText.includes("unlink")) {
+    return { pattern: TYPESCRIPT_PATTERNS.fs_unlink, patternKey: "fs_unlink" };
+  }
+
+  // fs.rm, rmSync, rmdir, rmdirSync
+  if (funcText.includes("rmSync") || funcText === "rm" || funcText.endsWith(".rm")) {
+    return { pattern: TYPESCRIPT_PATTERNS.fs_rm, patternKey: "fs_rm" };
+  }
+
+  if (funcText.includes("rmdir")) {
+    return { pattern: TYPESCRIPT_PATTERNS.fs_unlink, patternKey: "fs_unlink" };
+  }
+
+  // fs.mkdir, mkdirSync
+  if (funcText.includes("mkdir")) {
+    return { pattern: TYPESCRIPT_PATTERNS.fs_readFile, patternKey: "fs_readFile" };
+  }
+
+  // === API/HTTP PATTERNS ===
+
+  // fetch()
+  if (funcText === "fetch") {
+    return { pattern: TYPESCRIPT_PATTERNS.fetch_call, patternKey: "fetch_call" };
+  }
+
+  // axios
+  if (
+    funcText.startsWith("axios") ||
+    funcText === "axios" ||
+    funcText.endsWith(".get") && sourceCode.includes("axios") ||
+    funcText.endsWith(".post") && sourceCode.includes("axios")
+  ) {
+    return { pattern: TYPESCRIPT_PATTERNS.axios_call, patternKey: "axios_call" };
+  }
+
+  // http.request, https.request
+  if (
+    funcText.includes("http.request") ||
+    funcText.includes("https.request") ||
+    funcText.includes("http.get") ||
+    funcText.includes("https.get")
+  ) {
+    return { pattern: TYPESCRIPT_PATTERNS.http_request, patternKey: "http_request" };
+  }
+
+  // === DATABASE PATTERNS ===
+
+  // Prisma operations
+  if (sourceCode.includes("prisma") || sourceCode.includes("PrismaClient")) {
+    if (
+      funcText.includes(".create") ||
+      funcText.includes(".createMany")
+    ) {
+      return { pattern: TYPESCRIPT_PATTERNS.prisma_operation, patternKey: "prisma_operation" };
+    }
+    if (
+      funcText.includes(".update") ||
+      funcText.includes(".updateMany")
+    ) {
+      return { pattern: TYPESCRIPT_PATTERNS.prisma_operation, patternKey: "prisma_operation" };
+    }
+    if (
+      funcText.includes(".delete") ||
+      funcText.includes(".deleteMany")
+    ) {
+      return { pattern: TYPESCRIPT_PATTERNS.prisma_operation, patternKey: "prisma_operation" };
+    }
+    if (
+      funcText.includes("$executeRaw") ||
+      funcText.includes("$queryRaw")
+    ) {
+      return { pattern: TYPESCRIPT_PATTERNS.prisma_operation, patternKey: "prisma_operation" };
+    }
+  }
+
+  // Generic query/execute
+  if (
+    funcText.endsWith(".query") ||
+    funcText.endsWith(".execute")
+  ) {
+    if (
+      sourceCode.includes("sql") ||
+      sourceCode.includes("database") ||
+      sourceCode.includes("db") ||
+      sourceCode.includes("mysql") ||
+      sourceCode.includes("postgres") ||
+      sourceCode.includes("knex")
+    ) {
+      return { pattern: TYPESCRIPT_PATTERNS.query_execute, patternKey: "query_execute" };
+    }
+  }
+
+  // === CODE EXECUTION PATTERNS ===
+
+  // eval()
+  if (funcText === "eval") {
+    return { pattern: TYPESCRIPT_PATTERNS.eval_call, patternKey: "eval_call" };
+  }
+
+  // new Function()
+  if (node.parent?.type === "new_expression" && funcText === "Function") {
+    return { pattern: TYPESCRIPT_PATTERNS.function_constructor, patternKey: "function_constructor" };
+  }
+
+  return null;
+}
+
+/**
+ * Detects if a node is inside a tool definition context.
+ */
+function isInsideToolDefinition(
+  node: Parser.SyntaxNode,
+  sourceCode: string
+): { isToolDef: boolean; framework?: string } {
+  let current: Parser.SyntaxNode | null = node.parent;
+
+  while (current) {
+    // Check for tool() call
+    if (current.type === "call_expression") {
+      const funcNode = current.childForFieldName("function");
+      if (funcNode?.text === "tool" || funcNode?.text === "DynamicTool") {
+        return { isToolDef: true, framework: "langchain" };
       }
     }
 
-    // Find new expressions for tool classes
-    const newExpressions = this.walker.findNodesByType(tree, 'new_expression');
-    
-    for (const newExpr of newExpressions) {
-      const constructorNode = newExpr.childForFieldName('constructor');
-      if (!constructorNode) continue;
+    // Check for variable declaration with tool pattern
+    if (current.type === "variable_declarator") {
+      const init = current.childForFieldName("value");
+      if (init?.text.includes("tool(") || init?.text.includes("DynamicTool")) {
+        return { isToolDef: true, framework: "langchain" };
+      }
+    }
 
-      const constructorText = constructorNode.text;
-      
-      if (this.isToolClass(constructorText)) {
-        const { enclosingFunc, enclosingClass } = this.getCallContext(newExpr);
-        
-        findings.push(createFinding(
+    // Check for class extending Tool
+    if (current.type === "class_declaration" || current.type === "class") {
+      const heritage = current.descendantsOfType("extends_clause");
+      if (heritage.length > 0) {
+        const extendsText = heritage[0].text.toLowerCase();
+        if (
+          extendsText.includes("tool") ||
+          extendsText.includes("basetool") ||
+          extendsText.includes("structuredtool")
+        ) {
+          return { isToolDef: true, framework: "langchain" };
+        }
+      }
+    }
+
+    current = current.parent;
+  }
+
+  // Also check if the source contains tool-related imports near this code
+  if (sourceCode.includes("@langchain/core/tools") || sourceCode.includes("langchain/tools")) {
+    return { isToolDef: true, framework: "langchain" };
+  }
+
+  return { isToolDef: false };
+}
+
+/**
+ * Find tool definitions in the AST.
+ */
+function findToolDefinitions(
+  tree: Parser.Tree,
+  sourceCode: string
+): Parser.SyntaxNode[] {
+  const toolDefs: Parser.SyntaxNode[] = [];
+
+  astWalker.walk(tree, (node) => {
+    // tool() calls
+    if (node.type === "call_expression") {
+      const funcNode = node.childForFieldName("function");
+      if (
+        funcNode?.text === "tool" ||
+        funcNode?.text === "DynamicTool" ||
+        funcNode?.text === "DynamicStructuredTool"
+      ) {
+        toolDefs.push(node);
+      }
+    }
+
+    // new DynamicTool()
+    if (node.type === "new_expression") {
+      if (
+        node.text.includes("DynamicTool") ||
+        node.text.includes("DynamicStructuredTool")
+      ) {
+        toolDefs.push(node);
+      }
+    }
+
+    // Classes extending Tool
+    if (node.type === "class_declaration" || node.type === "class") {
+      const heritage = node.descendantsOfType("extends_clause");
+      if (heritage.length > 0) {
+        const extendsText = heritage[0].text.toLowerCase();
+        if (
+          extendsText.includes("tool") ||
+          extendsText.includes("basetool") ||
+          extendsText.includes("structuredtool")
+        ) {
+          toolDefs.push(node);
+        }
+      }
+    }
+  });
+
+  return toolDefs;
+}
+
+/**
+ * Analyze a single TypeScript/JavaScript file for AFB04 boundaries.
+ */
+export function analyzeTypeScriptFile(
+  filePath: string,
+  sourceCode: string
+): FileAnalysisResult {
+  const startTime = Date.now();
+  const findings: AFBFinding[] = [];
+
+  try {
+    const language = filePath.endsWith('.tsx') || filePath.endsWith('.jsx')
+      ? 'typescript'
+      : 'typescript';
+
+    const tree = astWalker.parse(sourceCode, language, filePath);
+
+    // First pass: find all tool definitions
+    const toolDefs = findToolDefinitions(tree, sourceCode);
+
+    // Report tool definitions as findings
+    for (const toolDef of toolDefs) {
+      const location = astWalker.getNodeLocation(toolDef);
+      const enclosingFunc = astWalker.getEnclosingFunction(toolDef, "typescript");
+      const funcName = enclosingFunc
+        ? astWalker.getFunctionName(enclosingFunc, "typescript")
+        : undefined;
+
+      findings.push(
+        createFinding(
           filePath,
-          this.walker.getNodeLocation(newExpr),
-          newExpr.text,
-          TYPESCRIPT_PATTERNS.dynamic_tool,
-          enclosingFunc,
-          enclosingClass,
+          location,
+          toolDef.text.split("\n").slice(0, 3).join("\n"),
+          TYPESCRIPT_PATTERNS.tool_function,
+          funcName || undefined,
+          undefined,
           true,
-          'langchain',
+          "langchain",
           0.9
-        ));
-      }
+        )
+      );
     }
 
-    return findings;
-  }
-
-  /**
-   * Detect shell command execution.
-   * Patterns:
-   * - exec(), execSync()
-   * - spawn(), spawnSync()
-   * - execFile(), execFileSync()
-   * - child_process module imports/requires
-   */
-  private detectShellExecution(
-    tree: Parser.Tree,
-    filePath: string,
-    sourceCode: string
-  ): AFBFinding[] {
-    const findings: AFBFinding[] = [];
-    const callExpressions = this.walker.findNodesByType(tree, 'call_expression');
-
-    for (const call of callExpressions) {
-      const funcNode = call.childForFieldName('function');
-      if (!funcNode) continue;
-
-      const funcText = funcNode.text;
-      let pattern: ExecutionPattern | null = null;
-
-      // exec functions
-      if (this.matchesPattern(funcText, ['exec', 'execSync', 
-          'child_process.exec', 'child_process.execSync'])) {
-        pattern = funcText.includes('Sync') ? 
-          TYPESCRIPT_PATTERNS.child_process_execSync : 
-          TYPESCRIPT_PATTERNS.child_process_exec;
-      }
-      // spawn functions
-      else if (this.matchesPattern(funcText, ['spawn', 'spawnSync',
-          'child_process.spawn', 'child_process.spawnSync'])) {
-        pattern = TYPESCRIPT_PATTERNS.child_process_spawn;
-      }
-      // execFile functions
-      else if (this.matchesPattern(funcText, ['execFile', 'execFileSync',
-          'child_process.execFile', 'child_process.execFileSync'])) {
-        pattern = TYPESCRIPT_PATTERNS.child_process_exec;
+    // Second pass: find all execution points
+    astWalker.walk(tree, (node, ancestors) => {
+      if (node.type !== "call_expression") {
+        return;
       }
 
-      if (pattern) {
-        const { enclosingFunc, enclosingClass, isInTool } = 
-          this.getCallContext(call, tree);
-        
-        findings.push(createFinding(
-          filePath,
-          this.walker.getNodeLocation(call),
-          call.text,
-          pattern,
-          enclosingFunc,
-          enclosingClass,
-          isInTool,
-          undefined,
-          0.95
-        ));
-      }
-    }
-
-    return findings;
-  }
-
-  /**
-   * Detect file operations.
-   * Patterns:
-   * - fs.writeFile(), fs.writeFileSync()
-   * - fs.readFile(), fs.readFileSync()
-   * - fs.unlink(), fs.rm(), fs.rmdir()
-   * - fs.promises.* methods
-   */
-  private detectFileOperations(
-    tree: Parser.Tree,
-    filePath: string,
-    sourceCode: string
-  ): AFBFinding[] {
-    const findings: AFBFinding[] = [];
-    const callExpressions = this.walker.findNodesByType(tree, 'call_expression');
-
-    for (const call of callExpressions) {
-      const funcNode = call.childForFieldName('function');
-      if (!funcNode) continue;
-
-      const funcText = funcNode.text;
-      let pattern: ExecutionPattern | null = null;
-
-      // Write operations
-      if (this.matchesPattern(funcText, ['writeFile', 'writeFileSync',
-          'fs.writeFile', 'fs.writeFileSync', 'fs.promises.writeFile',
-          'appendFile', 'appendFileSync', 'fs.appendFile'])) {
-        pattern = TYPESCRIPT_PATTERNS.fs_writeFile;
-      }
-      // Read operations
-      else if (this.matchesPattern(funcText, ['readFile', 'readFileSync',
-          'fs.readFile', 'fs.readFileSync', 'fs.promises.readFile'])) {
-        pattern = TYPESCRIPT_PATTERNS.fs_readFile;
-      }
-      // Delete operations
-      else if (this.matchesPattern(funcText, ['unlink', 'unlinkSync',
-          'fs.unlink', 'fs.unlinkSync', 'fs.promises.unlink'])) {
-        pattern = TYPESCRIPT_PATTERNS.fs_unlink;
-      }
-      // Recursive removal
-      else if (this.matchesPattern(funcText, ['rm', 'rmSync', 'rmdir',
-          'fs.rm', 'fs.rmSync', 'fs.rmdir', 'fs.promises.rm'])) {
-        pattern = TYPESCRIPT_PATTERNS.fs_rm;
+      const match = matchCallPattern(node, sourceCode);
+      if (!match) {
+        return;
       }
 
-      if (pattern) {
-        const { enclosingFunc, enclosingClass, isInTool } = 
-          this.getCallContext(call, tree);
-        
-        findings.push(createFinding(
-          filePath,
-          this.walker.getNodeLocation(call),
-          call.text,
-          pattern,
-          enclosingFunc,
-          enclosingClass,
-          isInTool,
-          undefined,
-          0.9
-        ));
-      }
-    }
+      // Determine if this is inside a tool definition
+      const { isToolDef, framework } = isInsideToolDefinition(node, sourceCode);
 
-    return findings;
-  }
-
-  /**
-   * Detect HTTP/API calls.
-   * Patterns:
-   * - fetch()
-   * - axios.get(), axios.post(), etc.
-   * - http.request(), https.request()
-   */
-  private detectApiCalls(
-    tree: Parser.Tree,
-    filePath: string,
-    sourceCode: string
-  ): AFBFinding[] {
-    const findings: AFBFinding[] = [];
-    const callExpressions = this.walker.findNodesByType(tree, 'call_expression');
-    const httpMethods = ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'];
-
-    for (const call of callExpressions) {
-      const funcNode = call.childForFieldName('function');
-      if (!funcNode) continue;
-
-      const funcText = funcNode.text;
-      let pattern: ExecutionPattern | null = null;
-
-      // fetch API
-      if (funcText === 'fetch' || funcText.endsWith('.fetch')) {
-        pattern = TYPESCRIPT_PATTERNS.fetch_call;
-      }
-      // axios
-      else if (httpMethods.some(m => this.matchesPattern(funcText, 
-          [`axios.${m}`, `axios`])) || funcText === 'axios') {
-        pattern = TYPESCRIPT_PATTERNS.axios_call;
-      }
-      // http/https modules
-      else if (this.matchesPattern(funcText, ['http.request', 'https.request',
-          'http.get', 'https.get'])) {
-        pattern = TYPESCRIPT_PATTERNS.http_request;
-      }
-
-      if (pattern) {
-        const { enclosingFunc, enclosingClass, isInTool } = 
-          this.getCallContext(call, tree);
-        
-        findings.push(createFinding(
-          filePath,
-          this.walker.getNodeLocation(call),
-          call.text,
-          pattern,
-          enclosingFunc,
-          enclosingClass,
-          isInTool,
-          undefined,
-          0.85
-        ));
-      }
-    }
-
-    return findings;
-  }
-
-  /**
-   * Detect database operations.
-   * Patterns:
-   * - .query(), .execute()
-   * - Prisma client methods
-   * - TypeORM operations
-   */
-  private detectDatabaseOperations(
-    tree: Parser.Tree,
-    filePath: string,
-    sourceCode: string
-  ): AFBFinding[] {
-    const findings: AFBFinding[] = [];
-    const callExpressions = this.walker.findNodesByType(tree, 'call_expression');
-
-    for (const call of callExpressions) {
-      const funcNode = call.childForFieldName('function');
-      if (!funcNode) continue;
-
-      const funcText = funcNode.text;
-      let pattern: ExecutionPattern | null = null;
-
-      // Generic query/execute methods
-      if (funcText.endsWith('.query') || funcText.endsWith('.execute')) {
-        // Check for database-related context
-        if (this.isDatabaseContext(funcText, call, tree)) {
-          pattern = TYPESCRIPT_PATTERNS.query_execute;
-        }
-      }
-      // Prisma operations
-      else if (this.isPrismaOperation(funcText)) {
-        pattern = TYPESCRIPT_PATTERNS.prisma_operation;
-      }
-
-      if (pattern) {
-        const { enclosingFunc, enclosingClass, isInTool } = 
-          this.getCallContext(call, tree);
-        
-        findings.push(createFinding(
-          filePath,
-          this.walker.getNodeLocation(call),
-          call.text,
-          pattern,
-          enclosingFunc,
-          enclosingClass,
-          isInTool,
-          undefined,
-          0.8
-        ));
-      }
-    }
-
-    return findings;
-  }
-
-  /**
-   * Detect code execution.
-   * Patterns:
-   * - eval()
-   * - new Function()
-   * - vm.runInContext(), vm.runInNewContext()
-   */
-  private detectCodeExecution(
-    tree: Parser.Tree,
-    filePath: string,
-    sourceCode: string
-  ): AFBFinding[] {
-    const findings: AFBFinding[] = [];
-
-    // Check call expressions for eval
-    const callExpressions = this.walker.findNodesByType(tree, 'call_expression');
-    
-    for (const call of callExpressions) {
-      const funcNode = call.childForFieldName('function');
-      if (!funcNode) continue;
-
-      const funcText = funcNode.text;
-      let pattern: ExecutionPattern | null = null;
-
-      if (funcText === 'eval') {
-        pattern = TYPESCRIPT_PATTERNS.eval_call;
-      }
-      // vm module
-      else if (this.matchesPattern(funcText, ['vm.runInContext', 
-          'vm.runInNewContext', 'vm.runInThisContext', 'vm.compileFunction'])) {
-        pattern = TYPESCRIPT_PATTERNS.eval_call;
-      }
-
-      if (pattern) {
-        const { enclosingFunc, enclosingClass, isInTool } = 
-          this.getCallContext(call, tree);
-        
-        findings.push(createFinding(
-          filePath,
-          this.walker.getNodeLocation(call),
-          call.text,
-          pattern,
-          enclosingFunc,
-          enclosingClass,
-          isInTool,
-          undefined,
-          0.95
-        ));
-      }
-    }
-
-    // Check new expressions for Function constructor
-    const newExpressions = this.walker.findNodesByType(tree, 'new_expression');
-    
-    for (const newExpr of newExpressions) {
-      const constructorNode = newExpr.childForFieldName('constructor');
-      if (!constructorNode) continue;
-
-      if (constructorNode.text === 'Function') {
-        const { enclosingFunc, enclosingClass, isInTool } = 
-          this.getCallContext(newExpr, tree);
-        
-        findings.push(createFinding(
-          filePath,
-          this.walker.getNodeLocation(newExpr),
-          newExpr.text,
-          TYPESCRIPT_PATTERNS.function_constructor,
-          enclosingFunc,
-          enclosingClass,
-          isInTool,
-          undefined,
-          0.95
-        ));
-      }
-    }
-
-    return findings;
-  }
-
-  // --- Helper methods ---
-
-  private isToolClass(text: string): boolean {
-    const patterns = [
-      'DynamicTool', 'StructuredTool', 'DynamicStructuredTool',
-      'Tool', 'BaseTool'
-    ];
-    return patterns.some(p => text === p || text.endsWith('.' + p));
-  }
-
-  private matchesPattern(text: string, patterns: string[]): boolean {
-    return patterns.some(pattern => 
-      text === pattern || text.endsWith(pattern) || text.includes(pattern)
-    );
-  }
-
-  private isPrismaOperation(funcText: string): boolean {
-    // Prisma patterns: prisma.user.create, prisma.post.findMany, etc.
-    const prismaOperations = [
-      'create', 'createMany', 'update', 'updateMany', 'upsert',
-      'delete', 'deleteMany', 'findUnique', 'findFirst', 'findMany',
-      'aggregate', 'groupBy', 'count'
-    ];
-    
-    // Check if it looks like prisma.model.operation
-    if (funcText.includes('prisma.') || funcText.includes('$transaction')) {
-      return prismaOperations.some(op => funcText.endsWith('.' + op));
-    }
-    return false;
-  }
-
-  private isDatabaseContext(
-    funcText: string,
-    call: Parser.SyntaxNode,
-    tree: Parser.Tree
-  ): boolean {
-    // Heuristics for database context:
-    // 1. Variable name contains db, database, pool, connection, client
-    // 2. Part of a chain that includes common DB patterns
-    const dbIndicators = ['db', 'database', 'pool', 'connection', 'client', 
-      'mysql', 'postgres', 'pg', 'mongo', 'sqlite', 'knex', 'sequelize'];
-    
-    const lowerText = funcText.toLowerCase();
-    return dbIndicators.some(indicator => lowerText.includes(indicator));
-  }
-
-  private getFunctionName(funcNode: Parser.SyntaxNode): string | undefined {
-    const nameNode = funcNode.childForFieldName('name');
-    return nameNode?.text;
-  }
-
-  private getClassName(classNode: Parser.SyntaxNode): string | undefined {
-    const nameNode = classNode.childForFieldName('name');
-    return nameNode?.text;
-  }
-
-  private getCallContext(
-    call: Parser.SyntaxNode,
-    tree?: Parser.Tree
-  ): { enclosingFunc?: string; enclosingClass?: string; isInTool: boolean } {
-    const enclosingFuncNode = this.walker.getEnclosingFunction(call, 'typescript');
-    const enclosingClassNode = this.walker.getEnclosingClass(call, 'typescript');
-    
-    const enclosingFunc = enclosingFuncNode ? 
-      this.getFunctionName(enclosingFuncNode) : undefined;
-    const enclosingClass = enclosingClassNode ? 
-      this.getClassName(enclosingClassNode) : undefined;
-
-    // Heuristic: check if we're inside a tool-related context
-    let isInTool = false;
-    let current: Parser.SyntaxNode | null = call.parent;
-    
-    while (current) {
-      // Check for tool-related patterns in ancestor nodes
-      if (current.type === 'call_expression') {
-        const func = current.childForFieldName('function');
-        if (func && (func.text === 'tool' || this.isToolClass(func.text))) {
-          isInTool = true;
+      // Also check if any ancestor is a tool definition
+      let ancestorIsToolDef = false;
+      for (const ancestor of ancestors) {
+        if (toolDefs.includes(ancestor)) {
+          ancestorIsToolDef = true;
           break;
         }
       }
-      // Check variable declarations with tool-related names
-      if (current.type === 'variable_declarator') {
-        const name = current.childForFieldName('name');
-        if (name && /tool/i.test(name.text)) {
-          isInTool = true;
-          break;
-        }
-      }
-      current = current.parent;
-    }
 
-    return { enclosingFunc, enclosingClass, isInTool };
+      const isInToolDefinition = isToolDef || ancestorIsToolDef;
+
+      const location = astWalker.getNodeLocation(node);
+      const enclosingFunc = astWalker.getEnclosingFunction(node, "typescript");
+      const enclosingClass = astWalker.getEnclosingClass(node, "typescript");
+
+      const funcName = enclosingFunc
+        ? astWalker.getFunctionName(enclosingFunc, "typescript")
+        : undefined;
+      const className = enclosingClass
+        ? astWalker.getClassName(enclosingClass, "typescript")
+        : undefined;
+
+      // Calculate confidence
+      let confidence = 0.8;
+      if (isInToolDefinition) {
+        confidence = 0.95;
+      }
+
+      findings.push(
+        createFinding(
+          filePath,
+          location,
+          node.text,
+          match.pattern,
+          funcName || undefined,
+          className || undefined,
+          isInToolDefinition,
+          framework,
+          confidence
+        )
+      );
+    });
+
+    return {
+      file: filePath,
+      language: "typescript",
+      findings,
+      success: true,
+      analysisTimeMs: Date.now() - startTime,
+    };
+  } catch (error) {
+    return {
+      file: filePath,
+      language: "typescript",
+      findings: [],
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      analysisTimeMs: Date.now() - startTime,
+    };
   }
+}
+
+/**
+ * Quick check if TypeScript code likely contains agent-related patterns.
+ */
+export function likelyContainsAgentCode(sourceCode: string): boolean {
+  const agentIndicators = [
+    "langchain",
+    "@langchain",
+    "DynamicTool",
+    "DynamicStructuredTool",
+    "tool(",
+    "BaseTool",
+    "StructuredTool",
+    "AgentExecutor",
+    "createAgent",
+    "tools:",
+  ];
+
+  const lowerCode = sourceCode.toLowerCase();
+  return agentIndicators.some((indicator) =>
+    lowerCode.includes(indicator.toLowerCase())
+  );
 }
