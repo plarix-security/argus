@@ -143,7 +143,30 @@ export interface AnalysisReport {
     totalTimeMs: number;
     /** Files that failed to analyze */
     failedFiles: string[];
+    /** Scanner capability sanity-check summary */
+    sanityCheck?: ScannerSanityCheck;
   };
+}
+
+/**
+ * Explicit capability sanity-check returned with each report.
+ * This is intentionally conservative and does not claim guaranteed coverage.
+ */
+export interface ScannerSanityCheck {
+  /** Frank yes/no answer to "will this detect all CEEs and all AFBs?" */
+  detectsAllCanonicalCEEsAndAllAFBs: false;
+  /** Which AFB boundaries are currently in scope */
+  supportedAFBs: AFBType[];
+  /** Which AFB boundaries are currently out of scope */
+  unsupportedAFBs: AFBType[];
+  /** Canonical execution categories in AFB04 taxonomy scope */
+  canonicalCEECategories: ExecutionCategory[];
+  /** Categories actually observed in this scan run */
+  observedCEECategories: ExecutionCategory[];
+  /** Canonical categories not observed in this scan run */
+  missingObservedCEECategories: ExecutionCategory[];
+  /** Human-readable, blunt explanation */
+  verdict: string;
 }
 
 /**

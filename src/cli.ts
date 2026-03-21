@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AFBAnalyzer } from './analyzer';
 import { generatePRComment, generateJSONReport } from './reporter/pr-comment';
+import { AFBType, ExecutionCategory } from './types';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -18,7 +19,7 @@ async function main(): Promise<void> {
 
   const stat = fs.statSync(targetPath);
   const report = stat.isFile() ? 
-    (() => { const r = analyzer.analyzeFile(targetPath); return { repository: '.', filesAnalyzed: [r.file], totalFindings: r.findings.length, findingsBySeverity: { critical: 0, high: 0, medium: 0 }, findings: r.findings, metadata: { scannerVersion: '0.1.0', timestamp: new Date().toISOString(), totalTimeMs: r.analysisTimeMs, failedFiles: [] } }; })() :
+    (() => { const r = analyzer.analyzeFile(targetPath); const canonicalCEECategories = [ExecutionCategory.TOOL_CALL, ExecutionCategory.SHELL_EXECUTION, ExecutionCategory.FILE_OPERATION, ExecutionCategory.API_CALL, ExecutionCategory.DATABASE_OPERATION, ExecutionCategory.CODE_EXECUTION]; const observedCEECategories = Array.from(new Set(r.findings.map(f => f.category))); return { repository: '.', filesAnalyzed: [r.file], totalFindings: r.findings.length, findingsBySeverity: { critical: 0, high: 0, medium: 0 }, findings: r.findings, metadata: { scannerVersion: '0.1.0', timestamp: new Date().toISOString(), totalTimeMs: r.analysisTimeMs, failedFiles: [], sanityCheck: { detectsAllCanonicalCEEsAndAllAFBs: false as const, supportedAFBs: [AFBType.UNAUTHORIZED_ACTION], unsupportedAFBs: [AFBType.INSTRUCTION, AFBType.CONTEXT, AFBType.CONSTRAINT], canonicalCEECategories, observedCEECategories, missingObservedCEECategories: canonicalCEECategories.filter(c => !observedCEECategories.includes(c)), verdict: 'No. This scanner only statically detects AFB04-style execution patterns and cannot guarantee detection of all canonical execution events or all AFB boundaries in production.' } } }; })() :
     analyzer.analyzeDirectory(targetPath);
 
   if (args.includes('--json')) {
@@ -41,6 +42,15 @@ async function main(): Promise<void> {
         console.log(`  ${finding.codeSnippet}\n`);
       }
       if (report.totalFindings > 10) console.log(`... and ${report.totalFindings - 10} more`);
+    }
+    if (report.metadata.sanityCheck) {
+      const sanity = report.metadata.sanityCheck;
+      console.log(`\nSanity check verdict: ${sanity.verdict}`);
+      console.log(`Supported AFBs: ${sanity.supportedAFBs.join(', ')}`);
+      console.log(`Unsupported AFBs: ${sanity.unsupportedAFBs.join(', ')}`);
+      if (sanity.missingObservedCEECategories.length > 0) {
+        console.log(`CEE categories not observed in this run: ${sanity.missingObservedCEECategories.join(', ')}`);
+      }
     }
   }
 
