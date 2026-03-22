@@ -182,6 +182,24 @@ const TOOL_REGISTRATION_PATTERNS: {
 
 /**
  * Patterns that indicate dangerous operations
+ *
+ * STRICT SEVERITY CRITERIA:
+ *
+ * CRITICAL: Tool can DELETE, EXFILTRATE, or IRREVERSIBLY MODIFY data/system state
+ *   - Shell execution (can do anything including delete)
+ *   - Code execution (eval, exec - can do anything)
+ *   - File deletion operations (rmtree, os.remove, unlink)
+ *   - Database destructive operations (implicitly via shell/code execution)
+ *
+ * HIGH: Tool can WRITE or TRANSMIT data externally
+ *   - File writes (write_text, write_bytes)
+ *   - HTTP POST/PUT/PATCH/DELETE (transmitting data)
+ *   - Database writes (INSERT, UPDATE via ORM)
+ *
+ * MEDIUM: Tool has READ access to sensitive paths or external APIs returning sensitive data
+ *   - Currently not implemented (requires path context analysis)
+ *
+ * DROPPED: Everything else (reads, GETs, selects, etc.)
  */
 const DANGEROUS_OPERATION_PATTERNS: {
   pattern: RegExp;
@@ -189,37 +207,47 @@ const DANGEROUS_OPERATION_PATTERNS: {
   severity: Severity;
   description: string;
 }[] = [
-  // Shell execution - CRITICAL
-  { pattern: /^subprocess\.(run|Popen|call|check_output|check_call)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Subprocess execution' },
+  // ==================== CRITICAL ====================
+  // Shell execution - can delete/modify/exfiltrate anything
+  { pattern: /^subprocess\.(run|Popen|call|check_output|check_call)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Shell command execution' },
   { pattern: /^os\.(system|popen|exec.*)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'OS shell command' },
   { pattern: /^commands\.(getoutput|getstatusoutput)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Commands module execution' },
 
-  // Code execution - CRITICAL
+  // Code execution - can do anything
   { pattern: /^eval$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'Dynamic code evaluation' },
   { pattern: /^exec$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'Dynamic code execution' },
-  { pattern: /^compile$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.HIGH, description: 'Code compilation' },
-  { pattern: /^__import__$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.HIGH, description: 'Dynamic import' },
 
-  // File operations - HIGH
-  { pattern: /^open$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.MEDIUM, description: 'File open' },
+  // File deletion - irreversible data loss
+  { pattern: /^shutil\.rmtree$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.CRITICAL, description: 'Recursive directory deletion' },
+  { pattern: /^os\.(remove|unlink|rmdir)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.CRITICAL, description: 'File/directory deletion' },
+  { pattern: /\.unlink$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.CRITICAL, description: 'Path unlink (deletion)' },
+  { pattern: /\.rmdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.CRITICAL, description: 'Directory deletion' },
+
+  // ==================== HIGH ====================
+  // File writes - can modify system state
   { pattern: /\.write_text$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'File write' },
-  { pattern: /\.write_bytes$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'File write bytes' },
-  { pattern: /^shutil\.(copy|move|rmtree|remove)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'Bulk file operation' },
-  { pattern: /^os\.(remove|unlink|rmdir|mkdir|makedirs|rename)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'OS file operation' },
-  { pattern: /^pathlib\.Path.*\.(write|unlink|rmdir|mkdir)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'Pathlib file operation' },
+  { pattern: /\.write_bytes$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'Binary file write' },
+  { pattern: /^shutil\.(copy|copy2|copyfile|move)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'File copy/move' },
+  { pattern: /^os\.rename$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'File rename' },
 
-  // API/HTTP calls - HIGH
-  { pattern: /^requests\.(get|post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, description: 'HTTP request' },
-  { pattern: /^httpx\.(get|post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, description: 'HTTP request' },
-  { pattern: /^aiohttp\.ClientSession$/i, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, description: 'Async HTTP client' },
-  { pattern: /^urllib\.request\.(urlopen|Request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, description: 'URL request' },
-  { pattern: /\.session\.(get|post|put|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, description: 'Session HTTP request' },
+  // HTTP methods that transmit data externally (not GET)
+  { pattern: /^requests\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, description: 'HTTP write request' },
+  { pattern: /^httpx\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, description: 'HTTP write request' },
+  { pattern: /\.session\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, description: 'Session HTTP write' },
 
-  // Database operations - HIGH
-  { pattern: /\.execute$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'SQL execute' },
-  { pattern: /\.executemany$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'SQL batch execute' },
-  { pattern: /\.raw$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'Raw SQL query' },
-  { pattern: /session\.(add|delete|commit|flush)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'ORM write operation' },
+  // ORM write operations
+  { pattern: /\.session\.(add|delete|commit|flush)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'ORM write operation' },
+  { pattern: /\.save$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'ORM save' },
+  { pattern: /\.create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'ORM create' },
+  { pattern: /\.update$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'ORM update' },
+  { pattern: /\.bulk_create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'ORM bulk create' },
+
+  // ==================== DROPPED (not included) ====================
+  // - open() for reading
+  // - requests.get(), httpx.get() - reading data
+  // - .execute() - could be SELECT
+  // - compile, __import__ - not direct execution
+  // - os.mkdir, os.makedirs - creating dirs is not destructive
 ];
 
 /**
