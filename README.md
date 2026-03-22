@@ -29,35 +29,128 @@ npm run build
 
 ## CLI Usage
 
-Run analysis on a file or directory:
+### Installation
+
+After building the project, you can run argus directly:
 
 ```bash
-npm run analyze -- ./path/to/project
+npm run build
+npm run argus -- scan ./path/to/project
 ```
 
-Output as JSON:
+Or use the compiled binary:
 
 ```bash
-npm run analyze -- ./path/to/project --json
+node dist/cli/index.js scan ./path/to/project
 ```
 
-Output as Markdown:
+### Commands
 
+**Scan a directory or file:**
 ```bash
-npm run analyze -- ./path/to/project --markdown
+argus scan <path>
 ```
 
-Show help:
-
+**Check dependencies:**
 ```bash
-npm run analyze -- --help
+argus check
+```
+
+**Show version:**
+```bash
+argus version
+```
+
+**Show help:**
+```bash
+argus help
+```
+
+### Scan Options
+
+**JSON output** (stable schema for CI/CD):
+```bash
+argus scan ./project --json
+```
+
+**Filter by severity level:**
+```bash
+argus scan ./project --level critical
+argus scan ./project --level warning
+argus scan ./project --level info
+```
+
+**Write to file:**
+```bash
+argus scan ./project --output report.txt
+argus scan ./project --json --output report.json
+```
+
+**Summary only** (one line for CI):
+```bash
+argus scan ./project --summary
 ```
 
 ### Exit Codes
 
-- `0`: no high/critical findings
-- `1`: high findings detected
-- `2`: critical findings detected
+- `0`: No critical or warning findings
+- `1`: Warning level findings detected
+- `2`: Critical level findings detected
+- `3`: Scanner error (parse failure, missing dependency)
+
+### JSON Schema
+
+The `--json` flag outputs structured data with a stable schema:
+
+```json
+{
+  "version": "0.1.0",
+  "scanned_path": "/path/to/repo",
+  "files_analyzed": 34,
+  "runtime_ms": 1200,
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "file": "path/to/file.py",
+      "line": 47,
+      "function": "shutil.rmtree",
+      "tool_registration": "setup_agent",
+      "description": "Tool can reach dangerous operation without gate",
+      "afb_type": "AFB04"
+    }
+  ],
+  "summary": {
+    "critical": 2,
+    "warning": 3,
+    "info": 5,
+    "suppressed": 10
+  }
+}
+```
+
+### Example Output
+
+Terminal output (default):
+```
+argus  v0.1.0  by Plarix
+AFB Scanner — github.com/plarix-security/argus
+
+Scanning: /path/to/agent-project
+──────────────────────────────────────────────────
+
+CRITICAL  agent_tools.py:19
+subprocess.run(command, shell=True) — shell command execution
+reachable from @tool (langchain), no policy gate in call path.
+Agent can execute this without authorization basis.
+
+WARNING   api_client.py:42
+requests.post(url, data=payload) — external API call reachable
+from @tool (langchain), no policy gate in call path.
+Agent can execute this without authorization basis.
+
+──────────────────────────────────────────────────
+2 critical  1 warning  3 info  34 files  1.2s
+```
 
 ## GitHub App Mode
 

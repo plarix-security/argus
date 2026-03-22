@@ -27,3 +27,5 @@ coverage/
 tmp/
 .tmp/
 *.tmp
+
+.mailmap
