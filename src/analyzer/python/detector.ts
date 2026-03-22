@@ -98,17 +98,9 @@ export function analyzePythonFile(
     findings.push(finding);
   }
 
-  // Also report tool definitions themselves (even if no dangerous ops found)
-  for (const tool of callGraph.toolRegistrations) {
-    // Only report if we haven't already reported it via exposed paths
-    const alreadyReported = findings.some(
-      (f) => f.line === tool.startLine && f.category === ExecutionCategory.TOOL_CALL
-    );
-
-    if (!alreadyReported) {
-      findings.push(createToolDefinitionFinding(filePath, tool, parsed));
-    }
-  }
+  // NOTE: Removed tool-registration-only findings.
+  // If a tool doesn't reach any dangerous operation, it's not a finding.
+  // This avoids noise from tools that just return strings or do safe operations.
 
   // Sort findings by severity, then line
   findings.sort((a, b) => {
@@ -179,28 +171,8 @@ export function analyzeProject(
       findings.push(createFindingFromExposedPath(filePath, exposed, parsed));
     }
 
-    // Add tool definitions
-    const toolsInFile = callGraph.toolRegistrations.filter((t) => {
-      // Find tools defined in this file by checking line ranges
-      for (const func of parsed.functions) {
-        if (func.startLine === t.startLine && func.name === t.name) return true;
-      }
-      for (const cls of parsed.classes) {
-        for (const method of cls.methods) {
-          if (method.startLine === t.startLine && t.id === `${cls.name}.${method.name}`) return true;
-        }
-      }
-      return false;
-    });
-
-    for (const tool of toolsInFile) {
-      const alreadyReported = findings.some(
-        (f) => f.line === tool.startLine && f.category === ExecutionCategory.TOOL_CALL
-      );
-      if (!alreadyReported) {
-        findings.push(createToolDefinitionFinding(filePath, tool, parsed));
-      }
-    }
+    // NOTE: Removed tool-registration-only findings for project analysis too.
+    // Tools without dangerous operations don't generate findings.
 
     findings.sort((a, b) => {
       const severityOrder = { critical: 0, high: 1, medium: 2 };
@@ -223,6 +195,9 @@ export function analyzeProject(
 
 /**
  * Create a finding from an exposed path
+ *
+ * STRICT SEVERITY: Use the operation's intrinsic severity.
+ * No elevation. The pattern definitions encode the true risk.
  */
 function createFindingFromExposedPath(
   filePath: string,
@@ -231,11 +206,8 @@ function createFindingFromExposedPath(
 ): AFBFinding {
   const op = exposed.operation;
 
-  // Elevate severity if inside a tool with no policy gate
-  let severity = op.severity;
-  if (!exposed.hasGateInPath && severity !== Severity.CRITICAL) {
-    severity = severity === Severity.MEDIUM ? Severity.HIGH : Severity.CRITICAL;
-  }
+  // Use the operation's intrinsic severity - no elevation
+  const severity = op.severity;
 
   // Find the call that contains this operation
   const call = parsed.calls.find((c) => c.startLine === op.line && c.callee === op.callee);
@@ -256,43 +228,6 @@ function createFindingFromExposedPath(
       enclosingClass: call?.enclosingClass,
       isToolDefinition: true,
       framework: exposed.tool.framework,
-    },
-  };
-}
-
-/**
- * Create a finding for a tool definition
- */
-function createToolDefinitionFinding(
-  filePath: string,
-  tool: { id: string; name: string; className?: string; startLine: number; decorators: string[]; framework?: string },
-  parsed: ParsedPythonFile
-): AFBFinding {
-  // Find the function definition
-  const func = parsed.functions.find(
-    (f) => f.startLine === tool.startLine || (f.className && `${f.className}.${f.name}` === tool.id)
-  );
-
-  const codeSnippet = func
-    ? `@${tool.decorators[0] || 'tool'}\ndef ${func.name}(...)`
-    : `${tool.className ? tool.className + '.' : ''}${tool.name}`;
-
-  return {
-    type: AFBType.UNAUTHORIZED_ACTION,
-    severity: Severity.HIGH,
-    category: ExecutionCategory.TOOL_CALL,
-    file: filePath,
-    line: tool.startLine,
-    column: 1,
-    codeSnippet,
-    operation: `Tool registration: ${tool.name}`,
-    explanation: `Tool "${tool.name}" is registered with ${tool.framework || 'agent framework'}, making it callable by agent reasoning. Review what this tool can do and ensure appropriate policy controls.`,
-    confidence: 0.9,
-    context: {
-      enclosingFunction: tool.name,
-      enclosingClass: tool.className,
-      isToolDefinition: true,
-      framework: tool.framework,
     },
   };
 }

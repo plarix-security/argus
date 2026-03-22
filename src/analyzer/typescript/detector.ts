@@ -1,45 +1,38 @@
-import { astWalker } from "../ast-walker";
-import { AFBFinding, FileAnalysisResult } from "../../types";
-import { TYPESCRIPT_PATTERNS, ExecutionPattern, createFinding } from "../../afb/afb04";
+/**
+ * TypeScript/JavaScript AFB04 Detector
+ *
+ * IMPORTANT: AFB04 is about AGENT failure boundaries - operations reachable
+ * from tools that an AI agent can call. Regular application code that uses
+ * fetch() or query() is NOT an AFB04 issue.
+ *
+ * Without full call graph analysis (not yet implemented for TS), we can only
+ * report findings if the file clearly contains agent tool patterns.
+ *
+ * Current approach: Return empty findings for TypeScript/JavaScript.
+ * This is intentional - we follow the principle:
+ * "A missed finding is acceptable. A false finding from pattern matching is not."
+ *
+ * Future iteration: Implement call graph analysis for TypeScript to properly
+ * trace from tool registrations to dangerous operations.
+ */
 
-type SyntaxNode = any;
-
-function matchCallPattern(node: SyntaxNode, sourceCode: string): { pattern: ExecutionPattern; patternKey: string } | null {
-  if (node.type !== "call_expression") return null;
-  const funcNode = node.childForFieldName?.("function");
-  if (!funcNode) return null;
-  const funcText = funcNode.text;
-
-  if (funcText === "tool") return { pattern: TYPESCRIPT_PATTERNS.tool_function, patternKey: "tool_function" };
-  if (funcText.includes("exec")) return { pattern: TYPESCRIPT_PATTERNS.child_process_exec, patternKey: "child_process_exec" };
-  if (funcText.includes("spawn")) return { pattern: TYPESCRIPT_PATTERNS.child_process_spawn, patternKey: "child_process_spawn" };
-  if (funcText.includes("writeFile")) return { pattern: TYPESCRIPT_PATTERNS.fs_writeFile, patternKey: "fs_writeFile" };
-  if (funcText.includes("readFile")) return { pattern: TYPESCRIPT_PATTERNS.fs_readFile, patternKey: "fs_readFile" };
-  if (funcText.includes("unlink")) return { pattern: TYPESCRIPT_PATTERNS.fs_unlink, patternKey: "fs_unlink" };
-  if (funcText.includes("rm")) return { pattern: TYPESCRIPT_PATTERNS.fs_rm, patternKey: "fs_rm" };
-  if (funcText === "fetch") return { pattern: TYPESCRIPT_PATTERNS.fetch_call, patternKey: "fetch_call" };
-  if (funcText.includes("axios")) return { pattern: TYPESCRIPT_PATTERNS.axios_call, patternKey: "axios_call" };
-  if (funcText.includes("http")) return { pattern: TYPESCRIPT_PATTERNS.http_request, patternKey: "http_request" };
-  if (funcText.includes("query") || funcText.includes("execute")) return { pattern: TYPESCRIPT_PATTERNS.query_execute, patternKey: "query_execute" };
-  if (funcText.includes("prisma")) return { pattern: TYPESCRIPT_PATTERNS.prisma_operation, patternKey: "prisma_operation" };
-  if (funcText === "eval") return { pattern: TYPESCRIPT_PATTERNS.eval_call, patternKey: "eval_call" };
-  return null;
-}
+import { FileAnalysisResult } from "../../types";
 
 export function analyzeTypeScriptFile(filePath: string, sourceCode: string): FileAnalysisResult {
   const startTime = Date.now();
-  const findings: AFBFinding[] = [];
-  try {
-    const tree = astWalker.parse(sourceCode, "typescript");
-    astWalker.walk(tree, (node: SyntaxNode) => {
-      const match = matchCallPattern(node, sourceCode);
-      if (match) {
-        const location = astWalker.getNodeLocation(node);
-        findings.push(createFinding(filePath, location, node.text, match.pattern, undefined, undefined, false, undefined, 0.8));
-      }
-    });
-    return { file: filePath, language: "typescript", findings, success: true, analysisTimeMs: Date.now() - startTime };
-  } catch (error) {
-    return { file: filePath, language: "typescript", findings: [], success: false, error: String(error), analysisTimeMs: Date.now() - startTime };
-  }
+
+  // TypeScript/JavaScript AFB04 detection is disabled until proper
+  // call graph analysis is implemented. Returning empty findings to
+  // avoid false positives from pattern matching regular application code.
+  //
+  // The Python detector has proper call graph analysis and should be
+  // the primary detection mechanism for now.
+
+  return {
+    file: filePath,
+    language: "typescript",
+    findings: [],
+    success: true,
+    analysisTimeMs: Date.now() - startTime,
+  };
 }
