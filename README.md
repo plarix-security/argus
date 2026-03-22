@@ -1,12 +1,12 @@
-# Argus
+# wyscan
 
 **Static analyzer for agentic AI codebases that detects unsafe tool boundaries.**
 
-Argus finds places in your agent code where tools can execute dangerous operations, like shell commands, file deletion, or external API calls, without authorization checks. It analyzes Python and TypeScript/JavaScript codebases to identify **AFB04 (Unauthorized Action)** boundaries: the execution paths where an AI agent's actions can affect systems or data.
+wyscan finds places in your agent code where tools can execute dangerous operations, like shell commands, file deletion, or external API calls, without authorization checks. It analyzes Python and TypeScript/JavaScript codebases to identify **AFB04 (Unauthorized Action)** boundaries: the execution paths where an AI agent's actions can affect systems or data.
 
 ```
-argus  v0.6.0  by Plarix
-AFB Scanner — github.com/plarix-security/argus
+wyscan  v0.6.0  by Plarix
+AFB Scanner — github.com/plarix-security/wyscan
 
 Scanning: /path/to/agent-project
 ──────────────────────────────────────────────────
@@ -27,7 +27,7 @@ Agent can transmit data externally without authorization.
 
 ## What It Does
 
-**Argus scans your agent codebase and reports:**
+**wyscan scans your agent codebase and reports:**
 
 - Tool functions exposed to LLM reasoning that can execute shell commands
 - File system operations (delete, write, move) reachable from agent tools
@@ -45,7 +45,7 @@ Agent can transmit data externally without authorization.
 
 In agentic systems, the boundary between AI reasoning and code execution is a critical security point. A tool decorated with `@tool` becomes callable by the LLM. If that tool can reach `subprocess.run()`, `shutil.rmtree()`, or `requests.post()` without authorization checks, the agent has unrestricted access to those capabilities.
 
-Argus helps you find these boundaries early so you can:
+wyscan helps you find these boundaries early so you can:
 - Add policy gates before deployment
 - Review which capabilities agents actually need
 - Audit authorization coverage across tool definitions
@@ -57,7 +57,7 @@ Argus helps you find these boundaries early so you can:
 
 **Option 1: Link locally (development)**
 ```bash
-cd argus
+cd wyscan
 npm install
 npm run build
 npm link
@@ -65,21 +65,21 @@ npm link
 
 **Option 2: Global install (when published)**
 ```bash
-npm install -g @plarix/argus
+npm install -g @plarix/wyscan
 ```
 
 **Option 3: Direct usage (no install)**
 ```bash
-npm run argus -- scan ./project
+npm run wyscan -- scan ./project
 ```
 
 ### Run Your First Scan
 
 ```bash
-argus scan ./my-agent-project
+wyscan scan ./my-agent-project
 ```
 
-That's it. Argus will scan all Python and TypeScript/JavaScript files, build a call graph from tool definitions, and report any dangerous operations reachable without policy gates.
+That's it. wyscan will scan all Python and TypeScript/JavaScript files, build a call graph from tool definitions, and report any dangerous operations reachable without policy gates.
 
 ## CLI Reference
 
@@ -87,23 +87,23 @@ That's it. Argus will scan all Python and TypeScript/JavaScript files, build a c
 
 | Command | Description |
 |---------|-------------|
-| `argus scan <path>` | Scan a directory or file for AFB exposures |
-| `argus check` | Verify dependencies (tree-sitter, Node.js) |
-| `argus version` | Print version and exit |
-| `argus help` | Show usage information |
+| `wyscan scan <path>` | Scan a directory or file for AFB exposures |
+| `wyscan check` | Verify dependencies (tree-sitter, Node.js) |
+| `wyscan version` | Print version and exit |
+| `wyscan help` | Show usage information |
 
 ### Scan Options
 
 | Flag | Description | Example |
 |------|-------------|---------|
-| `--json` | Output structured JSON with stable schema | `argus scan ./project --json` |
-| `--level <severity>` | Filter by severity: `critical`, `warning`, `info` | `argus scan ./project --level critical` |
-| `--output <file>` | Write report to file instead of stdout | `argus scan ./project --output report.txt` |
-| `--summary` | One-line summary only (for CI pipelines) | `argus scan ./project --summary` |
+| `--json` | Output structured JSON with stable schema | `wyscan scan ./project --json` |
+| `--level <severity>` | Filter by severity: `critical`, `warning`, `info` | `wyscan scan ./project --level critical` |
+| `--output <file>` | Write report to file instead of stdout | `wyscan scan ./project --output report.txt` |
+| `--summary` | One-line summary only (for CI pipelines) | `wyscan scan ./project --summary` |
 
 ### Exit Codes
 
-Argus uses exit codes for CI/CD integration:
+wyscan uses exit codes for CI/CD integration:
 
 | Code | Meaning | CI Action |
 |------|---------|-----------|
@@ -115,7 +115,7 @@ Argus uses exit codes for CI/CD integration:
 **CI/CD Example:**
 ```bash
 # Fail build on critical findings only
-argus scan ./src --level critical
+wyscan scan ./src --level critical
 if [ $? -eq 2 ]; then
   echo "Critical AFB exposures detected. Build failed."
   exit 1
@@ -127,13 +127,13 @@ fi
 ### Basic Scan
 
 ```bash
-argus scan ./agent-project
+wyscan scan ./agent-project
 ```
 
 **Output:**
 ```
-argus  v0.6.0  by Plarix
-AFB Scanner — github.com/plarix-security/argus
+wyscan  v0.6.0  by Plarix
+AFB Scanner — github.com/plarix-security/wyscan
 
 Scanning: /agent-project
 ──────────────────────────────────────────────────
@@ -160,7 +160,7 @@ Agent can execute this without authorization basis.
 ### JSON Output
 
 ```bash
-argus scan ./project --json
+wyscan scan ./project --json
 ```
 
 **Output:**
@@ -194,16 +194,16 @@ argus scan ./project --json
 
 ```bash
 # Show only critical findings
-argus scan ./project --level critical
+wyscan scan ./project --level critical
 
 # Show critical and warning (hide info)
-argus scan ./project --level warning
+wyscan scan ./project --level warning
 ```
 
 ### Summary for CI
 
 ```bash
-argus scan ./project --summary
+wyscan scan ./project --summary
 ```
 
 **Output:**
@@ -217,22 +217,22 @@ Perfect for CI pipelines that need a quick pass/fail status.
 
 ```bash
 # Human-readable report
-argus scan ./project --output report.txt
+wyscan scan ./project --output report.txt
 
 # Machine-readable JSON
-argus scan ./project --json --output report.json
+wyscan scan ./project --json --output report.json
 ```
 
 ### Check Dependencies
 
 ```bash
-argus check
+wyscan check
 ```
 
 **Output:**
 ```
-argus  v0.6.0  by Plarix
-AFB Scanner — github.com/plarix-security/argus
+wyscan  v0.6.0  by Plarix
+AFB Scanner — github.com/plarix-security/wyscan
 
 Checking dependencies...
 
@@ -243,11 +243,11 @@ Checking dependencies...
 All checks passed. Ready to scan.
 ```
 
-## What Argus Detects
+## What wyscan Detects
 
 ### Severity Levels
 
-Argus uses a four-level severity model based on blast radius and reversibility:
+wyscan uses a four-level severity model based on blast radius and reversibility:
 
 **CRITICAL** - Irreversible destruction, exfiltration, or arbitrary execution
 - Shell command execution (`subprocess.run`, `os.system`)
@@ -270,7 +270,7 @@ Argus uses a four-level severity model based on blast radius and reversibility:
 
 ### Supported Frameworks
 
-Argus detects tool registrations in:
+wyscan detects tool registrations in:
 
 - **LangChain**: `@tool` decorator, `BaseTool` subclasses, `Tool()` constructor
 - **CrewAI**: `@task` decorator, `@agent` decorator
@@ -295,7 +295,7 @@ Argus detects tool registrations in:
 
 **Policy Gate Detection:**
 
-Argus looks for structural authorization checks between tools and dangerous operations:
+wyscan looks for structural authorization checks between tools and dangerous operations:
 - Functions that raise `PermissionError`, `AuthorizationError`, or similar
 - Conditional branches that check parameters and can prevent execution
 - Early returns when authorization fails
@@ -336,7 +336,7 @@ The `--json` output follows this stable schema (versioned):
 
 ## GitHub App Mode
 
-Argus can run as a GitHub App to scan pull requests and push events automatically.
+wyscan can run as a GitHub App to scan pull requests and push events automatically.
 
 ### Setup
 
@@ -363,7 +363,7 @@ The GitHub App mode uses the same scanner engine as the CLI. Findings are identi
 
 ## Configuration
 
-Argus uses sensible defaults. No configuration file is required.
+wyscan uses sensible defaults. No configuration file is required.
 
 **Default exclusions:**
 - `node_modules/`
@@ -394,13 +394,13 @@ npm test
 npm run link
 
 # Run locally without install
-npm run argus -- scan ./project
+npm run wyscan -- scan ./project
 ```
 
 ### Project Structure
 
 ```
-argus/
+wyscan/
 ├── src/
 │   ├── cli/              # CLI interface
 │   │   ├── index.ts      # Entry point and commands
@@ -455,10 +455,10 @@ MIT License. See LICENSE file for details.
 
 ## Links
 
-- **Repository**: https://github.com/plarix-security/argus
-- **Documentation**: https://github.com/plarix-security/argus/blob/main/README.md
-- **Issues**: https://github.com/plarix-security/argus/issues
-- **AFB Specification**: https://github.com/plarix-security/argus/blob/main/afb-spec/
+- **Repository**: https://github.com/plarix-security/wyscan
+- **Documentation**: https://github.com/plarix-security/wyscan/blob/main/README.md
+- **Issues**: https://github.com/plarix-security/wyscan/issues
+- **AFB Specification**: https://github.com/plarix-security/wyscan/blob/main/afb-spec/
 
 ## About AFB
 
@@ -469,7 +469,7 @@ MIT License. See LICENSE file for details.
 - **AFB03**: Constraint Boundary - enforces operational limits and guardrails
 - **AFB04**: Unauthorized Action - controls what operations agents can perform
 
-Argus currently detects AFB04 boundaries through static analysis. Future versions will support AFB01-03 with semantic analysis capabilities.
+wyscan currently detects AFB04 boundaries through static analysis. Future versions will support AFB01-03 with semantic analysis capabilities.
 
 ---
 
