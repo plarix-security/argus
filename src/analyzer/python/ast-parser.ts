@@ -62,6 +62,24 @@ export interface FunctionDef {
   className?: string;
   /** Control flow information for policy gate detection */
   controlFlow?: ControlFlowInfo;
+  /** Whether any decorator structurally acts as a gate */
+  hasDecoratorGate?: boolean;
+  /** Names of decorators that act as structural gates */
+  gateDecorators?: string[];
+}
+
+/**
+ * Decorator definition info for structural gate detection
+ */
+export interface DecoratorDef {
+  /** Name of the decorator function */
+  name: string;
+  /** Line where defined */
+  startLine: number;
+  /** Whether this decorator structurally acts as a gate */
+  isStructuralGate: boolean;
+  /** Control flow info of the decorator (or inner wrapper) */
+  controlFlow?: ControlFlowInfo;
 }
 
 /**
@@ -106,6 +124,8 @@ export interface ParsedPythonFile {
   classes: ClassDef[];
   calls: CallSite[];
   imports: ImportInfo[];
+  /** Decorator functions defined in this file (for cross-file resolution) */
+  decoratorDefs: DecoratorDef[];
   success: boolean;
   error?: string;
 }
@@ -485,6 +505,96 @@ function analyzeControlFlow(funcNode: Parser.SyntaxNode): ControlFlowInfo {
 }
 
 /**
+ * Detect if a function is a decorator and analyze its gate behavior.
+ *
+ * A decorator is identified by:
+ * 1. It returns a function (wrapper pattern)
+ * 2. The wrapper wraps the original function
+ *
+ * A decorator is a STRUCTURAL GATE if the wrapper function:
+ * 1. Has conditional paths that can raise exceptions
+ * 2. Has conditional paths that can return early (before calling the wrapped function)
+ * 3. Checks some condition (like permissions) before proceeding
+ */
+function analyzeDecoratorFunction(funcNode: Parser.SyntaxNode): DecoratorDef | null {
+  const name = funcNode.childForFieldName('name')?.text || '';
+  const body = funcNode.childForFieldName('body');
+  if (!body) return null;
+
+  // Look for a nested function definition (the wrapper)
+  const nestedFuncs = findAllNodes(body, new Set(['function_definition', 'async_function_definition']));
+
+  // A decorator typically has one inner wrapper function
+  if (nestedFuncs.length === 0) return null;
+
+  // Check if the function returns the wrapper
+  const returnStmts = findAllNodes(body, new Set(['return_statement']));
+  let returnsWrapper = false;
+  for (const ret of returnStmts) {
+    const returnValue = ret.children.find(c => c.type !== 'return');
+    if (returnValue) {
+      // Check if it returns one of the nested function names
+      for (const nestedFunc of nestedFuncs) {
+        const nestedName = nestedFunc.childForFieldName('name')?.text;
+        if (nestedName && returnValue.text.includes(nestedName)) {
+          returnsWrapper = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!returnsWrapper) return null;
+
+  // This looks like a decorator! Now analyze the wrapper for gate behavior
+  // The wrapper is the innermost function that gets executed when the decorated function is called
+  const wrapperFunc = nestedFuncs[nestedFuncs.length - 1]; // Usually the last/deepest one is the actual wrapper
+  const wrapperControlFlow = analyzeControlFlow(wrapperFunc);
+
+  // A decorator is a structural gate if the wrapper can prevent execution
+  const isStructuralGate = (
+    wrapperControlFlow.hasConditionalRaise ||
+    wrapperControlFlow.hasConditionalReturn
+  ) && wrapperControlFlow.hasConditionalBranches;
+
+  return {
+    name,
+    startLine: funcNode.startPosition.row + 1,
+    isStructuralGate,
+    controlFlow: wrapperControlFlow,
+  };
+}
+
+/**
+ * Check if decorators on a function include any structural gates.
+ *
+ * Uses a map of decorator definitions from the same file
+ * to determine if decorators structurally act as gates.
+ */
+function checkDecoratorGates(
+  decorators: string[],
+  decoratorDefs: Map<string, DecoratorDef>
+): { hasGate: boolean; gateDecorators: string[] } {
+  const gateDecorators: string[] = [];
+
+  for (const dec of decorators) {
+    // Extract the decorator name (without arguments)
+    const decoratorName = dec.split('(')[0].trim();
+
+    // Check if we have the decorator definition and it's a gate
+    const def = decoratorDefs.get(decoratorName);
+    if (def?.isStructuralGate) {
+      gateDecorators.push(decoratorName);
+    }
+  }
+
+  return {
+    hasGate: gateDecorators.length > 0,
+    gateDecorators,
+  };
+}
+
+/**
  * Parse a Python source file and extract structural information
  */
 export function parsePythonSource(sourceCode: string): ParsedPythonFile {
@@ -494,6 +604,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       classes: [],
       calls: [],
       imports: [],
+      decoratorDefs: [],
       success: false,
       error: 'Parser not initialized. Call initParser() first.',
     };
@@ -508,6 +619,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
     const classes: ClassDef[] = [];
     const calls: CallSite[] = [];
     const imports: ImportInfo[] = [];
+    const decoratorDefs: DecoratorDef[] = [];
 
     // Find all decorated definitions, function definitions, and class definitions
     const decoratedDefs = findAllNodes(root, new Set(['decorated_definition']));
@@ -522,6 +634,17 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       new Set(['import_statement', 'import_from_statement'])
     );
 
+    // First pass: identify decorator definitions
+    // A decorator is a function that returns a wrapper function
+    const decoratorDefMap = new Map<string, DecoratorDef>();
+    for (const funcDef of funcDefs) {
+      const decDef = analyzeDecoratorFunction(funcDef);
+      if (decDef) {
+        decoratorDefs.push(decDef);
+        decoratorDefMap.set(decDef.name, decDef);
+      }
+    }
+
     // Process decorated definitions
     for (const decDef of decoratedDefs) {
       const decorators = extractDecorators(decDef);
@@ -533,6 +656,9 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       );
 
       if (!innerDef) continue;
+
+      // Check for decorator-based gates
+      const decoratorGateInfo = checkDecoratorGates(decorators, decoratorDefMap);
 
       if (
         innerDef.type === 'function_definition' ||
@@ -551,6 +677,8 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
             ? extractClassName(enclosingClass)
             : undefined,
           controlFlow: analyzeControlFlow(innerDef),
+          hasDecoratorGate: decoratorGateInfo.hasGate,
+          gateDecorators: decoratorGateInfo.gateDecorators,
         });
       } else if (innerDef.type === 'class_definition') {
         const classDef: ClassDef = {
@@ -738,6 +866,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       classes,
       calls,
       imports,
+      decoratorDefs,
       success: true,
     };
   } catch (error) {
@@ -746,6 +875,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       classes: [],
       calls: [],
       imports: [],
+      decoratorDefs: [],
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
