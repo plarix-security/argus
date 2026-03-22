@@ -1,4 +1,4 @@
-# AFB Scanner
+# Argus
 
 **Agent Failure Boundary Scanner** - Detects AFB04 (Unauthorized Action) boundaries in agentic AI codebases through static analysis.
 
