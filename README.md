@@ -22,6 +22,8 @@ In agentic systems, boundaries between reasoning and execution are high-risk poi
 
 ## Installation
 
+Build the project:
+
 ```bash
 npm install
 npm run build
@@ -29,16 +31,37 @@ npm run build
 
 ## CLI Usage
 
-### Installation
+### Install globally
 
-After building the project, you can run argus directly:
+**NPM package** (when published):
+```bash
+npm install -g @plarix/argus
+```
+
+**Link locally for development**:
+```bash
+npm run build && npm link
+```
+
+After installation or linking, the `argus` command is available system-wide:
 
 ```bash
-npm run build
+argus scan ./my-agent-repo
+argus check
+argus version
+```
+
+### Direct usage (without install):
+
+### Direct usage (without install):
+
+For development without global install:
+
+```bash
 npm run argus -- scan ./path/to/project
 ```
 
-Or use the compiled binary:
+Or use the compiled binary directly:
 
 ```bash
 node dist/cli/index.js scan ./path/to/project
