@@ -21,6 +21,7 @@ import {
   CallSite,
   ImportInfo,
   ControlFlowInfo,
+  DecoratorDef,
 } from './ast-parser';
 import { ExecutionCategory, Severity } from '../../types';
 import * as path from 'path';
@@ -522,6 +523,12 @@ export function buildCallGraph(
         : func.name;
       const globalId = `${filePath}:${localId}`;
 
+      // A function has a policy gate if:
+      // 1. Its own control flow is a structural gate, OR
+      // 2. It has a decorator that acts as a structural gate
+      const hasStructuralGate = isStructuralPolicyGate(func.controlFlow);
+      const hasDecoratorGate = func.hasDecoratorGate || false;
+
       const node: CallGraphNode = {
         id: globalId,
         name: func.name,
@@ -533,8 +540,8 @@ export function buildCallGraph(
         callers: new Set(),
         isToolRegistration: false,
         dangerousOps: [],
-        // Use structural analysis to determine if this is a policy gate
-        hasPolicyGate: isStructuralPolicyGate(func.controlFlow),
+        // Use structural analysis + decorator analysis to determine if this is a policy gate
+        hasPolicyGate: hasStructuralGate || hasDecoratorGate,
         controlFlow: func.controlFlow,
         sourceFile: filePath,
       };
@@ -559,6 +566,12 @@ export function buildCallGraph(
         const localId = `${cls.name}.${method.name}`;
         const globalId = `${filePath}:${localId}`;
 
+        // A method has a policy gate if:
+        // 1. Its own control flow is a structural gate, OR
+        // 2. It has a decorator that acts as a structural gate
+        const hasStructuralGate = isStructuralPolicyGate(method.controlFlow);
+        const hasDecoratorGate = method.hasDecoratorGate || false;
+
         const node: CallGraphNode = {
           id: globalId,
           name: method.name,
@@ -571,8 +584,8 @@ export function buildCallGraph(
           isToolRegistration: toolInfo !== null && (method.name === '_run' || method.name === 'run' || method.name === 'invoke'),
           framework: toolInfo?.framework,
           dangerousOps: [],
-          // Use structural analysis to determine if this is a policy gate
-          hasPolicyGate: isStructuralPolicyGate(method.controlFlow),
+          // Use structural analysis + decorator analysis to determine if this is a policy gate
+          hasPolicyGate: hasStructuralGate || hasDecoratorGate,
           controlFlow: method.controlFlow,
           sourceFile: filePath,
         };
