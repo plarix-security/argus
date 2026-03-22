@@ -18,14 +18,14 @@ This includes:
 
 These execution points require careful authorization and validation to prevent unintended actions driven by adversarial inputs or compromised reasoning.
 
-## Why AFB Scanner?
+## Why Argus?
 
 Traditional security scanners miss agent-specific risks:
 - They don't understand tool-calling patterns
 - They can't identify agent execution boundaries
 - They don't distinguish between direct user code and agent-accessible code
 
-AFB Scanner is purpose-built for agentic AI security:
+Argus is purpose-built for agentic AI security:
 - **Framework-aware**: Recognizes LangChain, CrewAI, and custom agent patterns
 - **Context-sensitive**: Distinguishes code inside tool definitions (higher risk) from regular code
 - **No hardcoding**: Uses AST analysis, not regex matching
