@@ -104,7 +104,7 @@ export function analyzePythonFile(
 
   // Sort findings by severity, then line
   findings.sort((a, b) => {
-    const severityOrder = { critical: 0, high: 1, medium: 2 };
+    const severityOrder = { critical: 0, warning: 1, info: 2, suppressed: 3 };
     const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
     if (sevDiff !== 0) return sevDiff;
     return a.line - b.line;
@@ -175,7 +175,7 @@ export function analyzeProject(
     // Tools without dangerous operations don't generate findings.
 
     findings.sort((a, b) => {
-      const severityOrder = { critical: 0, high: 1, medium: 2 };
+      const severityOrder = { critical: 0, warning: 1, info: 2, suppressed: 3 };
       const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
       if (sevDiff !== 0) return sevDiff;
       return a.line - b.line;

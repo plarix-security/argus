@@ -99,10 +99,10 @@ AFB01, AFB02, AFB03 are out of scope for this version.
 *AFB Scanner by Plarix — runtime enforcement: plarix.dev*`;
   }
 
-  // Group findings by severity
+  // Group findings by severity (exclude SUPPRESSED from PR reports)
   const criticalFindings = findings.filter((f) => f.severity === Severity.CRITICAL);
-  const highFindings = findings.filter((f) => f.severity === Severity.HIGH);
-  const mediumFindings = findings.filter((f) => f.severity === Severity.MEDIUM);
+  const warningFindings = findings.filter((f) => f.severity === Severity.WARNING);
+  const infoFindings = findings.filter((f) => f.severity === Severity.INFO);
 
   // Build sections
   const sections: string[] = [];
@@ -131,35 +131,35 @@ AFB01, AFB02, AFB03 are out of scope for this version.
     }
   }
 
-  // High section
-  if (highFindings.length > 0) {
+  // Warning section
+  if (warningFindings.length > 0) {
     sections.push(`---
 
-### High
+### Warning
 `);
-    const toShow = highFindings.slice(0, 5);
+    const toShow = warningFindings.slice(0, 5);
     for (const finding of toShow) {
       sections.push(formatFinding(finding));
       sections.push('');
     }
-    if (highFindings.length > 5) {
-      sections.push(`*...and ${highFindings.length - 5} more high findings*`);
+    if (warningFindings.length > 5) {
+      sections.push(`*...and ${warningFindings.length - 5} more warning findings*`);
     }
   }
 
-  // Medium section
-  if (mediumFindings.length > 0) {
+  // Info section
+  if (infoFindings.length > 0) {
     sections.push(`---
 
-### Medium
+### Info
 `);
-    const toShow = mediumFindings.slice(0, 3);
+    const toShow = infoFindings.slice(0, 3);
     for (const finding of toShow) {
       sections.push(formatFinding(finding));
       sections.push('');
     }
-    if (mediumFindings.length > 3) {
-      sections.push(`*...and ${mediumFindings.length - 3} more medium findings*`);
+    if (infoFindings.length > 3) {
+      sections.push(`*...and ${infoFindings.length - 3} more info findings*`);
     }
   }
 
@@ -198,11 +198,11 @@ export function generateStatusSummary(report: AnalysisReport): string {
   if (findingsBySeverity.critical > 0) {
     parts.push(`${findingsBySeverity.critical} critical`);
   }
-  if (findingsBySeverity.high > 0) {
-    parts.push(`${findingsBySeverity.high} high`);
+  if (findingsBySeverity.warning > 0) {
+    parts.push(`${findingsBySeverity.warning} warning`);
   }
-  if (findingsBySeverity.medium > 0) {
-    parts.push(`${findingsBySeverity.medium} medium`);
+  if (findingsBySeverity.info > 0) {
+    parts.push(`${findingsBySeverity.info} info`);
   }
 
   return `AFB Scanner: ${totalFindings} AFB04 exposures (${parts.join(', ')})`;
@@ -240,8 +240,8 @@ ${GREEN}No AFB04 exposures detected.${RESET}
   output += `
 ${BOLD}Summary:${RESET}
   ${RED}Critical:${RESET} ${findingsBySeverity.critical}
-  ${YELLOW}High:${RESET}     ${findingsBySeverity.high}
-  Medium:   ${findingsBySeverity.medium}
+  ${YELLOW}Warning:${RESET}  ${findingsBySeverity.warning}
+  Info:     ${findingsBySeverity.info}
 
 ${BOLD}Findings:${RESET}
 `;
@@ -250,7 +250,7 @@ ${BOLD}Findings:${RESET}
   const toShow = findings.slice(0, 10);
   for (const finding of toShow) {
     const severityColor = finding.severity === Severity.CRITICAL ? RED :
-                          finding.severity === Severity.HIGH ? YELLOW : RESET;
+                          finding.severity === Severity.WARNING ? YELLOW : RESET;
     const funcName = finding.context?.enclosingFunction || 'unknown';
 
     output += `
