@@ -234,11 +234,17 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.write_bytes$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'Binary file write' },
   { pattern: /^shutil\.(copy|copy2|copyfile|move)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File copy/move' },
   { pattern: /^os\.rename$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File rename' },
+  { pattern: /^os\.makedirs$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'Directory creation' },
+  { pattern: /\.mkdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'Directory creation' },
+  { pattern: /\.write$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File write' },
 
-  // HTTP methods that transmit data externally
+  // HTTP methods that transmit data externally (various client styles)
   { pattern: /^requests\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP write request' },
   { pattern: /^httpx\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP write request' },
+  { pattern: /^aiohttp\.ClientSession\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Async HTTP write' },
   { pattern: /\.session\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Session HTTP write' },
+  // Match any .post(), .put(), .patch(), .delete() method calls (common API client patterns)
+  { pattern: /\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP write request' },
 
   // ORM write operations
   { pattern: /\.session\.(add|delete|commit|flush)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM write operation' },
@@ -246,27 +252,40 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM create' },
   { pattern: /\.update$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM update' },
   { pattern: /\.bulk_create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM bulk create' },
+  { pattern: /\.insert$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database insert' },
+
+  // Email sending
+  { pattern: /\.send_message$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Send message/email' },
+  { pattern: /\.send_email$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Send email' },
+  { pattern: /smtp\.sendmail$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'SMTP send' },
 
   // ==================== INFO ====================
   // File reads - read-only access to sensitive data
   { pattern: /^open$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File open (read)' },
   { pattern: /\.read_text$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read' },
   { pattern: /\.read_bytes$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Binary file read' },
+  { pattern: /\.read$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read' },
 
-  // HTTP GET - reading from external APIs
+  // HTTP GET - reading from external APIs (various client styles)
   { pattern: /^requests\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP GET request' },
   { pattern: /^httpx\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP GET request' },
   { pattern: /^urllib\.request\.(urlopen|urlretrieve)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'URL fetch' },
+  { pattern: /^aiohttp\.ClientSession\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'Async HTTP GET' },
+  // Generic .get() is too common (dict.get, etc.) - don't match it
 
   // Database reads
   { pattern: /\.execute$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database query execution' },
   { pattern: /\.fetchall$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database fetch' },
   { pattern: /\.fetchone$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database fetch' },
   { pattern: /\.query$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database query' },
+  { pattern: /\.select$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database select' },
 
   // Environment access
   { pattern: /^os\.getenv$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Environment variable read' },
   { pattern: /^os\.environ$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Environment access' },
+  { pattern: /\.listdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory listing' },
+  { pattern: /^os\.listdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory listing' },
+  { pattern: /\.glob$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File glob' },
 ];
 
 /**
@@ -843,14 +862,43 @@ function detectToolClass(
 
 /**
  * Detect if a call is a dangerous operation
+ *
+ * For open() calls, checks the mode argument to determine if write (WARNING)
+ * or read (INFO). Default mode 'r' is read.
  */
 function detectDangerousOperation(call: CallSite): DangerousOperation | null {
   for (const pattern of DANGEROUS_OPERATION_PATTERNS) {
     if (pattern.pattern.test(call.callee)) {
+      let severity = pattern.severity;
+
+      // Special handling for open() - check mode argument
+      // write modes: 'w', 'wb', 'a', 'ab', 'x', 'xb', 'r+', 'rb+', 'w+', 'wb+', 'a+', 'ab+'
+      // read modes: 'r', 'rb', '' (default)
+      if (call.callee === 'open') {
+        const args = call.arguments;
+        // Mode is typically the second argument
+        if (args.length >= 2) {
+          const modeArg = args[1].toLowerCase().replace(/['"]/g, '');
+          // Check for write modes
+          if (modeArg.includes('w') || modeArg.includes('a') || modeArg.includes('x') || modeArg.includes('+')) {
+            severity = Severity.WARNING;
+          }
+        }
+        // Also check keyword argument mode=
+        for (const arg of args) {
+          const lowerArg = arg.toLowerCase();
+          if (lowerArg.includes('mode=') || lowerArg.includes('mode =')) {
+            if (lowerArg.includes('w') || lowerArg.includes('a') || lowerArg.includes('x') || lowerArg.includes('+')) {
+              severity = Severity.WARNING;
+            }
+          }
+        }
+      }
+
       return {
         callee: call.callee,
         category: pattern.category,
-        severity: pattern.severity,
+        severity,
         line: call.startLine,
         column: call.startColumn,
         codeSnippet: call.codeSnippet,
