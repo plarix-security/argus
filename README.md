@@ -1,144 +1,325 @@
 # Argus
 
-Argus is a static analysis tool for agentic AI codebases. It identifies **AFB04 (Unauthorized Action)** boundaries, the points where an agent can execute actions that affect systems or data.
+**Static analyzer for agentic AI codebases that detects unsafe tool boundaries.**
 
-The project provides:
-- A command-line scanner for local analysis
-- A GitHub App mode for automated pull request and push scanning
+Argus finds places in your agent code where tools can execute dangerous operations—like shell commands, file deletion, or external API calls—without authorization checks. It analyzes Python and TypeScript/JavaScript codebases to identify **AFB04 (Unauthorized Action)** boundaries: the execution paths where an AI agent's actions can affect systems or data.
 
-## What Argus Detects
+```
+argus  v0.1.0  by Plarix
+AFB Scanner — github.com/plarix-security/argus
 
-Argus focuses on action-capable execution paths in Python and TypeScript/JavaScript projects, including:
-- Tool definitions exposed to agent reasoning
-- Shell command execution
-- File system writes and destructive file operations
-- External API calls
-- Database execution paths
-- Dynamic code execution primitives
+Scanning: /path/to/agent-project
+──────────────────────────────────────────────────
+
+CRITICAL  agent_tools.py:47
+shutil.rmtree(agent_dir) — file operation reachable from @tool
+(langchain), no policy gate in call path.
+Agent can delete arbitrary directories without authorization.
+
+WARNING   api_client.py:83
+requests.post(url, data=payload) — external API call reachable
+from @tool (langchain), no policy gate in call path.
+Agent can transmit data externally without authorization.
+
+──────────────────────────────────────────────────
+2 critical  3 warning  5 info  34 files  1.2s
+```
+
+## What It Does
+
+**Argus scans your agent codebase and reports:**
+
+- Tool functions exposed to LLM reasoning that can execute shell commands
+- File system operations (delete, write, move) reachable from agent tools
+- External API calls (HTTP POST/PUT/DELETE) without policy gates
+- Database write operations accessible from tool definitions
+- Dynamic code execution (eval, exec) in agent-callable functions
+
+**It does NOT:**
+- Execute your code (static analysis only)
+- Require you to change your code to run
+- Use LLMs or inference (pure AST-based detection)
+- Produce false positives from pattern matching (proper call graph analysis)
 
 ## Why This Matters
 
-In agentic systems, boundaries between reasoning and execution are high-risk points. Argus helps teams find these boundaries early so they can review authorization, validation, and guardrail coverage before deployment.
+In agentic systems, the boundary between AI reasoning and code execution is a critical security point. A tool decorated with `@tool` becomes callable by the LLM. If that tool can reach `subprocess.run()`, `shutil.rmtree()`, or `requests.post()` without authorization checks, the agent has unrestricted access to those capabilities.
 
-## Installation
+Argus helps you find these boundaries early so you can:
+- Add policy gates before deployment
+- Review which capabilities agents actually need
+- Audit authorization coverage across tool definitions
+- Prevent agents from performing unauthorized actions
 
-Build the project:
+## Quick Start
 
+### Install
+
+**Option 1: Link locally (development)**
 ```bash
+cd argus
 npm install
 npm run build
+npm link
 ```
 
-## CLI Usage
-
-### Install globally
-
-**NPM package** (when published):
+**Option 2: Global install (when published)**
 ```bash
 npm install -g @plarix/argus
 ```
 
-**Link locally for development**:
+**Option 3: Direct usage (no install)**
 ```bash
-npm run build && npm link
+npm run argus -- scan ./project
 ```
 
-After installation or linking, the `argus` command is available system-wide:
+### Run Your First Scan
 
 ```bash
-argus scan ./my-agent-repo
-argus check
-argus version
+argus scan ./my-agent-project
 ```
 
-### Direct usage (without install):
+That's it. Argus will scan all Python and TypeScript/JavaScript files, build a call graph from tool definitions, and report any dangerous operations reachable without policy gates.
 
-### Direct usage (without install):
-
-For development without global install:
-
-```bash
-npm run argus -- scan ./path/to/project
-```
-
-Or use the compiled binary directly:
-
-```bash
-node dist/cli/index.js scan ./path/to/project
-```
+## CLI Reference
 
 ### Commands
 
-**Scan a directory or file:**
-```bash
-argus scan <path>
-```
-
-**Check dependencies:**
-```bash
-argus check
-```
-
-**Show version:**
-```bash
-argus version
-```
-
-**Show help:**
-```bash
-argus help
-```
+| Command | Description |
+|---------|-------------|
+| `argus scan <path>` | Scan a directory or file for AFB exposures |
+| `argus check` | Verify dependencies (tree-sitter, Node.js) |
+| `argus version` | Print version and exit |
+| `argus help` | Show usage information |
 
 ### Scan Options
 
-**JSON output** (stable schema for CI/CD):
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--json` | Output structured JSON with stable schema | `argus scan ./project --json` |
+| `--level <severity>` | Filter by severity: `critical`, `warning`, `info` | `argus scan ./project --level critical` |
+| `--output <file>` | Write report to file instead of stdout | `argus scan ./project --output report.txt` |
+| `--summary` | One-line summary only (for CI pipelines) | `argus scan ./project --summary` |
+
+### Exit Codes
+
+Argus uses exit codes for CI/CD integration:
+
+| Code | Meaning | CI Action |
+|------|---------|-----------|
+| `0` | No critical or warning findings | ✓ Pass build |
+| `1` | Warning level findings detected | ⚠ Optional: fail build |
+| `2` | Critical level findings detected | ✗ Fail build |
+| `3` | Scanner error (parse failure, dependency missing) | ✗ Fail build |
+
+**CI/CD Example:**
+```bash
+# Fail build on critical findings only
+argus scan ./src --level critical
+if [ $? -eq 2 ]; then
+  echo "Critical AFB exposures detected. Build failed."
+  exit 1
+fi
+```
+
+## Examples
+
+### Basic Scan
+
+```bash
+argus scan ./agent-project
+```
+
+**Output:**
+```
+argus  v0.1.0  by Plarix
+AFB Scanner — github.com/plarix-security/argus
+
+Scanning: /agent-project
+──────────────────────────────────────────────────
+
+CRITICAL  tools/setup_agent.py:60
+shutil.rmtree(agent_dir) — file operation reachable from @tool
+(langchain), no policy gate in call path.
+Agent can execute this without authorization basis.
+
+WARNING   tools/api_client.py:42
+requests.post(url, data=payload) — external API call reachable
+from @tool (crewai), no policy gate in call path.
+Agent can execute this without authorization basis.
+
+INFO      tools/reader.py:28
+open(file_path, 'r') — file operation reachable from @tool
+(langchain), no policy gate in call path.
+Agent can execute this without authorization basis.
+
+──────────────────────────────────────────────────
+1 critical  1 warning  1 info  12 files  0.3s
+```
+
+### JSON Output
+
 ```bash
 argus scan ./project --json
 ```
 
-**Filter by severity level:**
+**Output:**
+```json
+{
+  "version": "0.1.0",
+  "scanned_path": "/project",
+  "files_analyzed": 12,
+  "runtime_ms": 342,
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "file": "tools/setup_agent.py",
+      "line": 60,
+      "function": "shutil.rmtree",
+      "tool_registration": "setup_agent",
+      "description": "Tool \"setup_agent\" (langchain) can reach shutil.rmtree. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    }
+  ],
+  "summary": {
+    "critical": 1,
+    "warning": 1,
+    "info": 1,
+    "suppressed": 0
+  }
+}
+```
+
+### Filter by Severity
+
 ```bash
+# Show only critical findings
 argus scan ./project --level critical
+
+# Show critical and warning (hide info)
 argus scan ./project --level warning
-argus scan ./project --level info
 ```
 
-**Write to file:**
-```bash
-argus scan ./project --output report.txt
-argus scan ./project --json --output report.json
-```
+### Summary for CI
 
-**Summary only** (one line for CI):
 ```bash
 argus scan ./project --summary
 ```
 
-### Exit Codes
+**Output:**
+```
+1 critical  1 warning  1 info  12 files  0.3s
+```
 
-- `0`: No critical or warning findings
-- `1`: Warning level findings detected
-- `2`: Critical level findings detected
-- `3`: Scanner error (parse failure, missing dependency)
+Perfect for CI pipelines that need a quick pass/fail status.
 
-### JSON Schema
+### Output to File
 
-The `--json` flag outputs structured data with a stable schema:
+```bash
+# Human-readable report
+argus scan ./project --output report.txt
+
+# Machine-readable JSON
+argus scan ./project --json --output report.json
+```
+
+### Check Dependencies
+
+```bash
+argus check
+```
+
+**Output:**
+```
+argus  v0.1.0  by Plarix
+AFB Scanner — github.com/plarix-security/argus
+
+Checking dependencies...
+
+  ✓ Node.js                   v18.0.0
+  ✓ tree-sitter-python.wasm   found
+  ✓ Parser initialization     ok
+
+All checks passed. Ready to scan.
+```
+
+## What Argus Detects
+
+### Severity Levels
+
+Argus uses a four-level severity model based on blast radius and reversibility:
+
+**CRITICAL** - Irreversible destruction, exfiltration, or arbitrary execution
+- Shell command execution (`subprocess.run`, `os.system`)
+- Dynamic code execution (`eval`, `exec`)
+- File/directory deletion (`shutil.rmtree`, `os.remove`, `unlink`)
+
+**WARNING** - Recoverable but consequential state modification or transmission
+- File writes (`write_text`, `open('w')`, `shutil.copy`)
+- HTTP mutations (`requests.post`, `httpx.put`, `fetch` with POST)
+- Database writes (`session.add`, `execute` with INSERT/UPDATE)
+- Email sending (`smtp.sendmail`)
+
+**INFO** - Read-only access to sensitive data or external systems
+- File reads (`open('r')`, `read_text`)
+- HTTP GET requests (`requests.get`, `fetch`)
+- Database queries (`execute` with SELECT, `fetchall`)
+- Environment variable access (`os.getenv`)
+
+**SUPPRESSED** - Low-confidence detections (logged but not reported)
+
+### Supported Frameworks
+
+Argus detects tool registrations in:
+
+- **LangChain**: `@tool` decorator, `BaseTool` subclasses, `Tool()` constructor
+- **CrewAI**: `@task` decorator, `@agent` decorator
+- **AutoGen**: `register_function`, `function_map`
+- **LlamaIndex**: `FunctionTool`, `QueryEngineTool`
+- **MCP**: `@server.tool` decorator
+- **OpenAI**: Raw function calling with `tools=` parameter
+
+### Supported Languages
+
+- **Python**: Full AST parsing with tree-sitter, cross-file call graph analysis
+- **TypeScript/JavaScript**: Planned (detector exists but currently returns empty findings)
+
+## How It Works
+
+1. **Parse source files** using tree-sitter to build an AST
+2. **Identify tool registrations** by detecting framework-specific patterns
+3. **Build a call graph** from each tool definition
+4. **Trace execution paths** to find dangerous operations
+5. **Check for policy gates** in call paths (authorization checks)
+6. **Report findings** with severity based on operation type and context
+
+**Policy Gate Detection:**
+
+Argus looks for structural authorization checks between tools and dangerous operations:
+- Functions that raise `PermissionError`, `AuthorizationError`, or similar
+- Conditional branches that check parameters and can prevent execution
+- Early returns when authorization fails
+
+If no gate is detected in the call path, the finding is reported.
+
+## JSON Schema
+
+The `--json` output follows this stable schema (versioned):
 
 ```json
 {
   "version": "0.1.0",
-  "scanned_path": "/path/to/repo",
+  "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,
   "findings": [
     {
-      "severity": "CRITICAL",
-      "file": "path/to/file.py",
+      "severity": "CRITICAL|WARNING|INFO|SUPPRESSED",
+      "file": "relative/path/to/file.py",
       "line": 47,
       "function": "shutil.rmtree",
-      "tool_registration": "setup_agent",
-      "description": "Tool can reach dangerous operation without gate",
+      "tool_registration": "function_name_with_@tool",
+      "description": "Detailed explanation of the finding",
       "afb_type": "AFB04"
     }
   ],
@@ -151,73 +332,145 @@ The `--json` flag outputs structured data with a stable schema:
 }
 ```
 
-### Example Output
-
-Terminal output (default):
-```
-argus  v0.1.0  by Plarix
-AFB Scanner — github.com/plarix-security/argus
-
-Scanning: /path/to/agent-project
-──────────────────────────────────────────────────
-
-CRITICAL  agent_tools.py:19
-subprocess.run(command, shell=True) — shell command execution
-reachable from @tool (langchain), no policy gate in call path.
-Agent can execute this without authorization basis.
-
-WARNING   api_client.py:42
-requests.post(url, data=payload) — external API call reachable
-from @tool (langchain), no policy gate in call path.
-Agent can execute this without authorization basis.
-
-──────────────────────────────────────────────────
-2 critical  1 warning  3 info  34 files  1.2s
-```
+**Schema Stability:** The JSON schema will not change between patch versions. Breaking schema changes require a minor version bump with migration documentation.
 
 ## GitHub App Mode
 
-Argus can run as a GitHub App webhook service and scan pull request and push events.
+Argus can run as a GitHub App to scan pull requests and push events automatically.
 
-### Required environment variables
+### Setup
 
-```bash
-GITHUB_APP_ID=your-app-id
-GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
-GITHUB_WEBHOOK_SECRET=your-webhook-secret
-PORT=3000
-```
+1. Create a GitHub App with webhook events enabled
+2. Set environment variables:
+   ```bash
+   GITHUB_APP_ID=your-app-id
+   GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
+   GITHUB_WEBHOOK_SECRET=your-webhook-secret
+   PORT=3000
+   ```
+3. Start the service:
+   ```bash
+   npm run build
+   npm start
+   ```
 
-### Run the service
+### Endpoints
 
-```bash
-npm start
-```
+- `GET /health` - Health check
+- `POST /webhook` - GitHub webhook events
 
-The service exposes:
-- `GET /health` for health checks
-- `POST /webhook` for GitHub webhook events
+The GitHub App mode uses the same scanner engine as the CLI. Findings are identical.
 
-## Scope and Limitations
+## Configuration
 
-Current scope:
-- AFB04 detection
-- Python and TypeScript/JavaScript scanning
-- Pattern-based static analysis using AST parsing
+Argus uses sensible defaults. No configuration file is required.
 
-Out of scope in the current version:
-- AFB01, AFB02, and AFB03 classes
-- Runtime behavior analysis
-- Automatic remediation
+**Default exclusions:**
+- `node_modules/`
+- `.venv/`, `venv/`
+- `__pycache__/`
+- `dist/`, `build/`
+- `.git/`
+- `test/`, `tests/`, `*.test.*`, `*.spec.*`
+
+**Default limits:**
+- Max files: 1000
+- Confidence threshold: 0.7
+- Include: `**/*.py`, `**/*.ts`, `**/*.tsx`, `**/*.js`, `**/*.jsx`
 
 ## Development
 
 ```bash
+# Install dependencies
+npm install
+
+# Build
 npm run build
+
+# Run tests
 npm test
-npm run dev
+
+# Link for development
+npm run link
+
+# Run locally without install
+npm run argus -- scan ./project
 ```
+
+### Project Structure
+
+```
+argus/
+├── src/
+│   ├── cli/              # CLI interface
+│   │   ├── index.ts      # Entry point and commands
+│   │   ├── formatter.ts  # Terminal output formatting
+│   │   └── version.ts    # Version constants
+│   ├── analyzer/         # Scanner engine
+│   │   ├── index.ts      # Orchestrator
+│   │   ├── python/       # Python analyzer
+│   │   │   ├── detector.ts     # Detection logic
+│   │   │   ├── ast-parser.ts   # Tree-sitter AST parser
+│   │   │   └── call-graph.ts   # Call graph builder
+│   │   └── typescript/   # TypeScript analyzer (planned)
+│   ├── github/           # GitHub App integration
+│   ├── reporter/         # Output formatters
+│   └── types/            # TypeScript types
+├── wasm/                 # Tree-sitter WASM binaries
+└── test-repos/           # Test fixtures
+```
+
+## Limitations
+
+**Current scope:**
+- AFB04 (Unauthorized Action) detection only
+- Python language support (TypeScript planned)
+- Tree-sitter based AST parsing
+- Single-level cross-file call resolution
+
+**Out of scope:**
+- AFB01 (Instruction Injection) - requires semantic analysis
+- AFB02 (Context Poisoning) - requires data provenance tracking
+- AFB03 (Constraint Bypass) - requires business logic understanding
+- Runtime behavior analysis
+- Automatic remediation or code generation
+- Multi-language projects (Python + TypeScript in same scan)
+
+## Roadmap
+
+- [ ] Full TypeScript/JavaScript support
+- [ ] Multi-level transitive import resolution
+- [ ] Custom pattern definitions
+- [ ] IDE plugins (VSCode, JetBrains)
+- [ ] AFB01-03 detection with semantic analysis
+- [ ] Configuration file support
+
+## Contributing
+
+Contributions are welcome. See the project's GitHub repository for guidelines.
 
 ## License
 
-MIT
+MIT License. See LICENSE file for details.
+
+## Links
+
+- **Repository**: https://github.com/plarix-security/argus
+- **Documentation**: https://github.com/plarix-security/argus/blob/main/README.md
+- **Issues**: https://github.com/plarix-security/argus/issues
+- **AFB Specification**: https://github.com/plarix-security/argus/blob/main/afb-spec/
+
+## About AFB
+
+**Agent Failure Boundary (AFB)** is a security taxonomy for AI agent systems that defines four critical boundaries:
+
+- **AFB01**: Instruction Boundary - separates system instructions from user input
+- **AFB02**: Context Boundary - separates trustworthy from untrusted retrieved context
+- **AFB03**: Constraint Boundary - enforces operational limits and guardrails
+- **AFB04**: Unauthorized Action - controls what operations agents can perform
+
+Argus currently detects AFB04 boundaries through static analysis. Future versions will support AFB01-03 with semantic analysis capabilities.
+
+---
+
+**Built by Plarix Security** • Securing agentic AI systems from the ground up
