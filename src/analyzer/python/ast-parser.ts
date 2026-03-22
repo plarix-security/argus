@@ -139,13 +139,50 @@ export async function initParser(): Promise<void> {
   await Parser.init();
   parser = new Parser();
 
-  // Try dist first, then fall back to source wasm
-  let wasmPath = path.join(__dirname, '../../../wasm/tree-sitter-python.wasm');
-  if (!fs.existsSync(wasmPath)) {
-    wasmPath = path.join(process.cwd(), 'wasm/tree-sitter-python.wasm');
+  // WASM loading paths in order of preference:
+  // 1. dist/wasm (built/deployed)
+  // 2. wasm (source directory)
+  // 3. node_modules/tree-sitter-wasms/out (npm package)
+  const wasmCandidates = [
+    path.join(__dirname, '../../../wasm/tree-sitter-python.wasm'),     // from dist/analyzer/python
+    path.join(__dirname, '../../wasm/tree-sitter-python.wasm'),        // from src/analyzer/python (dev)
+    path.join(process.cwd(), 'dist/wasm/tree-sitter-python.wasm'),
+    path.join(process.cwd(), 'wasm/tree-sitter-python.wasm'),
+    path.join(process.cwd(), 'node_modules/tree-sitter-wasms/out/tree-sitter-python.wasm'),
+  ];
+
+  let wasmPath: string | undefined;
+  let validationError: string | undefined;
+
+  for (const candidate of wasmCandidates) {
+    if (fs.existsSync(candidate)) {
+      // Validate it's actually a WASM file by checking magic bytes
+      try {
+        const fd = fs.openSync(candidate, 'r');
+        const buffer = Buffer.alloc(4);
+        fs.readSync(fd, buffer, 0, 4, 0);
+        fs.closeSync(fd);
+
+        // WASM magic number: 0x00 0x61 0x73 0x6D (null + 'asm')
+        if (buffer[0] === 0x00 && buffer[1] === 0x61 && buffer[2] === 0x73 && buffer[3] === 0x6d) {
+          wasmPath = candidate;
+          break;
+        } else {
+          validationError = `${candidate} is not a valid WASM file (wrong magic number)`;
+        }
+      } catch (err) {
+        validationError = `Failed to validate ${candidate}: ${err}`;
+      }
+    }
   }
-  if (!fs.existsSync(wasmPath)) {
-    throw new Error(`Python WASM not found at ${wasmPath}`);
+
+  if (!wasmPath) {
+    const triedPaths = wasmCandidates.join('\n  - ');
+    throw new Error(
+      `Python WASM not found. Tried:\n  - ${triedPaths}\n` +
+      (validationError ? `Last validation error: ${validationError}\n` : '') +
+      `Install with: npm install tree-sitter-wasms`
+    );
   }
 
   pythonLanguage = await Parser.Language.load(wasmPath);
