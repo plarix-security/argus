@@ -6,38 +6,40 @@
  * Wraps the existing scanner engine used by the GitHub App.
  *
  * Commands:
- *   argus scan <path>     Scan a directory or file for AFB exposures
- *   argus check           Verify dependencies are working
- *   argus version         Print version and exit
- *   argus help            Print usage information
+ *   argus scan <path> [flags]   Scan for AFB exposures
+ *   argus check                 Verify dependencies
+ *   argus version               Print version
+ *   argus help [command]        Show usage
  *
  * Exit codes:
  *   0  No critical or warning findings
- *   1  Warning level findings detected
- *   2  Critical level findings detected
- *   3  Scanner error (parse failure, missing dependency)
+ *   1  Warning findings detected
+ *   2  Critical findings detected
+ *   3  Scanner or dependency error
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { AFBAnalyzer } from '../analyzer';
 import { AnalysisReport, Severity } from '../types';
-import { VERSION, NAME, AUTHOR, REPO } from './version';
+import { VERSION, NAME } from './version';
 import {
   printHeader,
-  printScanStart,
+  printScanTarget,
+  printSummaryCounts,
   printFindings,
-  printSummary,
+  printFooter,
   printOneLiner,
   printError,
   printCheckStatus,
+  printZeroFindings,
   isTTY,
 } from './formatter';
 
 /**
  * Exit codes
  */
-const EXIT_CODES = {
+const EXIT = {
   CLEAN: 0,
   WARNING: 1,
   CRITICAL: 2,
@@ -45,20 +47,117 @@ const EXIT_CODES = {
 };
 
 /**
+ * Scan options
+ */
+interface ScanOptions {
+  level: Severity;
+  output: string | null;
+  json: boolean;
+  summary: boolean;
+  recursive: boolean;
+  quiet: boolean;
+  debug: boolean;
+}
+
+/**
  * Parse severity level from string
  */
-function parseSeverityLevel(level: string): Severity | null {
-  const lower = level.toLowerCase();
-  if (lower === 'critical') return Severity.CRITICAL;
-  if (lower === 'warning') return Severity.WARNING;
-  if (lower === 'info') return Severity.INFO;
+function parseSeverity(level: string): Severity | null {
+  const l = level.toLowerCase();
+  if (l === 'critical') return Severity.CRITICAL;
+  if (l === 'warning') return Severity.WARNING;
+  if (l === 'info') return Severity.INFO;
   return null;
 }
 
 /**
- * Generate JSON report with stable schema
+ * Parse command line flags
  */
-function generateJSONOutput(report: AnalysisReport, scannedPath: string): string {
+function parseFlags(args: string[]): { targetPath: string | null; options: ScanOptions; error: string | null } {
+  const options: ScanOptions = {
+    level: Severity.INFO,
+    output: null,
+    json: false,
+    summary: false,
+    recursive: true,
+    quiet: false,
+    debug: false,
+  };
+
+  let targetPath: string | null = null;
+  let i = 0;
+
+  while (i < args.length) {
+    const arg = args[i];
+
+    // Boolean flags
+    if (arg === '-j' || arg === '--json') {
+      options.json = true;
+      i++;
+      continue;
+    }
+    if (arg === '-s' || arg === '--summary') {
+      options.summary = true;
+      i++;
+      continue;
+    }
+    if (arg === '-r' || arg === '--recursive') {
+      options.recursive = true;
+      i++;
+      continue;
+    }
+    if (arg === '-q' || arg === '--quiet') {
+      options.quiet = true;
+      i++;
+      continue;
+    }
+    if (arg === '-d' || arg === '--debug') {
+      options.debug = true;
+      i++;
+      continue;
+    }
+
+    // Flags with values
+    if (arg === '-l' || arg === '--level') {
+      if (!args[i + 1] || args[i + 1].startsWith('-')) {
+        return { targetPath: null, options, error: `${arg} requires a value (critical|warning|info)` };
+      }
+      const level = parseSeverity(args[i + 1]);
+      if (!level) {
+        return { targetPath: null, options, error: `invalid level: ${args[i + 1]} (use critical|warning|info)` };
+      }
+      options.level = level;
+      i += 2;
+      continue;
+    }
+    if (arg === '-o' || arg === '--output') {
+      if (!args[i + 1] || args[i + 1].startsWith('-')) {
+        return { targetPath: null, options, error: `${arg} requires a filename` };
+      }
+      options.output = args[i + 1];
+      i += 2;
+      continue;
+    }
+
+    // Unknown flag
+    if (arg.startsWith('-')) {
+      return { targetPath: null, options, error: `unknown flag: ${arg}` };
+    }
+
+    // Positional argument (path)
+    if (!targetPath) {
+      targetPath = arg;
+    }
+    i++;
+  }
+
+  return { targetPath, options, error: null };
+}
+
+/**
+ * Generate JSON report
+ */
+function generateJSON(report: AnalysisReport, scannedPath: string): string {
   const output = {
     version: VERSION,
     scanned_path: scannedPath,
@@ -68,7 +167,7 @@ function generateJSONOutput(report: AnalysisReport, scannedPath: string): string
       severity: f.severity.toUpperCase(),
       file: f.file,
       line: f.line,
-      function: f.codeSnippet.split('(')[0].trim(),
+      function: f.codeSnippet.split('(')[0].trim().replace(/^[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*/, ''),
       tool_registration: f.context?.enclosingFunction || null,
       description: f.explanation,
       afb_type: f.type,
@@ -84,63 +183,64 @@ function generateJSONOutput(report: AnalysisReport, scannedPath: string): string
 }
 
 /**
- * Print help message
+ * Print help
  */
-function printHelp(): void {
-  console.log(`
-${NAME} - AFB Scanner for agentic AI codebases
+function printHelp(command?: string): void {
+  if (command === 'scan') {
+    console.log(`
+  ${NAME} scan <path> [flags]
 
-USAGE
-  ${NAME} scan <path> [options]    Scan a directory or file
-  ${NAME} check                    Verify dependencies
-  ${NAME} version                  Print version
-  ${NAME} help                     Print this help
+  Scan a file or directory for AFB exposures.
 
-SCAN OPTIONS
-  --json                Output as JSON (stable schema for CI)
-  --level <level>       Filter by severity: critical, warning, info
-  --output <file>       Write report to file instead of stdout
-  --summary             One-line output only (for CI pipelines)
+  Flags:
+    -l, --level <level>   Minimum severity (critical|warning|info)
+    -o, --output <file>   Write output to file
+    -j, --json            JSON output
+    -s, --summary         One-line summary only
+    -r, --recursive       Scan recursively (default: true)
+    -q, --quiet           Suppress output, exit code only
+    -d, --debug           Show debug information
 
-EXIT CODES
-  0    No critical or warning findings
-  1    Warning level findings detected
-  2    Critical level findings detected
-  3    Scanner error (parse failure, missing dependency)
-
-EXAMPLES
-  ${NAME} scan ./my-agent-project
-  ${NAME} scan ./tools.py --json
-  ${NAME} scan ./project --level warning
-  ${NAME} scan ./project --json --output report.json
-  ${NAME} scan ./project --summary
-
-JSON SCHEMA
-  {
-    "version": "0.1.0",
-    "scanned_path": "/path/to/repo",
-    "files_analyzed": 34,
-    "runtime_ms": 1200,
-    "findings": [
-      {
-        "severity": "CRITICAL",
-        "file": "path/to/file.py",
-        "line": 47,
-        "function": "shutil.rmtree",
-        "tool_registration": "setup_agent",
-        "description": "...",
-        "afb_type": "AFB04"
-      }
-    ],
-    "summary": {
-      "critical": 2,
-      "warning": 3,
-      "info": 5,
-      "suppressed": 10
-    }
+  Examples:
+    ${NAME} scan .
+    ${NAME} scan ./agent.py -l critical
+    ${NAME} scan . -j -o findings.json
+`);
+    return;
   }
 
-More info: ${REPO}
+  console.log(`
+  ${NAME} v${VERSION}  ·  Plarix
+  AFB Scanner — Static analysis for AI agent codebases.
+
+  Usage:
+    ${NAME} scan <path> [flags]
+    ${NAME} check
+    ${NAME} version
+    ${NAME} help [command]
+
+  Flags:
+    -l, --level <level>   Minimum severity to report
+                          (critical|warning|info)
+    -o, --output <file>   Write output to file
+    -j, --json            JSON output
+    -s, --summary         One-line summary only
+    -r, --recursive       Scan recursively
+    -q, --quiet           Suppress output, exit code only
+    -d, --debug           Show debug information
+
+  Exit codes:
+    0   No findings at warning or critical level
+    1   Warning findings detected
+    2   Critical findings detected
+    3   Scanner or dependency error
+
+  Examples:
+    ${NAME} scan .
+    ${NAME} scan ./agent.py -l critical
+    ${NAME} scan . -j -o findings.json
+    ${NAME} scan . -s
+    ${NAME} check
 `);
 }
 
@@ -152,11 +252,12 @@ function printVersion(): void {
 }
 
 /**
- * Check dependencies
+ * Run check command
  */
 async function runCheck(): Promise<number> {
   printHeader();
-  console.log('Checking dependencies...');
+  console.log();
+  console.log('  Checking dependencies...');
   console.log();
 
   let allOk = true;
@@ -172,8 +273,7 @@ async function runCheck(): Promise<number> {
   const wasmDir = path.join(__dirname, '../../wasm');
   const pythonWasm = path.join(wasmDir, 'tree-sitter-python.wasm');
   const pythonWasmExists = fs.existsSync(pythonWasm);
-  printCheckStatus('tree-sitter-python.wasm', pythonWasmExists,
-    pythonWasmExists ? 'found' : 'missing');
+  printCheckStatus('tree-sitter-python.wasm', pythonWasmExists, pythonWasmExists ? 'found' : 'missing');
   if (!pythonWasmExists) allOk = false;
 
   // Try to initialize the analyzer
@@ -182,55 +282,39 @@ async function runCheck(): Promise<number> {
     await analyzer.ensureInitialized();
     printCheckStatus('Parser initialization', true, 'ok');
   } catch (err) {
-    printCheckStatus('Parser initialization', false,
-      err instanceof Error ? err.message : 'failed');
+    printCheckStatus('Parser initialization', false, err instanceof Error ? err.message : 'failed');
     allOk = false;
   }
 
   console.log();
   if (allOk) {
-    console.log('All checks passed. Ready to scan.');
-    return EXIT_CODES.CLEAN;
+    console.log('  All checks passed. Ready to scan.');
   } else {
-    console.log('Some checks failed. See above for details.');
-    return EXIT_CODES.ERROR;
+    console.log('  Some checks failed. See above for details.');
   }
+  console.log();
+
+  return allOk ? EXIT.CLEAN : EXIT.ERROR;
 }
 
 /**
  * Run scan command
  */
 async function runScan(args: string[]): Promise<number> {
-  // Parse arguments
-  const targetArg = args.find(a => !a.startsWith('--'));
-  const jsonOutput = args.includes('--json');
-  const summaryOnly = args.includes('--summary');
+  const { targetPath, options, error } = parseFlags(args);
 
-  // Parse --level flag
-  const levelIdx = args.indexOf('--level');
-  let level = Severity.INFO;
-  if (levelIdx !== -1 && args[levelIdx + 1]) {
-    const parsed = parseSeverityLevel(args[levelIdx + 1]);
-    if (!parsed) {
-      printError(`invalid level: ${args[levelIdx + 1]}`, 'use: critical, warning, or info');
-      return EXIT_CODES.ERROR;
-    }
-    level = parsed;
+  if (error) {
+    printError(error);
+    console.error();
+    console.error('  Run "argus help scan" for usage.');
+    return EXIT.ERROR;
   }
 
-  // Parse --output flag
-  const outputIdx = args.indexOf('--output');
-  let outputFile: string | null = null;
-  if (outputIdx !== -1 && args[outputIdx + 1]) {
-    outputFile = args[outputIdx + 1];
-  }
+  const resolvedPath = path.resolve(targetPath || '.');
 
-  // Resolve target path
-  const targetPath = path.resolve(targetArg || '.');
-
-  if (!fs.existsSync(targetPath)) {
-    printError(`path does not exist: ${targetPath}`);
-    return EXIT_CODES.ERROR;
+  if (!fs.existsSync(resolvedPath)) {
+    printError(`path does not exist: ${resolvedPath}`);
+    return EXIT.ERROR;
   }
 
   // Initialize analyzer
@@ -239,20 +323,22 @@ async function runScan(args: string[]): Promise<number> {
     analyzer = new AFBAnalyzer();
     await analyzer.ensureInitialized();
   } catch (err) {
-    printError('failed to initialize scanner',
-      err instanceof Error ? err.message : 'unknown error');
-    return EXIT_CODES.ERROR;
+    if (options.debug) {
+      console.error(err);
+    }
+    printError('failed to initialize scanner', err instanceof Error ? err.message : 'unknown error');
+    return EXIT.ERROR;
   }
 
   // Run scan
   let report: AnalysisReport;
-  const stat = fs.statSync(targetPath);
+  const stat = fs.statSync(resolvedPath);
 
   try {
     if (stat.isFile()) {
-      const result = analyzer.analyzeFile(targetPath);
+      const result = analyzer.analyzeFile(resolvedPath);
       report = {
-        repository: path.basename(path.dirname(targetPath)),
+        repository: path.basename(path.dirname(resolvedPath)),
         filesAnalyzed: result.success ? [result.file] : [],
         totalFindings: result.findings.length,
         findingsBySeverity: {
@@ -271,16 +357,18 @@ async function runScan(args: string[]): Promise<number> {
       };
 
       if (!result.success) {
-        printError(`failed to parse: ${result.file}`, result.error);
-        return EXIT_CODES.ERROR;
+        printError(`could not parse ${path.basename(result.file)}`, result.error);
+        return EXIT.ERROR;
       }
     } else {
-      report = analyzer.analyzeDirectory(targetPath);
+      report = analyzer.analyzeDirectory(resolvedPath);
     }
   } catch (err) {
-    printError('scan failed',
-      err instanceof Error ? err.message : 'unknown error');
-    return EXIT_CODES.ERROR;
+    if (options.debug) {
+      console.error(err);
+    }
+    printError('scan failed', err instanceof Error ? err.message : 'unknown error');
+    return EXIT.ERROR;
   }
 
   // Filter findings by level
@@ -290,97 +378,68 @@ async function runScan(args: string[]): Promise<number> {
     [Severity.INFO]: 2,
     [Severity.SUPPRESSED]: 3,
   };
-  const filteredFindings = report.findings.filter(
-    f => severityOrder[f.severity] <= severityOrder[level]
-  );
-  const filteredReport = {
-    ...report,
-    findings: filteredFindings,
-    totalFindings: filteredFindings.length,
-  };
+  const filteredFindings = report.findings.filter(f => severityOrder[f.severity] <= severityOrder[options.level]);
+  const filteredReport = { ...report, findings: filteredFindings, totalFindings: filteredFindings.length };
 
-  // Generate and output results
-  if (jsonOutput) {
-    const output = generateJSONOutput(filteredReport, targetPath);
-    if (outputFile) {
-      try {
-        fs.writeFileSync(outputFile, output + '\n');
-      } catch (err) {
-        printError(`failed to write output file: ${outputFile}`,
-          err instanceof Error ? err.message : 'unknown error');
-        return EXIT_CODES.ERROR;
-      }
+  // Generate output
+  if (options.quiet) {
+    // No output, just exit code
+  } else if (options.json) {
+    const json = generateJSON(filteredReport, resolvedPath);
+    if (options.output) {
+      fs.writeFileSync(options.output, json + '\n');
     } else {
-      console.log(output);
+      console.log(json);
     }
-  } else if (summaryOnly) {
-    // Summary only - one line
-    const parts: string[] = [];
-    if (report.findingsBySeverity.critical > 0) {
-      parts.push(`${report.findingsBySeverity.critical} critical`);
-    }
-    if (report.findingsBySeverity.warning > 0) {
-      parts.push(`${report.findingsBySeverity.warning} warning`);
-    }
-    if (report.findingsBySeverity.info > 0) {
-      parts.push(`${report.findingsBySeverity.info} info`);
-    }
-    const runtimeSec = (report.metadata.totalTimeMs / 1000).toFixed(1);
-    let output: string;
-    if (parts.length === 0) {
-      output = `0 findings  ${report.filesAnalyzed.length} files  ${runtimeSec}s`;
-    } else {
-      output = `${parts.join('  ')}  ${report.filesAnalyzed.length} files  ${runtimeSec}s`;
-    }
-    if (outputFile) {
-      try {
-        fs.writeFileSync(outputFile, output + '\n');
-      } catch (err) {
-        printError(`failed to write output file: ${outputFile}`,
-          err instanceof Error ? err.message : 'unknown error');
-        return EXIT_CODES.ERROR;
-      }
-    } else {
-      console.log(output);
-    }
+  } else if (options.summary) {
+    printOneLiner(report);
   } else {
-    // Full terminal output - print directly or capture for file
-    if (outputFile) {
-      // Capture output for file
-      const originalLog = console.log;
+    // Full terminal output
+    if (options.output) {
+      // Capture output for file (strip colors)
+      const origTTY = process.stdout.isTTY;
+      Object.defineProperty(process.stdout, 'isTTY', { value: false, writable: true });
+
       const captured: string[] = [];
-      console.log = (...args) => captured.push(args.join(' '));
+      const origLog = console.log;
+      console.log = (...a) => captured.push(a.join(' '));
 
-      printHeader();
-      printScanStart(targetPath);
-      printFindings(filteredFindings, level);
-      printSummary(report);
-
-      console.log = originalLog;
-      try {
-        fs.writeFileSync(outputFile, captured.join('\n') + '\n');
-      } catch (err) {
-        printError(`failed to write output file: ${outputFile}`,
-          err instanceof Error ? err.message : 'unknown error');
-        return EXIT_CODES.ERROR;
+      if (report.totalFindings === 0) {
+        printZeroFindings(report, resolvedPath);
+      } else {
+        printHeader();
+        printScanTarget(resolvedPath);
+        printSummaryCounts(report);
+        printFindings(filteredFindings, options.level);
+        printFooter(report);
       }
+
+      console.log = origLog;
+      Object.defineProperty(process.stdout, 'isTTY', { value: origTTY, writable: true });
+
+      fs.writeFileSync(options.output, captured.join('\n') + '\n');
     } else {
-      // Print directly to console
-      printHeader();
-      printScanStart(targetPath);
-      printFindings(filteredFindings, level);
-      printSummary(report);
+      // Print to console
+      if (report.totalFindings === 0) {
+        printZeroFindings(report, resolvedPath);
+      } else {
+        printHeader();
+        printScanTarget(resolvedPath);
+        printSummaryCounts(report);
+        printFindings(filteredFindings, options.level);
+        printFooter(report);
+      }
     }
   }
 
-  // Determine exit code based on unfiltered findings
+  // Exit code based on unfiltered findings
   if (report.findingsBySeverity.critical > 0) {
-    return EXIT_CODES.CRITICAL;
+    return EXIT.CRITICAL;
   }
   if (report.findingsBySeverity.warning > 0) {
-    return EXIT_CODES.WARNING;
+    return EXIT.WARNING;
   }
-  return EXIT_CODES.CLEAN;
+  return EXIT.CLEAN;
 }
 
 /**
@@ -392,44 +451,47 @@ async function main(): Promise<void> {
   // No arguments - show help
   if (args.length === 0) {
     printHelp();
-    process.exit(EXIT_CODES.CLEAN);
+    process.exit(EXIT.CLEAN);
   }
 
   const command = args[0];
 
-  // Handle commands
-  if (command === 'help' || command === '--help' || command === '-h') {
-    printHelp();
-    process.exit(EXIT_CODES.CLEAN);
+  // Global flags
+  if (command === '-h' || command === '--help' || command === 'help') {
+    printHelp(args[1]);
+    process.exit(EXIT.CLEAN);
   }
 
-  if (command === 'version' || command === '--version' || command === '-v') {
+  if (command === '-v' || command === '--version' || command === 'version') {
     printVersion();
-    process.exit(EXIT_CODES.CLEAN);
+    process.exit(EXIT.CLEAN);
   }
 
+  // Commands
   if (command === 'check') {
-    const exitCode = await runCheck();
-    process.exit(exitCode);
+    const code = await runCheck();
+    process.exit(code);
   }
 
   if (command === 'scan') {
-    const exitCode = await runScan(args.slice(1));
-    process.exit(exitCode);
+    const code = await runScan(args.slice(1));
+    process.exit(code);
   }
 
-  // Legacy: treat first arg as path if it looks like a path
+  // Legacy: treat as path if it exists
   if (command.startsWith('.') || command.startsWith('/') || fs.existsSync(command)) {
-    const exitCode = await runScan(args);
-    process.exit(exitCode);
+    const code = await runScan(args);
+    process.exit(code);
   }
 
   // Unknown command
-  printError(`unknown command: ${command}`, 'run "argus help" for usage');
-  process.exit(EXIT_CODES.ERROR);
+  printError(`unknown command: ${command}`);
+  console.error();
+  console.error('  Run "argus help" for usage.');
+  process.exit(EXIT.ERROR);
 }
 
 main().catch(err => {
   printError(err.message);
-  process.exit(EXIT_CODES.ERROR);
+  process.exit(EXIT.ERROR);
 });

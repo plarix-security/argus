@@ -1,27 +1,16 @@
 /**
  * Terminal Output Formatter
  *
- * Professional security tool output formatting.
- * Reference: nmap, nuclei, semgrep style.
- * No emoji. No ASCII art boxes. Clean and dense.
+ * Clean, professional security tool output.
+ * Uses chalk for colors, strips when not TTY.
  */
 
+import chalk from 'chalk';
+import * as path from 'path';
 import { AFBFinding, AnalysisReport, Severity, ExecutionCategory } from '../types';
-import { VERSION, NAME, AUTHOR, REPO } from './version';
+import { VERSION } from './version';
 
-/**
- * ANSI color codes
- */
-const COLORS = {
-  reset: '\x1b[0m',
-  bold: '\x1b[1m',
-  dim: '\x1b[2m',
-  red: '\x1b[31m',
-  yellow: '\x1b[33m',
-  green: '\x1b[32m',
-  cyan: '\x1b[36m',
-  white: '\x1b[37m',
-};
+const DIVIDER = '─'.repeat(53);
 
 /**
  * Check if stdout is a TTY (supports colors)
@@ -31,161 +20,197 @@ export function isTTY(): boolean {
 }
 
 /**
- * Apply color if TTY, otherwise return plain text
+ * Apply chalk styling only if TTY
  */
-function color(text: string, ...codes: string[]): string {
-  if (!isTTY()) return text;
-  return codes.join('') + text + COLORS.reset;
+function styled(text: string, styleFn: (s: string) => string): string {
+  return isTTY() ? styleFn(text) : text;
 }
 
 /**
- * Get severity color
+ * Get specific description for a finding based on category and severity
  */
-function severityColor(severity: Severity): string {
-  switch (severity) {
-    case Severity.CRITICAL:
-      return COLORS.bold + COLORS.red;
-    case Severity.WARNING:
-      return COLORS.bold + COLORS.yellow;
-    case Severity.INFO:
-      return COLORS.cyan;
-    default:
-      return '';
-  }
-}
-
-/**
- * Format severity label with padding
- */
-function formatSeverity(severity: Severity): string {
-  const label = severity.toUpperCase().padEnd(8);
-  return color(label, severityColor(severity));
-}
-
-/**
- * Category to action description
- */
-const CATEGORY_ACTION: Record<ExecutionCategory, string> = {
-  [ExecutionCategory.TOOL_CALL]: 'tool registered',
-  [ExecutionCategory.SHELL_EXECUTION]: 'shell command execution',
-  [ExecutionCategory.FILE_OPERATION]: 'file operation',
-  [ExecutionCategory.API_CALL]: 'external API call',
-  [ExecutionCategory.DATABASE_OPERATION]: 'database operation',
-  [ExecutionCategory.CODE_EXECUTION]: 'dynamic code execution',
-};
-
-/**
- * Get capability description for a finding
- */
-function getCapabilityDescription(finding: AFBFinding): string {
+function getDescription(finding: AFBFinding): string {
   const snippet = finding.codeSnippet.toLowerCase();
-  switch (finding.category) {
-    case ExecutionCategory.SHELL_EXECUTION:
-      return 'shell/execute capability';
-    case ExecutionCategory.FILE_OPERATION:
-      if (snippet.includes('remove') || snippet.includes('delete') || snippet.includes('unlink') || snippet.includes('rmtree')) {
-        return 'delete capability';
-      }
-      if (snippet.includes('write')) {
-        return 'write capability';
-      }
-      return 'file access capability';
-    case ExecutionCategory.API_CALL:
-      if (snippet.includes('post') || snippet.includes('put') || snippet.includes('patch') || snippet.includes('delete')) {
-        return 'write/send capability';
-      }
-      return 'external request capability';
-    case ExecutionCategory.DATABASE_OPERATION:
-      return 'database write capability';
-    case ExecutionCategory.CODE_EXECUTION:
-      return 'code execution capability';
-    case ExecutionCategory.TOOL_CALL:
-      return 'agent-callable capability';
-    default:
-      return 'external effect capability';
-  }
-}
 
-/**
- * Wrap text at specified width
- */
-function wrapText(text: string, width: number, indent: string = ''): string {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let currentLine = '';
-
-  for (const word of words) {
-    if (currentLine.length + word.length + 1 > width) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = currentLine ? currentLine + ' ' + word : word;
+  // CRITICAL operations
+  if (finding.severity === Severity.CRITICAL) {
+    if (finding.category === ExecutionCategory.SHELL_EXECUTION) {
+      return 'Shell command execution. No policy gate in call path.';
+    }
+    if (finding.category === ExecutionCategory.CODE_EXECUTION) {
+      if (snippet.includes('eval')) {
+        return 'Arbitrary code execution via eval(). No policy gate in call path.';
+      }
+      return 'Dynamic code execution. No policy gate in call path.';
+    }
+    if (finding.category === ExecutionCategory.FILE_OPERATION) {
+      if (snippet.includes('rmtree') || snippet.includes('remove') || snippet.includes('unlink')) {
+        return 'Recursive directory deletion. No policy gate in call path.';
+      }
     }
   }
-  if (currentLine) lines.push(currentLine);
 
-  return lines.join('\n' + indent);
+  // WARNING operations
+  if (finding.severity === Severity.WARNING) {
+    if (finding.category === ExecutionCategory.FILE_OPERATION) {
+      if (snippet.includes('write')) {
+        return 'File write operation. No policy gate in call path.';
+      }
+      if (snippet.includes('mkdir')) {
+        return 'Directory creation. No policy gate in call path.';
+      }
+      if (snippet.includes('copy') || snippet.includes('move')) {
+        return 'File copy/move operation. No policy gate in call path.';
+      }
+      return 'File system modification. No policy gate in call path.';
+    }
+    if (finding.category === ExecutionCategory.API_CALL) {
+      if (snippet.includes('post')) {
+        return 'HTTP POST to external endpoint. No policy gate in call path.';
+      }
+      if (snippet.includes('put') || snippet.includes('patch')) {
+        return 'HTTP mutation to external endpoint. No policy gate in call path.';
+      }
+      if (snippet.includes('delete')) {
+        return 'HTTP DELETE to external endpoint. No policy gate in call path.';
+      }
+      return 'External API mutation. No policy gate in call path.';
+    }
+    if (finding.category === ExecutionCategory.DATABASE_OPERATION) {
+      return 'Database write operation. No policy gate in call path.';
+    }
+  }
+
+  // INFO operations
+  if (finding.severity === Severity.INFO) {
+    if (finding.category === ExecutionCategory.API_CALL) {
+      return 'External HTTP read. No policy gate in call path.';
+    }
+    if (finding.category === ExecutionCategory.DATABASE_OPERATION) {
+      if (snippet.includes('execute')) {
+        return 'Database query execution. No policy gate in call path.';
+      }
+      return 'Database read operation. No policy gate in call path.';
+    }
+    if (finding.category === ExecutionCategory.FILE_OPERATION) {
+      if (snippet.includes('read') || snippet.includes('open')) {
+        return 'File read operation. No policy gate in call path.';
+      }
+      if (snippet.includes('listdir') || snippet.includes('glob')) {
+        return 'Directory listing. No policy gate in call path.';
+      }
+      return 'File system access. No policy gate in call path.';
+    }
+  }
+
+  // Default
+  return 'Operation reachable from tool. No policy gate in call path.';
 }
 
 /**
- * Print CLI header
+ * Format code snippet - extract just the call, truncate at 60 chars
+ */
+function formatSnippet(snippet: string): string {
+  // Clean up the snippet
+  let clean = snippet.trim();
+
+  // Remove common prefixes like "result = ", "response = ", etc.
+  clean = clean.replace(/^[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*/, '');
+
+  // Truncate at 60 chars
+  if (clean.length > 60) {
+    clean = clean.slice(0, 57) + '...';
+  }
+
+  return clean;
+}
+
+/**
+ * Format severity with color and bullet
+ */
+function formatSeverityLabel(severity: Severity): string {
+  const label = severity.toUpperCase().padEnd(8);
+  switch (severity) {
+    case Severity.CRITICAL:
+      return styled(`● ${label}`, chalk.red.bold);
+    case Severity.WARNING:
+      return styled(`● ${label}`, chalk.yellow.bold);
+    case Severity.INFO:
+      return styled(`● ${label}`, chalk.cyan);
+    default:
+      return `● ${label}`;
+  }
+}
+
+/**
+ * Print header
  */
 export function printHeader(): void {
-  console.log();
-  console.log(color(`${NAME}`, COLORS.bold) + `  v${VERSION}  by ${AUTHOR}`);
-  console.log(color(`AFB Scanner`, COLORS.dim) + color(` \u2014 ${REPO}`, COLORS.dim));
-  console.log();
+  console.log(`  ${styled('argus', chalk.white)} v${VERSION}  ·  Plarix`);
+  console.log(`  ${styled(DIVIDER, chalk.dim)}`);
 }
 
 /**
- * Print scan start info
+ * Print scan target
  */
-export function printScanStart(targetPath: string): void {
-  console.log(`Scanning: ${targetPath}`);
-  console.log('\u2500'.repeat(50));
+export function printScanTarget(targetPath: string): void {
+  // Show relative path or just filename
+  const display = targetPath.startsWith('/') ? path.relative(process.cwd(), targetPath) : targetPath;
   console.log();
+  console.log(`  Scanning  ${display}`);
 }
 
 /**
- * Format a single finding for terminal output
+ * Print summary counts line
+ */
+export function printSummaryCounts(report: AnalysisReport): void {
+  console.log();
+  console.log(`  ${styled(DIVIDER, chalk.dim)}`);
+
+  const { findingsBySeverity } = report;
+  const parts: string[] = [];
+
+  if (findingsBySeverity.critical > 0) {
+    parts.push(styled(String(findingsBySeverity.critical), chalk.bold) + styled(' critical', chalk.dim));
+  }
+  if (findingsBySeverity.warning > 0) {
+    parts.push(styled(String(findingsBySeverity.warning), chalk.bold) + styled(' warning', chalk.dim));
+  }
+  if (findingsBySeverity.info > 0) {
+    parts.push(styled(String(findingsBySeverity.info), chalk.bold) + styled(' info', chalk.dim));
+  }
+
+  if (parts.length === 0) {
+    console.log(`  ${styled('No AFB exposures detected.', chalk.green)}`);
+  } else {
+    console.log(`  ${parts.join(styled('  ·  ', chalk.dim))}`);
+  }
+
+  console.log(`  ${styled(DIVIDER, chalk.dim)}`);
+}
+
+/**
+ * Format a single finding
  */
 export function formatFinding(finding: AFBFinding): string {
-  const funcName = finding.context?.enclosingFunction || finding.codeSnippet.split('(')[0].trim();
-  const toolReg = finding.context?.isToolDefinition ? ` reachable from @tool` : '';
-  const framework = finding.context?.framework ? ` (${finding.context.framework})` : '';
-  const gateStatus = finding.context?.isToolDefinition
-    ? ', no policy gate in call path'
-    : '';
+  const filename = path.basename(finding.file);
+  const location = `${styled(filename, chalk.white.bold)}${styled(`:${finding.line}`, chalk.dim)}`;
+  const snippet = formatSnippet(finding.codeSnippet);
+  const description = getDescription(finding);
 
-  const lines: string[] = [];
-
-  // Severity + file:line
-  const location = color(`${finding.file}:${finding.line}`, COLORS.white);
-  lines.push(`${formatSeverity(finding.severity)}${location}`);
-
-  // Code snippet and explanation
-  const snippet = finding.codeSnippet.length > 60
-    ? finding.codeSnippet.slice(0, 60) + '...'
-    : finding.codeSnippet;
-  const action = CATEGORY_ACTION[finding.category] || 'operation';
-  const capability = getCapabilityDescription(finding);
-
-  const description = `${snippet} \u2014 ${action}${toolReg}${framework}${gateStatus}.`;
-  lines.push(wrapText(description, 72, '         '));
-
-  // AFB explanation
-  if (finding.context?.isToolDefinition) {
-    lines.push(color('Agent can execute this without authorization basis.', COLORS.dim));
-  }
+  const lines = [
+    `  ${formatSeverityLabel(finding.severity)} ${location}`,
+    `    ${styled(snippet, chalk.white)}`,
+    `    ${styled(description, chalk.dim)}`,
+  ];
 
   return lines.join('\n');
 }
 
 /**
- * Print findings grouped by severity
+ * Print all findings
  */
 export function printFindings(findings: AFBFinding[], level: Severity = Severity.INFO): void {
-  // Filter by level
   const severityOrder: Record<Severity, number> = {
     [Severity.CRITICAL]: 0,
     [Severity.WARNING]: 1,
@@ -195,49 +220,31 @@ export function printFindings(findings: AFBFinding[], level: Severity = Severity
 
   const filtered = findings.filter(f => severityOrder[f.severity] <= severityOrder[level]);
 
-  for (const finding of filtered) {
-    console.log(formatFinding(finding));
-    console.log();
+  if (filtered.length === 0) {
+    return;
+  }
+
+  console.log();
+  for (let i = 0; i < filtered.length; i++) {
+    console.log(formatFinding(filtered[i]));
+    if (i < filtered.length - 1) {
+      console.log(); // Blank line between findings
+    }
   }
 }
 
 /**
- * Print summary line
+ * Print footer with file count and timing
  */
-export function printSummary(report: AnalysisReport): void {
-  const { findingsBySeverity, filesAnalyzed, metadata } = report;
+export function printFooter(report: AnalysisReport): void {
+  const { filesAnalyzed, metadata } = report;
   const runtimeSec = (metadata.totalTimeMs / 1000).toFixed(1);
+  const fileCount = filesAnalyzed.length;
+  const fileLabel = fileCount === 1 ? 'file' : 'files';
 
-  console.log('\u2500'.repeat(50));
-
-  if (report.totalFindings === 0) {
-    console.log(color('No AFB exposures detected.', COLORS.green) +
-      color(`  ${filesAnalyzed.length} files  ${runtimeSec}s`, COLORS.dim));
-    return;
-  }
-
-  const parts: string[] = [];
-
-  if (findingsBySeverity.critical > 0) {
-    parts.push(color(String(findingsBySeverity.critical), COLORS.bold + COLORS.red) +
-      color(' critical', COLORS.dim));
-  }
-  if (findingsBySeverity.warning > 0) {
-    parts.push(color(String(findingsBySeverity.warning), COLORS.bold + COLORS.yellow) +
-      color(' warning', COLORS.dim));
-  }
-  if (findingsBySeverity.info > 0) {
-    parts.push(color(String(findingsBySeverity.info), COLORS.bold) +
-      color(' info', COLORS.dim));
-  }
-  if (findingsBySeverity.suppressed > 0) {
-    parts.push(color(`(${findingsBySeverity.suppressed} suppressed)`, COLORS.dim));
-  }
-
-  parts.push(color(`${filesAnalyzed.length} files`, COLORS.dim));
-  parts.push(color(`${runtimeSec}s`, COLORS.dim));
-
-  console.log(parts.join('  '));
+  console.log();
+  console.log(`  ${styled(DIVIDER, chalk.dim)}`);
+  console.log(`  ${styled(`${fileCount} ${fileLabel}  ·  ${runtimeSec}s  ·  AFB04 coverage only`, chalk.dim)}`);
 }
 
 /**
@@ -259,10 +266,13 @@ export function printOneLiner(report: AnalysisReport): void {
     parts.push(`${findingsBySeverity.info} info`);
   }
 
+  const fileCount = filesAnalyzed.length;
+  const fileLabel = fileCount === 1 ? 'file' : 'files';
+
   if (parts.length === 0) {
-    console.log(`0 findings  ${filesAnalyzed.length} files  ${runtimeSec}s`);
+    console.log(`0 findings  ·  ${fileCount} ${fileLabel}  ·  ${runtimeSec}s`);
   } else {
-    console.log(`${parts.join('  ')}  ${filesAnalyzed.length} files  ${runtimeSec}s`);
+    console.log(`${parts.join('  ·  ')}  ·  ${fileCount} ${fileLabel}  ·  ${runtimeSec}s`);
   }
 }
 
@@ -270,9 +280,9 @@ export function printOneLiner(report: AnalysisReport): void {
  * Print error to stderr
  */
 export function printError(message: string, detail?: string): void {
-  console.error(`error: ${message}`);
+  console.error(`  ${styled('error', chalk.red.bold)}  ${message}`);
   if (detail) {
-    console.error(`       ${detail}`);
+    console.error(`         ${styled(detail, chalk.dim)}`);
   }
 }
 
@@ -281,9 +291,32 @@ export function printError(message: string, detail?: string): void {
  */
 export function printCheckStatus(name: string, ok: boolean, detail?: string): void {
   const status = ok
-    ? color('\u2713', COLORS.green)
-    : color('\u2717', COLORS.red);
+    ? styled('✓', chalk.green)
+    : styled('✗', chalk.red);
   const nameFormatted = name.padEnd(25);
-  const detailStr = detail ? color(` ${detail}`, COLORS.dim) : '';
+  const detailStr = detail ? styled(` ${detail}`, chalk.dim) : '';
   console.log(`  ${status} ${nameFormatted}${detailStr}`);
+}
+
+/**
+ * Full scan output
+ */
+export function printScanReport(report: AnalysisReport, targetPath: string, level: Severity): void {
+  printHeader();
+  printScanTarget(targetPath);
+  printSummaryCounts(report);
+  printFindings(report.findings, level);
+  printFooter(report);
+}
+
+/**
+ * Zero findings output
+ */
+export function printZeroFindings(report: AnalysisReport, targetPath: string): void {
+  printHeader();
+  printScanTarget(targetPath);
+  console.log();
+  console.log(`  ${styled(DIVIDER, chalk.dim)}`);
+  console.log(`  ${styled('No AFB exposures detected.', chalk.green)}`);
+  printFooter(report);
 }
