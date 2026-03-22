@@ -2,22 +2,22 @@
 
 **Static analyzer for agentic AI codebases that detects unsafe tool boundaries.**
 
-Argus finds places in your agent code where tools can execute dangerous operations—like shell commands, file deletion, or external API calls—without authorization checks. It analyzes Python and TypeScript/JavaScript codebases to identify **AFB04 (Unauthorized Action)** boundaries: the execution paths where an AI agent's actions can affect systems or data.
+Argus finds places in your agent code where tools can execute dangerous operations-like shell commands, file deletion, or external API calls-without authorization checks. It analyzes Python and TypeScript/JavaScript codebases to identify **AFB04 (Unauthorized Action)** boundaries: the execution paths where an AI agent's actions can affect systems or data.
 
 ```
 Argus  v0.6.0-beta  by Plarix
-AFB Scanner — github.com/plarix-security/argus
+AFB Scanner - github.com/plarix-security/argus
 
 Scanning: /path/to/agent-project
 ──────────────────────────────────────────────────
 
 CRITICAL  agent_tools.py:47
-shutil.rmtree(agent_dir) — file operation reachable from @tool
+shutil.rmtree(agent_dir) - file operation reachable from @tool
 (langchain), no policy gate in call path.
 Agent can delete arbitrary directories without authorization.
 
 WARNING   api_client.py:83
-requests.post(url, data=payload) — external API call reachable
+requests.post(url, data=payload) - external API call reachable
 from @tool (langchain), no policy gate in call path.
 Agent can transmit data externally without authorization.
 
@@ -133,23 +133,23 @@ argus scan ./agent-project
 **Output:**
 ```
 argus  v0.1.0  by Plarix
-AFB Scanner — github.com/plarix-security/argus
+AFB Scanner - github.com/plarix-security/argus
 
 Scanning: /agent-project
 ──────────────────────────────────────────────────
 
 CRITICAL  tools/setup_agent.py:60
-shutil.rmtree(agent_dir) — file operation reachable from @tool
+shutil.rmtree(agent_dir) - file operation reachable from @tool
 (langchain), no policy gate in call path.
 Agent can execute this without authorization basis.
 
 WARNING   tools/api_client.py:42
-requests.post(url, data=payload) — external API call reachable
+requests.post(url, data=payload) - external API call reachable
 from @tool (crewai), no policy gate in call path.
 Agent can execute this without authorization basis.
 
 INFO      tools/reader.py:28
-open(file_path, 'r') — file operation reachable from @tool
+open(file_path, 'r') - file operation reachable from @tool
 (langchain), no policy gate in call path.
 Agent can execute this without authorization basis.
 
@@ -232,7 +232,7 @@ argus check
 **Output:**
 ```
 argus  v0.1.0  by Plarix
-AFB Scanner — github.com/plarix-security/argus
+AFB Scanner - github.com/plarix-security/argus
 
 Checking dependencies...
 
