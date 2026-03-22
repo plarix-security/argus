@@ -1,14 +1,18 @@
 {
-  "name": "afb-scanner",
-  "version": "1.0.0",
+  "name": "argus",
+  "version": "0.1.0",
   "description": "Agent Failure Boundary Scanner - Detects AFB04 (Unauthorized Action) boundaries in agentic AI codebases through static analysis",
   "main": "dist/app.js",
+  "bin": {
+    "argus": "dist/cli/index.js"
+  },
   "scripts": {
     "build": "npx tsc",
     "start": "node dist/app.js",
     "dev": "npx ts-node src/app.ts",
     "lint": "npx eslint src/**/*.ts",
     "test": "npx jest",
+    "argus": "npx ts-node src/cli/index.ts",
     "analyze": "npx ts-node src/cli.ts"
   },
   "keywords": [
