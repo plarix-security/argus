@@ -87,12 +87,22 @@ export function analyzePythonFile(
   fileMap.set(filePath, parsed);
   const callGraph = buildCallGraph(fileMap);
 
-  // Convert exposed paths to findings
+  // Convert exposed paths to findings with deduplication
+  // Key: file:line:callee - same dangerous operation should only be reported once
+  const seenOperations = new Set<string>();
+
   for (const exposed of callGraph.exposedPaths) {
     // Skip if there's a policy gate in the path
     if (exposed.hasGateInPath) {
       continue;
     }
+
+    // Deduplicate: same file + line + callee = same finding
+    const opKey = `${filePath}:${exposed.operation.line}:${exposed.operation.callee}`;
+    if (seenOperations.has(opKey)) {
+      continue;
+    }
+    seenOperations.add(opKey);
 
     const finding = createFindingFromExposedPath(filePath, exposed, parsed);
     findings.push(finding);
@@ -161,13 +171,23 @@ export function analyzeProject(
     pathsByFile.set(exposed.file, existing);
   }
 
-  // Generate findings per file
+  // Generate findings per file with deduplication
   for (const [filePath, parsed] of parsedFiles) {
     const findings: AFBFinding[] = [];
     const exposedPaths = pathsByFile.get(filePath) || [];
 
+    // Deduplicate: same file + line + callee = same finding
+    const seenOperations = new Set<string>();
+
     for (const exposed of exposedPaths) {
       if (exposed.hasGateInPath) continue;
+
+      const opKey = `${filePath}:${exposed.operation.line}:${exposed.operation.callee}`;
+      if (seenOperations.has(opKey)) {
+        continue;
+      }
+      seenOperations.add(opKey);
+
       findings.push(createFindingFromExposedPath(filePath, exposed, parsed));
     }
 
