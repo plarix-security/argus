@@ -374,21 +374,30 @@ function findAllNodes(
 }
 
 /**
- * Check if a node is inside a conditional branch (if statement, try block, etc.)
+ * Check if a node is inside a conditional branch that can PREVENT execution.
+ *
+ * IMPORTANT: try/except is NOT a gate mechanism!
+ * A try/except doesn't prevent the dangerous operation from running - it handles
+ * exceptions AFTER the operation fails. Per the AFB specification:
+ * "A try/except around the dangerous operation is NOT a gate."
+ *
+ * Only if statements and early returns can actually prevent execution.
  */
 function isInsideConditional(node: Parser.SyntaxNode): boolean {
   let current = node.parent;
   while (current) {
+    // Only if/elif branches can actually prevent execution
+    // try/except/with do NOT prevent execution - they handle it afterwards
     if (
       current.type === 'if_statement' ||
-      current.type === 'elif_clause' ||
-      current.type === 'else_clause' ||
-      current.type === 'try_statement' ||
-      current.type === 'except_clause' ||
-      current.type === 'with_statement'
+      current.type === 'elif_clause'
     ) {
       return true;
     }
+    // Note: else_clause removed - an else branch always runs when condition is false,
+    // it doesn't conditionally prevent execution based on input
+    // Note: try_statement/except_clause/with_statement removed - they don't prevent execution
+
     // Stop at function boundary
     if (
       current.type === 'function_definition' ||
