@@ -5,7 +5,7 @@
 Argus finds places in your agent code where tools can execute dangerous operations—like shell commands, file deletion, or external API calls—without authorization checks. It analyzes Python and TypeScript/JavaScript codebases to identify **AFB04 (Unauthorized Action)** boundaries: the execution paths where an AI agent's actions can affect systems or data.
 
 ```
-argus  v0.1.0  by Plarix
+Argus  v0.6.0-beta  by Plarix
 AFB Scanner — github.com/plarix-security/argus
 
 Scanning: /path/to/agent-project
