@@ -96,7 +96,7 @@ export class AFBAnalyzer {
   private buildReport(repository: string, results: FileAnalysisResult[], failedFiles: string[], startTime: number): AnalysisReport {
     const allFindings = results.flatMap(r => r.findings).filter(f => f.confidence >= this.config.minConfidence);
     allFindings.sort((a, b) => {
-      const severityOrder = { critical: 0, high: 1, medium: 2 };
+      const severityOrder = { critical: 0, warning: 1, info: 2, suppressed: 3 };
       const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
       if (sevDiff !== 0) return sevDiff;
       const fileDiff = a.file.localeCompare(b.file);
@@ -109,8 +109,9 @@ export class AFBAnalyzer {
       totalFindings: allFindings.length,
       findingsBySeverity: {
         critical: allFindings.filter(f => f.severity === Severity.CRITICAL).length,
-        high: allFindings.filter(f => f.severity === Severity.HIGH).length,
-        medium: allFindings.filter(f => f.severity === Severity.MEDIUM).length,
+        warning: allFindings.filter(f => f.severity === Severity.WARNING).length,
+        info: allFindings.filter(f => f.severity === Severity.INFO).length,
+        suppressed: allFindings.filter(f => f.severity === Severity.SUPPRESSED).length,
       },
       findings: allFindings,
       metadata: { scannerVersion: SCANNER_VERSION, timestamp: new Date().toISOString(), totalTimeMs: Date.now() - startTime, failedFiles },

@@ -183,23 +183,27 @@ const TOOL_REGISTRATION_PATTERNS: {
 /**
  * Patterns that indicate dangerous operations
  *
- * STRICT SEVERITY CRITERIA:
+ * STRICT FOUR-LEVEL SEVERITY CRITERIA:
  *
- * CRITICAL: Tool can DELETE, EXFILTRATE, or IRREVERSIBLY MODIFY data/system state
- *   - Shell execution (can do anything including delete)
+ * CRITICAL: Irreversible destruction, exfiltration, or arbitrary execution
+ *   - Shell execution (can delete/modify/exfiltrate anything)
  *   - Code execution (eval, exec - can do anything)
- *   - File deletion operations (rmtree, os.remove, unlink)
- *   - Database destructive operations (implicitly via shell/code execution)
+ *   - File/directory deletion (rmtree, remove, unlink)
  *
- * HIGH: Tool can WRITE or TRANSMIT data externally
- *   - File writes (write_text, write_bytes)
- *   - HTTP POST/PUT/PATCH/DELETE (transmitting data)
- *   - Database writes (INSERT, UPDATE via ORM)
+ * WARNING: Recoverable but consequential state modification or transmission
+ *   - File writes (write_text, write_bytes, copy, move, rename)
+ *   - HTTP POST/PUT/PATCH/DELETE (transmitting data externally)
+ *   - Database writes (INSERT, UPDATE, DELETE via ORM)
  *
- * MEDIUM: Tool has READ access to sensitive paths or external APIs returning sensitive data
- *   - Currently not implemented (requires path context analysis)
+ * INFO: Read-only access to sensitive data or external systems
+ *   - File reads (open with 'r' mode, read_text, read_bytes)
+ *   - HTTP GET requests (reading from external APIs)
+ *   - Database SELECT queries
+ *   - Environment variable access
  *
- * DROPPED: Everything else (reads, GETs, selects, etc.)
+ * SUPPRESSED: Everything else (low-confidence, internal operations, safe targets)
+ *   - Not matched by any pattern
+ *   - Not included in PR reports
  */
 const DANGEROUS_OPERATION_PATTERNS: {
   pattern: RegExp;
@@ -210,6 +214,7 @@ const DANGEROUS_OPERATION_PATTERNS: {
   // ==================== CRITICAL ====================
   // Shell execution - can delete/modify/exfiltrate anything
   { pattern: /^subprocess\.(run|Popen|call|check_output|check_call)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Shell command execution' },
+  { pattern: /^asyncio\.create_subprocess_(exec|shell)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Async subprocess execution' },
   { pattern: /^os\.(system|popen|exec.*)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'OS shell command' },
   { pattern: /^commands\.(getoutput|getstatusoutput)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Commands module execution' },
 
@@ -223,31 +228,45 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.unlink$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.CRITICAL, description: 'Path unlink (deletion)' },
   { pattern: /\.rmdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.CRITICAL, description: 'Directory deletion' },
 
-  // ==================== HIGH ====================
-  // File writes - can modify system state
-  { pattern: /\.write_text$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'File write' },
-  { pattern: /\.write_bytes$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'Binary file write' },
-  { pattern: /^shutil\.(copy|copy2|copyfile|move)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'File copy/move' },
-  { pattern: /^os\.rename$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.HIGH, description: 'File rename' },
+  // ==================== WARNING ====================
+  // File writes - can modify system state (recoverable but consequential)
+  { pattern: /\.write_text$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File write' },
+  { pattern: /\.write_bytes$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'Binary file write' },
+  { pattern: /^shutil\.(copy|copy2|copyfile|move)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File copy/move' },
+  { pattern: /^os\.rename$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File rename' },
 
-  // HTTP methods that transmit data externally (not GET)
-  { pattern: /^requests\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, description: 'HTTP write request' },
-  { pattern: /^httpx\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, description: 'HTTP write request' },
-  { pattern: /\.session\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.HIGH, description: 'Session HTTP write' },
+  // HTTP methods that transmit data externally
+  { pattern: /^requests\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP write request' },
+  { pattern: /^httpx\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP write request' },
+  { pattern: /\.session\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Session HTTP write' },
 
   // ORM write operations
-  { pattern: /\.session\.(add|delete|commit|flush)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'ORM write operation' },
-  { pattern: /\.save$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'ORM save' },
-  { pattern: /\.create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'ORM create' },
-  { pattern: /\.update$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'ORM update' },
-  { pattern: /\.bulk_create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.HIGH, description: 'ORM bulk create' },
+  { pattern: /\.session\.(add|delete|commit|flush)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM write operation' },
+  { pattern: /\.save$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM save' },
+  { pattern: /\.create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM create' },
+  { pattern: /\.update$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM update' },
+  { pattern: /\.bulk_create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM bulk create' },
 
-  // ==================== DROPPED (not included) ====================
-  // - open() for reading
-  // - requests.get(), httpx.get() - reading data
-  // - .execute() - could be SELECT
-  // - compile, __import__ - not direct execution
-  // - os.mkdir, os.makedirs - creating dirs is not destructive
+  // ==================== INFO ====================
+  // File reads - read-only access to sensitive data
+  { pattern: /^open$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File open (read)' },
+  { pattern: /\.read_text$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read' },
+  { pattern: /\.read_bytes$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Binary file read' },
+
+  // HTTP GET - reading from external APIs
+  { pattern: /^requests\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP GET request' },
+  { pattern: /^httpx\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP GET request' },
+  { pattern: /^urllib\.request\.(urlopen|urlretrieve)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'URL fetch' },
+
+  // Database reads
+  { pattern: /\.execute$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database query execution' },
+  { pattern: /\.fetchall$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database fetch' },
+  { pattern: /\.fetchone$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database fetch' },
+  { pattern: /\.query$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database query' },
+
+  // Environment access
+  { pattern: /^os\.getenv$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Environment variable read' },
+  { pattern: /^os\.environ$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Environment access' },
 ];
 
 /**
@@ -268,44 +287,65 @@ const AUTHORIZATION_EXCEPTION_TYPES = [
 /**
  * Determine if a function is a structural policy gate.
  *
- * A policy gate is STRUCTURAL, not nominal. It must have:
- * 1. A conditional branch (if statement) that can prevent execution
- * 2. That branch should either raise an exception or return early
- * 3. The condition should be based on input parameters
+ * STRICT THREE-PROPERTY VALIDATION (per AFB specification):
  *
- * A function named "check_permission" that always returns True is NOT a gate.
- * A function named "process_data" that raises PermissionError conditionally IS.
+ * A real gate has ALL THREE of these properties:
+ * 1. It sits between tool registration and dangerous operation in call path
+ *    (checked externally in findDangerousPathsFromNode)
+ * 2. It receives the operation, its parameters, or the principal as input
+ *    (checked here via checksParameters)
+ * 3. It has a branch that can PREVENT the dangerous operation from executing
+ *    (checked here via strict execution prevention)
+ *
+ * NOT gates:
+ * - A conditional that does something else and then calls the operation anyway
+ * - A try/except around the dangerous operation
+ * - A logging call before the operation
+ * - A type check that doesn't prevent execution on failure
+ *
+ * IS a gate:
+ * - Raises PermissionError/AuthorizationError when condition fails
+ * - Returns False/None and caller checks the result before executing operation
+ * - Exits function without calling operation when condition fails
  */
 function isStructuralPolicyGate(controlFlow: ControlFlowInfo | undefined): boolean {
   if (!controlFlow) {
     return false;
   }
 
-  // Must have conditional branches
+  // PROPERTY #3: Must have conditional branches
   if (!controlFlow.hasConditionalBranches) {
     return false;
   }
 
-  // Must be able to prevent execution (raise or return early)
+  // PROPERTY #3: Must be able to prevent execution via raise or early return
   const canPreventExecution = controlFlow.hasConditionalRaise || controlFlow.hasConditionalReturn;
   if (!canPreventExecution) {
     return false;
   }
 
-  // Higher confidence if it raises authorization-related exceptions
+  // PROPERTY #2: Must check input parameters
+  // Without this, it's not receiving operation context
+  if (!controlFlow.checksParameters) {
+    return false;
+  }
+
+  // STRICT: Require authorization-related exception types
+  // A generic ValueError or TypeError is not sufficient for gate detection
   const raisesAuthException = controlFlow.raiseTypes.some((type) =>
     AUTHORIZATION_EXCEPTION_TYPES.some((authType) =>
       type.toLowerCase().includes(authType.toLowerCase())
     )
   );
 
-  // Higher confidence if conditions check parameters
-  const checksInput = controlFlow.checksParameters;
-
-  // A function is a policy gate if:
-  // - It can prevent execution AND
-  // - (It raises auth exceptions OR it checks its parameters)
-  return raisesAuthException || checksInput;
+  // Gate detection is ALL THREE properties:
+  // - Has conditional branches (checked above)
+  // - Checks parameters (checked above)
+  // - Can prevent execution via auth exception OR early return
+  //
+  // If uncertain (no auth exception but has early return), do NOT credit as gate
+  // Per spec: "If gate detection is uncertain, do not credit a gate"
+  return raisesAuthException;
 }
 
 /**
@@ -609,7 +649,7 @@ export function buildCallGraph(
           decorators: method.decorators,
           callees: new Set(),
           callers: new Set(),
-          isToolRegistration: toolInfo !== null && (method.name === '_run' || method.name === 'run' || method.name === 'invoke'),
+          isToolRegistration: toolInfo !== null && (method.name === '_run' || method.name === 'run' || method.name === 'invoke' || method.name === '_execute' || method.name === 'execute'),
           framework: toolInfo?.framework,
           dangerousOps: [],
           // Use structural analysis + decorator analysis to determine if this is a policy gate

@@ -47,7 +47,7 @@ export const PYTHON_PATTERNS: Record<string, ExecutionPattern> = {
   tool_decorator: {
     id: 'py-tool-decorator',
     category: ExecutionCategory.TOOL_CALL,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'LangChain/CrewAI tool definition',
     rationale:
       'Tool definitions expose execution capabilities that agents can invoke without explicit user approval per-call',
@@ -55,7 +55,7 @@ export const PYTHON_PATTERNS: Record<string, ExecutionPattern> = {
   tool_instantiation: {
     id: 'py-tool-instantiation',
     category: ExecutionCategory.TOOL_CALL,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Tool object instantiation',
     rationale:
       'Tool instantiation creates an execution capability that can be invoked by agent reasoning',
@@ -91,7 +91,7 @@ export const PYTHON_PATTERNS: Record<string, ExecutionPattern> = {
   file_open: {
     id: 'py-file-open',
     category: ExecutionCategory.FILE_OPERATION,
-    baseSeverity: Severity.MEDIUM,
+    baseSeverity: Severity.INFO,
     description: 'File open operation',
     rationale:
       'File operations can read sensitive data or write malicious content',
@@ -99,7 +99,7 @@ export const PYTHON_PATTERNS: Record<string, ExecutionPattern> = {
   pathlib_write: {
     id: 'py-pathlib-write',
     category: ExecutionCategory.FILE_OPERATION,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Pathlib file write',
     rationale:
       'File write operations can overwrite critical files or plant malicious content',
@@ -107,7 +107,7 @@ export const PYTHON_PATTERNS: Record<string, ExecutionPattern> = {
   shutil_operation: {
     id: 'py-shutil',
     category: ExecutionCategory.FILE_OPERATION,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Shutil file operation',
     rationale:
       'Bulk file operations (copy, move, delete) with broader filesystem impact',
@@ -117,7 +117,7 @@ export const PYTHON_PATTERNS: Record<string, ExecutionPattern> = {
   requests_call: {
     id: 'py-requests',
     category: ExecutionCategory.API_CALL,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'HTTP request via requests library',
     rationale:
       'External HTTP calls can exfiltrate data or trigger external actions',
@@ -125,7 +125,7 @@ export const PYTHON_PATTERNS: Record<string, ExecutionPattern> = {
   httpx_call: {
     id: 'py-httpx',
     category: ExecutionCategory.API_CALL,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'HTTP request via httpx library',
     rationale:
       'External HTTP calls can exfiltrate data or trigger external actions',
@@ -133,7 +133,7 @@ export const PYTHON_PATTERNS: Record<string, ExecutionPattern> = {
   aiohttp_call: {
     id: 'py-aiohttp',
     category: ExecutionCategory.API_CALL,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Async HTTP request via aiohttp',
     rationale:
       'External HTTP calls can exfiltrate data or trigger external actions',
@@ -141,7 +141,7 @@ export const PYTHON_PATTERNS: Record<string, ExecutionPattern> = {
   urllib_call: {
     id: 'py-urllib',
     category: ExecutionCategory.API_CALL,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'HTTP request via urllib',
     rationale:
       'External HTTP calls can exfiltrate data or trigger external actions',
@@ -151,14 +151,14 @@ export const PYTHON_PATTERNS: Record<string, ExecutionPattern> = {
   cursor_execute: {
     id: 'py-cursor-execute',
     category: ExecutionCategory.DATABASE_OPERATION,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Database cursor execute',
     rationale: 'Direct SQL execution can read, modify, or delete database records',
   },
   sqlalchemy_execute: {
     id: 'py-sqlalchemy',
     category: ExecutionCategory.DATABASE_OPERATION,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'SQLAlchemy query execution',
     rationale: 'ORM operations can modify database state',
   },
@@ -181,7 +181,7 @@ export const PYTHON_PATTERNS: Record<string, ExecutionPattern> = {
   compile_call: {
     id: 'py-compile',
     category: ExecutionCategory.CODE_EXECUTION,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Code compilation',
     rationale: 'compile() prepares code for execution, often used with eval/exec',
   },
@@ -195,7 +195,7 @@ export const TYPESCRIPT_PATTERNS: Record<string, ExecutionPattern> = {
   tool_function: {
     id: 'ts-tool-function',
     category: ExecutionCategory.TOOL_CALL,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'LangChain tool definition',
     rationale:
       'Tool definitions expose execution capabilities that agents can invoke without explicit user approval per-call',
@@ -203,7 +203,7 @@ export const TYPESCRIPT_PATTERNS: Record<string, ExecutionPattern> = {
   dynamic_tool: {
     id: 'ts-dynamic-tool',
     category: ExecutionCategory.TOOL_CALL,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Dynamic tool creation',
     rationale:
       'Dynamic tool creation exposes execution capabilities to agent reasoning',
@@ -239,7 +239,7 @@ export const TYPESCRIPT_PATTERNS: Record<string, ExecutionPattern> = {
   fs_writeFile: {
     id: 'ts-fs-write',
     category: ExecutionCategory.FILE_OPERATION,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'File write operation',
     rationale:
       'File write operations can overwrite critical files or plant malicious content',
@@ -247,14 +247,14 @@ export const TYPESCRIPT_PATTERNS: Record<string, ExecutionPattern> = {
   fs_readFile: {
     id: 'ts-fs-read',
     category: ExecutionCategory.FILE_OPERATION,
-    baseSeverity: Severity.MEDIUM,
+    baseSeverity: Severity.INFO,
     description: 'File read operation',
     rationale: 'File read operations can access sensitive data',
   },
   fs_unlink: {
     id: 'ts-fs-unlink',
     category: ExecutionCategory.FILE_OPERATION,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'File deletion',
     rationale: 'File deletion can cause data loss or system instability',
   },
@@ -271,7 +271,7 @@ export const TYPESCRIPT_PATTERNS: Record<string, ExecutionPattern> = {
   fetch_call: {
     id: 'ts-fetch',
     category: ExecutionCategory.API_CALL,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Fetch API call',
     rationale:
       'External HTTP calls can exfiltrate data or trigger external actions',
@@ -279,7 +279,7 @@ export const TYPESCRIPT_PATTERNS: Record<string, ExecutionPattern> = {
   axios_call: {
     id: 'ts-axios',
     category: ExecutionCategory.API_CALL,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Axios HTTP request',
     rationale:
       'External HTTP calls can exfiltrate data or trigger external actions',
@@ -287,7 +287,7 @@ export const TYPESCRIPT_PATTERNS: Record<string, ExecutionPattern> = {
   http_request: {
     id: 'ts-http',
     category: ExecutionCategory.API_CALL,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Node.js HTTP request',
     rationale:
       'External HTTP calls can exfiltrate data or trigger external actions',
@@ -297,14 +297,14 @@ export const TYPESCRIPT_PATTERNS: Record<string, ExecutionPattern> = {
   query_execute: {
     id: 'ts-db-query',
     category: ExecutionCategory.DATABASE_OPERATION,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Database query execution',
     rationale: 'Database operations can read, modify, or delete records',
   },
   prisma_operation: {
     id: 'ts-prisma',
     category: ExecutionCategory.DATABASE_OPERATION,
-    baseSeverity: Severity.HIGH,
+    baseSeverity: Severity.WARNING,
     description: 'Prisma database operation',
     rationale: 'ORM operations can modify database state',
   },
@@ -327,36 +327,20 @@ export const TYPESCRIPT_PATTERNS: Record<string, ExecutionPattern> = {
 };
 
 /**
- * Elevates severity based on context.
- * - Inside tool definitions: severity elevated
- * - Has dynamic/user-controlled input: severity elevated
+ * Severity adjustment is REMOVED in the new model.
+ * We use the operation's intrinsic severity directly.
+ * No elevation based on context.
+ *
+ * This function is kept for API compatibility but returns
+ * the base severity unchanged.
  */
 export function adjustSeverity(
   baseSeverity: Severity,
   isInTool: boolean,
   hasDynamicInput: boolean
 ): Severity {
-  // Convert to numeric level for comparison
-  const severityLevel = (s: Severity): number => {
-    switch (s) {
-      case Severity.CRITICAL: return 3;
-      case Severity.HIGH: return 2;
-      case Severity.MEDIUM: return 1;
-    }
-  };
-
-  const levelToSeverity = (level: number): Severity => {
-    if (level >= 3) return Severity.CRITICAL;
-    if (level >= 2) return Severity.HIGH;
-    return Severity.MEDIUM;
-  };
-
-  let level = severityLevel(baseSeverity);
-
-  if (isInTool) level = Math.min(level + 1, 3);
-  if (hasDynamicInput) level = Math.min(level + 1, 3);
-
-  return levelToSeverity(level);
+  // No adjustment - use intrinsic severity
+  return baseSeverity;
 }
 
 /**

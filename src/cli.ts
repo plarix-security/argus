@@ -50,8 +50,9 @@ Examples:
     // Count findings by severity
     const findingsBySeverity = {
       critical: result.findings.filter(f => f.severity === Severity.CRITICAL).length,
-      high: result.findings.filter(f => f.severity === Severity.HIGH).length,
-      medium: result.findings.filter(f => f.severity === Severity.MEDIUM).length,
+      warning: result.findings.filter(f => f.severity === Severity.WARNING).length,
+      info: result.findings.filter(f => f.severity === Severity.INFO).length,
+      suppressed: result.findings.filter(f => f.severity === Severity.SUPPRESSED).length,
     };
     report = {
       repository: path.basename(path.dirname(targetPath)),
@@ -78,7 +79,7 @@ Examples:
     console.log(generateTerminalReport(report));
   }
 
-  process.exit(report.findingsBySeverity.critical > 0 ? 2 : report.findingsBySeverity.high > 0 ? 1 : 0);
+  process.exit(report.findingsBySeverity.critical > 0 ? 2 : report.findingsBySeverity.warning > 0 ? 1 : 0);
 }
 
 main().catch(error => {

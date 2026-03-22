@@ -44,7 +44,7 @@ async function runAnalysis(context: WebhookContext, config: GitHubAppConfig): Pr
     const report = context.changedFiles ? analyzer.analyzeFiles(context.changedFiles, workDir) : analyzer.analyzeDirectory(workDir);
     report.commitSha = context.sha;
     report.pullRequest = context.pullNumber;
-    const conclusion = report.findingsBySeverity.critical > 0 ? 'failure' : report.findingsBySeverity.high > 0 ? 'neutral' : 'success';
+    const conclusion = report.findingsBySeverity.critical > 0 ? 'failure' : report.findingsBySeverity.warning > 0 ? 'neutral' : 'success';
     await octokit.checks.update({ owner: context.owner, repo: context.repo, check_run_id: checkRun.id, status: 'completed', conclusion, completed_at: new Date().toISOString(), output: { title: 'AFB Scanner', summary: `Found ${report.totalFindings} findings`, text: generatePRComment(report) } });
     if (context.pullNumber && report.totalFindings > 0) await postComment(octokit, context, report);
   } catch (error) {

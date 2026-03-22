@@ -27,15 +27,36 @@ export enum AFBType {
 
 /**
  * Severity levels for detected boundaries.
- * Based on potential blast radius and reversibility.
+ *
+ * Four-level model based on blast radius and reversibility:
+ *
+ * CRITICAL: Irreversible destruction, exfiltration, or arbitrary execution.
+ *   No gate anywhere in call path. Examples: delete files/directories,
+ *   execute shell commands, send data to external endpoints, write to
+ *   system paths, eval/exec arbitrary code.
+ *
+ * WARNING: Recoverable but consequential state modification or data transmission.
+ *   Gate detection is uncertain or partial. Examples: write files in user
+ *   directories, POST to external APIs, database writes, email sending.
+ *
+ * INFO: Read-only access to sensitive data or external systems. Not immediately
+ *   dangerous but worth knowing about. Examples: read files outside working
+ *   directory, GET requests to external APIs, environment variable access,
+ *   credential file reads.
+ *
+ * SUPPRESSED: Everything else. Low-confidence detections, internal operations,
+ *   operations on clearly safe targets. These do not appear in PR reports,
+ *   logged internally only.
  */
 export enum Severity {
-  /** Critical: Irreversible external effects (shell commands, file deletion, network writes) */
+  /** Critical: Irreversible operations with no gate */
   CRITICAL = 'critical',
-  /** High: Significant state changes (database writes, API mutations, file writes) */
-  HIGH = 'high',
-  /** Medium: Observable but limited effects (API reads, file reads, logging) */
-  MEDIUM = 'medium',
+  /** Warning: Consequential operations with uncertain gate detection */
+  WARNING = 'warning',
+  /** Info: Read-only access to sensitive data or external systems */
+  INFO = 'info',
+  /** Suppressed: Low-confidence or safe operations (not reported) */
+  SUPPRESSED = 'suppressed',
 }
 
 /**
@@ -128,8 +149,9 @@ export interface AnalysisReport {
   /** Findings grouped by severity */
   findingsBySeverity: {
     critical: number;
-    high: number;
-    medium: number;
+    warning: number;
+    info: number;
+    suppressed: number;
   };
   /** All individual findings */
   findings: AFBFinding[];
