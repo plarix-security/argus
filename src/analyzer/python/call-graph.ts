@@ -23,6 +23,23 @@ import {
   ControlFlowInfo,
 } from './ast-parser';
 import { ExecutionCategory, Severity } from '../../types';
+import * as path from 'path';
+
+/**
+ * Import resolution result
+ */
+export interface ResolvedImport {
+  /** The name being imported */
+  name: string;
+  /** Alias if any */
+  alias?: string;
+  /** Resolved file path (if found) */
+  resolvedFile?: string;
+  /** Whether this import could be resolved */
+  resolved: boolean;
+  /** Module path from import statement */
+  modulePath: string;
+}
 
 /**
  * A node in the call graph representing a function or method
@@ -54,6 +71,10 @@ export interface CallGraphNode {
   hasPolicyGate: boolean;
   /** Control flow information */
   controlFlow?: ControlFlowInfo;
+  /** Source file path */
+  sourceFile?: string;
+  /** Whether this node was resolved from a cross-file import */
+  isCrossFileResolved?: boolean;
 }
 
 /**
@@ -94,6 +115,22 @@ export interface ExposedPath {
   hasGateInPath: boolean;
   /** File path */
   file: string;
+  /** Whether cross-file resolution was involved */
+  involvesCrossFile?: boolean;
+  /** If cross-file resolution failed, note it here */
+  unresolvedCrossFileCalls?: string[];
+}
+
+/**
+ * Cross-file import map for tracking imports across files
+ */
+export interface CrossFileImportMap {
+  /** Map from file path to its resolved imports */
+  fileImports: Map<string, ResolvedImport[]>;
+  /** Map from imported name to its source file */
+  nameToFile: Map<string, string>;
+  /** Map from (file, name) to the actual function node ID */
+  nameToNodeId: Map<string, string>;
 }
 
 /**
@@ -243,7 +280,224 @@ function isStructuralPolicyGate(controlFlow: ControlFlowInfo | undefined): boole
 }
 
 /**
+ * Resolve a Python module path to a file path.
+ *
+ * Given a module path like "utils.auth" and a base directory,
+ * returns the resolved file path like "/project/utils/auth.py".
+ *
+ * Only resolves one level deep - does not follow transitive imports.
+ */
+function resolveModulePath(
+  modulePath: string,
+  currentFilePath: string,
+  allFilePaths: string[]
+): string | undefined {
+  // Convert module path to potential file paths
+  const moduleAsPath = modulePath.replace(/\./g, '/');
+  const currentDir = path.dirname(currentFilePath);
+
+  // Try relative import first (from . or from ..)
+  if (modulePath.startsWith('.')) {
+    const dots = modulePath.match(/^\.+/)?.[0].length || 0;
+    let baseDir = currentDir;
+    for (let i = 1; i < dots; i++) {
+      baseDir = path.dirname(baseDir);
+    }
+    const relativeModule = modulePath.slice(dots).replace(/\./g, '/');
+    const candidates = [
+      path.join(baseDir, relativeModule + '.py'),
+      path.join(baseDir, relativeModule, '__init__.py'),
+    ];
+    for (const candidate of candidates) {
+      const normalized = path.normalize(candidate);
+      if (allFilePaths.includes(normalized)) {
+        return normalized;
+      }
+    }
+  }
+
+  // Try absolute import from common roots
+  const possibleRoots = new Set<string>();
+  for (const filePath of allFilePaths) {
+    // Find common package roots
+    const parts = filePath.split(path.sep);
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (parts[i] === 'src' || parts[i] === 'lib' || parts[i] === 'packages' || parts[i] === 'backend') {
+        possibleRoots.add(parts.slice(0, i + 1).join(path.sep));
+      }
+    }
+    // Also try from dirname
+    possibleRoots.add(path.dirname(filePath));
+  }
+
+  for (const root of possibleRoots) {
+    const candidates = [
+      path.join(root, moduleAsPath + '.py'),
+      path.join(root, moduleAsPath, '__init__.py'),
+    ];
+    for (const candidate of candidates) {
+      const normalized = path.normalize(candidate);
+      if (allFilePaths.includes(normalized)) {
+        return normalized;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Build a cross-file import map from parsed files.
+ *
+ * This maps imported names to their source files, enabling
+ * resolution of function calls to their definitions across files.
+ */
+function buildCrossFileImportMap(
+  files: Map<string, ParsedPythonFile>,
+  allFilePaths: string[]
+): CrossFileImportMap {
+  const fileImports = new Map<string, ResolvedImport[]>();
+  const nameToFile = new Map<string, string>();
+  const nameToNodeId = new Map<string, string>();
+
+  for (const [filePath, parsed] of files) {
+    const resolvedImports: ResolvedImport[] = [];
+
+    for (const imp of parsed.imports) {
+      const resolvedFile = resolveModulePath(imp.module, filePath, allFilePaths);
+
+      if (imp.isFrom) {
+        // from module import name1, name2
+        for (const { name, alias } of imp.names) {
+          const resolved: ResolvedImport = {
+            name,
+            alias,
+            modulePath: imp.module,
+            resolved: resolvedFile !== undefined,
+            resolvedFile,
+          };
+          resolvedImports.push(resolved);
+
+          if (resolvedFile) {
+            const key = `${filePath}:${alias || name}`;
+            nameToFile.set(key, resolvedFile);
+          }
+        }
+      } else {
+        // import module
+        const resolved: ResolvedImport = {
+          name: imp.module,
+          alias: imp.names[0]?.alias,
+          modulePath: imp.module,
+          resolved: resolvedFile !== undefined,
+          resolvedFile,
+        };
+        resolvedImports.push(resolved);
+
+        if (resolvedFile) {
+          const key = `${filePath}:${imp.names[0]?.alias || imp.module}`;
+          nameToFile.set(key, resolvedFile);
+        }
+      }
+    }
+
+    fileImports.set(filePath, resolvedImports);
+  }
+
+  // Second pass: map imported names to their actual node IDs
+  for (const [filePath, imports] of fileImports) {
+    for (const imp of imports) {
+      if (!imp.resolved || !imp.resolvedFile) continue;
+
+      const targetParsed = files.get(imp.resolvedFile);
+      if (!targetParsed) continue;
+
+      // Find the function/class in the target file
+      const func = targetParsed.functions.find(f => f.name === imp.name);
+      if (func) {
+        const nodeId = func.className
+          ? `${func.className}.${func.name}`
+          : func.name;
+        const key = `${filePath}:${imp.alias || imp.name}`;
+        nameToNodeId.set(key, `${imp.resolvedFile}:${nodeId}`);
+      }
+
+      // Also check classes
+      const cls = targetParsed.classes.find(c => c.name === imp.name);
+      if (cls) {
+        const key = `${filePath}:${imp.alias || imp.name}`;
+        nameToNodeId.set(key, `${imp.resolvedFile}:${cls.name}`);
+      }
+    }
+  }
+
+  return { fileImports, nameToFile, nameToNodeId };
+}
+
+/**
+ * Try to resolve a call to a cross-file import.
+ * Returns the resolved node ID if found, undefined otherwise.
+ */
+function resolveCrossFileCall(
+  callee: string,
+  currentFilePath: string,
+  importMap: CrossFileImportMap,
+  files: Map<string, ParsedPythonFile>
+): { nodeId: string; sourceFile: string } | undefined {
+  // Check if the callee matches an imported name
+  const baseName = callee.split('.')[0];
+  const key = `${currentFilePath}:${baseName}`;
+
+  const sourceFile = importMap.nameToFile.get(key);
+  if (!sourceFile) return undefined;
+
+  const targetParsed = files.get(sourceFile);
+  if (!targetParsed) return undefined;
+
+  // If callee is "module.func", try to find func in the target file
+  if (callee.includes('.')) {
+    const parts = callee.split('.');
+    const funcName = parts[parts.length - 1];
+
+    // Look for the function in the target file
+    const func = targetParsed.functions.find(f => f.name === funcName);
+    if (func) {
+      const nodeId = func.className
+        ? `${func.className}.${func.name}`
+        : func.name;
+      return { nodeId: `${sourceFile}:${nodeId}`, sourceFile };
+    }
+
+    // Look in classes for methods
+    for (const cls of targetParsed.classes) {
+      if (parts.includes(cls.name)) {
+        const methodName = parts[parts.length - 1];
+        const method = cls.methods.find(m => m.name === methodName);
+        if (method) {
+          return { nodeId: `${sourceFile}:${cls.name}.${methodName}`, sourceFile };
+        }
+      }
+    }
+  } else {
+    // Direct function call of imported name
+    const func = targetParsed.functions.find(f => f.name === callee);
+    if (func) {
+      const nodeId = func.className
+        ? `${func.className}.${func.name}`
+        : func.name;
+      return { nodeId: `${sourceFile}:${nodeId}`, sourceFile };
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * Build a call graph from parsed Python files
+ *
+ * Supports cross-file resolution for one level of imports.
+ * When a function call cannot be resolved in the current file,
+ * it tries to resolve through imports to find the definition.
  */
 export function buildCallGraph(
   files: Map<string, ParsedPythonFile>
@@ -252,16 +506,24 @@ export function buildCallGraph(
   const toolRegistrations: CallGraphNode[] = [];
   const exposedPaths: ExposedPath[] = [];
 
+  // Get all file paths for cross-file resolution
+  const allFilePaths = Array.from(files.keys());
+
+  // Build cross-file import map
+  const importMap = buildCrossFileImportMap(files, allFilePaths);
+
   // First pass: create nodes for all functions and classes
+  // Use file-prefixed IDs for cross-file uniqueness
   for (const [filePath, parsed] of files) {
     // Process standalone functions
     for (const func of parsed.functions) {
-      const id = func.className
+      const localId = func.className
         ? `${func.className}.${func.name}`
         : func.name;
+      const globalId = `${filePath}:${localId}`;
 
       const node: CallGraphNode = {
-        id,
+        id: globalId,
         name: func.name,
         className: func.className,
         startLine: func.startLine,
@@ -274,6 +536,7 @@ export function buildCallGraph(
         // Use structural analysis to determine if this is a policy gate
         hasPolicyGate: isStructuralPolicyGate(func.controlFlow),
         controlFlow: func.controlFlow,
+        sourceFile: filePath,
       };
 
       // Check if this is a tool registration
@@ -284,7 +547,7 @@ export function buildCallGraph(
         toolRegistrations.push(node);
       }
 
-      nodes.set(id, node);
+      nodes.set(globalId, node);
     }
 
     // Process class definitions
@@ -293,10 +556,11 @@ export function buildCallGraph(
       const toolInfo = detectToolClass(cls, parsed.imports);
 
       for (const method of cls.methods) {
-        const id = `${cls.name}.${method.name}`;
+        const localId = `${cls.name}.${method.name}`;
+        const globalId = `${filePath}:${localId}`;
 
         const node: CallGraphNode = {
-          id,
+          id: globalId,
           name: method.name,
           className: cls.name,
           startLine: method.startLine,
@@ -310,37 +574,60 @@ export function buildCallGraph(
           // Use structural analysis to determine if this is a policy gate
           hasPolicyGate: isStructuralPolicyGate(method.controlFlow),
           controlFlow: method.controlFlow,
+          sourceFile: filePath,
         };
 
         if (node.isToolRegistration) {
           toolRegistrations.push(node);
         }
 
-        nodes.set(id, node);
+        nodes.set(globalId, node);
       }
     }
   }
 
   // Second pass: populate call edges and detect dangerous operations
+  // Now with cross-file resolution support
   for (const [filePath, parsed] of files) {
     for (const call of parsed.calls) {
-      // Find the enclosing function node
+      // Find the enclosing function node with file-prefixed ID
       let callerId: string | undefined;
       if (call.enclosingClass && call.enclosingFunction) {
-        callerId = `${call.enclosingClass}.${call.enclosingFunction}`;
+        callerId = `${filePath}:${call.enclosingClass}.${call.enclosingFunction}`;
       } else if (call.enclosingFunction) {
-        callerId = call.enclosingFunction;
+        callerId = `${filePath}:${call.enclosingFunction}`;
       }
 
       if (callerId && nodes.has(callerId)) {
         const callerNode = nodes.get(callerId)!;
 
-        // Add callee to caller's outgoing edges
-        callerNode.callees.add(call.callee);
+        // Try to resolve the callee
+        // First, check if it's a local function (same file)
+        let resolvedCalleeId: string | undefined;
+        const localCalleeId = `${filePath}:${call.callee}`;
 
-        // Check if callee is a known node
-        if (nodes.has(call.callee)) {
-          const calleeNode = nodes.get(call.callee)!;
+        if (nodes.has(localCalleeId)) {
+          resolvedCalleeId = localCalleeId;
+        } else {
+          // Try cross-file resolution
+          const crossFileResult = resolveCrossFileCall(
+            call.callee,
+            filePath,
+            importMap,
+            files
+          );
+          if (crossFileResult) {
+            resolvedCalleeId = crossFileResult.nodeId;
+          }
+        }
+
+        // Add callee to caller's outgoing edges (use resolved ID if found)
+        const calleeRef = resolvedCalleeId || call.callee;
+        callerNode.callees.add(calleeRef);
+
+        // If resolved, establish bidirectional edge
+        if (resolvedCalleeId && nodes.has(resolvedCalleeId)) {
+          const calleeNode = nodes.get(resolvedCalleeId)!;
           calleeNode.callers.add(callerId);
         }
 
@@ -364,16 +651,23 @@ export function buildCallGraph(
       []
     );
 
-    for (const { operation, path, hasGate } of paths) {
+    for (const { operation, path, hasGate, involvesCrossFile, unresolvedCalls } of paths) {
       // Find the file containing this operation
-      let file = '<unknown>';
-      for (const [filePath, parsed] of files) {
-        const matchingCall = parsed.calls.find(
-          (c) => c.startLine === operation.line && c.callee === operation.callee
-        );
-        if (matchingCall) {
-          file = filePath;
-          break;
+      // With cross-file IDs, we can extract the file from the path nodes
+      let file = tool.sourceFile || '<unknown>';
+      for (const nodeId of path) {
+        if (nodeId.includes(':')) {
+          const operationFile = nodeId.split(':')[0];
+          // The operation is in the last file in the path that contains the operation
+          for (const [filePath, parsed] of files) {
+            const matchingCall = parsed.calls.find(
+              (c) => c.startLine === operation.line && c.callee === operation.callee
+            );
+            if (matchingCall) {
+              file = filePath;
+              break;
+            }
+          }
         }
       }
 
@@ -383,6 +677,8 @@ export function buildCallGraph(
         path,
         hasGateInPath: hasGate,
         file,
+        involvesCrossFile,
+        unresolvedCrossFileCalls: unresolvedCalls,
       });
     }
   }
@@ -484,15 +780,16 @@ function detectDangerousOperation(call: CallSite): DangerousOperation | null {
 }
 
 /**
- * Find all dangerous operation paths from a starting node
+ * Find all dangerous operation paths from a starting node.
+ * Tracks cross-file resolution and unresolved calls.
  */
 function findDangerousPathsFromNode(
   node: CallGraphNode,
   allNodes: Map<string, CallGraphNode>,
   visited: Set<string>,
   currentPath: string[],
-  foundPaths: { operation: DangerousOperation; path: string[]; hasGate: boolean }[]
-): { operation: DangerousOperation; path: string[]; hasGate: boolean }[] {
+  foundPaths: { operation: DangerousOperation; path: string[]; hasGate: boolean; involvesCrossFile: boolean; unresolvedCalls: string[] }[]
+): { operation: DangerousOperation; path: string[]; hasGate: boolean; involvesCrossFile: boolean; unresolvedCalls: string[] }[] {
   // Prevent infinite loops
   if (visited.has(node.id)) {
     return foundPaths;
@@ -505,12 +802,26 @@ function findDangerousPathsFromNode(
     return n?.hasPolicyGate || false;
   });
 
+  // Track cross-file involvement: check if path spans multiple files
+  const filesInPath = new Set<string>();
+  for (const nodeId of currentPath) {
+    if (nodeId.includes(':')) {
+      filesInPath.add(nodeId.split(':')[0]);
+    }
+  }
+  const involvesCrossFile = filesInPath.size > 1;
+
+  // Track unresolved calls
+  const unresolvedCalls: string[] = [];
+
   // Report dangerous operations in this node
   for (const op of node.dangerousOps) {
     foundPaths.push({
       operation: op,
       path: [...currentPath],
       hasGate: hasGateInPath || node.hasPolicyGate,
+      involvesCrossFile,
+      unresolvedCalls: [...unresolvedCalls],
     });
   }
 
@@ -526,6 +837,16 @@ function findDangerousPathsFromNode(
           [...currentPath, calleeId],
           foundPaths
         );
+      } else {
+        // Track unresolved cross-file calls (not in our node map)
+        // These are calls we couldn't resolve - mark as potentially gated
+        // Don't add to unresolved if it's a known dangerous operation pattern
+        const isKnownDangerousPattern = DANGEROUS_OPERATION_PATTERNS.some(
+          (p) => p.pattern.test(calleeId)
+        );
+        if (!isKnownDangerousPattern && !calleeId.startsWith('_')) {
+          unresolvedCalls.push(calleeId);
+        }
       }
     }
   }
