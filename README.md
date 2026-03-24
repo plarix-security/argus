@@ -1,4 +1,4 @@
-# wyscan
+# WyScan
 
 **Static analyzer for agentic AI codebases that detects unsafe tool boundaries.**
 
