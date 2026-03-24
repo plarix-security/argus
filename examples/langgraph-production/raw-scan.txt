@@ -4,7 +4,7 @@
   Scanning  examples/langgraph-production
 
   ─────────────────────────────────────────────────────
-  5 critical  ·  19 warning  ·  14 info
+  4 critical  ·  18 warning  ·  12 info
   ─────────────────────────────────────────────────────
 
   ● CRITICAL shell.py:56
@@ -17,10 +17,6 @@
 
   ● CRITICAL shell.py:131
     shutil.rmtree(target_dir)
-    Recursive directory deletion. No policy gate in call path.
-
-  ● CRITICAL shell.py:208
-    shutil.rmtree(temp_path)
     Recursive directory deletion. No policy gate in call path.
 
   ● CRITICAL shell.py:254
@@ -39,10 +35,6 @@
     temp_path.write_text(json.dumps(data))
     File write operation. No policy gate in call path.
 
-  ● WARNING  data_pipeline_agent.py:284
-    customer.update({
-    Database write operation. No policy gate in call path.
-
   ● WARNING  crm.py:94
     requests.patch(
     HTTP mutation to external endpoint. No policy gate in call path.
@@ -54,6 +46,14 @@
   ● WARNING  crm.py:171
     requests.post(
     HTTP POST to external endpoint. No policy gate in call path.
+
+  ● WARNING  email.py:91
+    server.sendmail(email_config.from_address, all_recipients...
+    External API mutation. No policy gate in call path.
+
+  ● WARNING  email.py:147
+    server.sendmail(email_config.from_address, [email_addr], ...
+    External API mutation. No policy gate in call path.
 
   ● WARNING  files.py:87
     full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -86,14 +86,6 @@
   ● WARNING  shell.py:174
     shutil.copy2(file_path, workspace_path)
     File copy/move operation. No policy gate in call path.
-
-  ● WARNING  shell.py:209
-    temp_path.mkdir(parents=True, exist_ok=True)
-    Directory creation. No policy gate in call path.
-
-  ● WARNING  shell.py:252
-    env.update(env_vars)
-    Database write operation. No policy gate in call path.
 
   ● WARNING  tickets.py:77
     requests.post(
@@ -131,14 +123,6 @@
     cursor.execute(query, values)
     Database query execution. No policy gate in call path.
 
-  ● INFO     database.py:193
-    cursor.execute(
-    Database query execution. No policy gate in call path.
-
-  ● INFO     database.py:198
-    cursor.execute(
-    Database query execution. No policy gate in call path.
-
   ● INFO     files.py:43
     full_path.read_text(encoding=encoding)
     File read operation. No policy gate in call path.
@@ -160,4 +144,4 @@
     External HTTP read. No policy gate in call path.
 
   ─────────────────────────────────────────────────────
-  12 files  ·  0.3s  ·  AFB04 coverage only
+  12 files  ·  1.0s  ·  AFB04 coverage only
