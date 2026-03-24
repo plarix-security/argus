@@ -250,7 +250,8 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.session\.(add|delete|commit|flush)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM write operation' },
   { pattern: /\.save$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM save' },
   { pattern: /\.create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM create' },
-  { pattern: /\.update$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM update' },
+  { pattern: /\.objects\.update$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM queryset update' },
+  { pattern: /\.filter\([^)]*\)\.update$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM filtered update' },
   { pattern: /\.bulk_create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM bulk create' },
   { pattern: /\.insert$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database insert' },
 
@@ -258,6 +259,7 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.send_message$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Send message/email' },
   { pattern: /\.send_email$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Send email' },
   { pattern: /smtp\.sendmail$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'SMTP send' },
+  { pattern: /\.sendmail$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Email send via SMTP' },
 
   // ==================== INFO ====================
   // File reads - read-only access to sensitive data
@@ -302,6 +304,56 @@ const AUTHORIZATION_EXCEPTION_TYPES = [
   'NotAuthorized',
   'SecurityError',
 ];
+
+/**
+ * Known authorization decorator patterns.
+ * These decorators are commonly used access control gates that should be
+ * recognized even when their source code is in a different file.
+ */
+const KNOWN_AUTHORIZATION_DECORATORS = [
+  // Permission/authorization decorators
+  /^require_permission$/i,
+  /^require_permissions$/i,
+  /^permission_required$/i,
+  /^permissions_required$/i,
+  /^require_admin$/i,
+  /^admin_required$/i,
+  /^login_required$/i,
+  /^authenticated$/i,
+  /^auth_required$/i,
+  /^authorization_required$/i,
+  /^requires_auth$/i,
+  /^requires_permission$/i,
+  /^check_permission$/i,
+  /^check_permissions$/i,
+  /^has_permission$/i,
+  /^has_permissions$/i,
+  // Role-based access control
+  /^require_role$/i,
+  /^role_required$/i,
+  /^roles_required$/i,
+  /^has_role$/i,
+  /^user_passes_test$/i,
+  // Django-style decorators
+  /^permission_classes$/i,
+  /^api_view$/i,
+  // Flask-style decorators
+  /^login_manager\.user_loader$/i,
+  // Generic access control
+  /^access_control$/i,
+  /^authorize$/i,
+  /^protected$/i,
+];
+
+/**
+ * Check if a decorator name matches a known authorization pattern.
+ * This handles imported decorators that can't be structurally analyzed.
+ */
+function isKnownAuthorizationDecorator(decoratorName: string): boolean {
+  // Extract the base name without arguments
+  const baseName = decoratorName.split('(')[0].trim();
+  return KNOWN_AUTHORIZATION_DECORATORS.some(pattern => pattern.test(baseName));
+}
 
 /**
  * Determine if a function is a structural policy gate.
@@ -612,9 +664,11 @@ export function buildCallGraph(
 
       // A function has a policy gate if:
       // 1. Its own control flow is a structural gate, OR
-      // 2. It has a decorator that acts as a structural gate
+      // 2. It has a decorator that acts as a structural gate (from same file), OR
+      // 3. It has a decorator matching known authorization patterns (from any file)
       const hasStructuralGate = isStructuralPolicyGate(func.controlFlow);
       const hasDecoratorGate = func.hasDecoratorGate || false;
+      const hasKnownAuthDecorator = func.decorators.some(d => isKnownAuthorizationDecorator(d));
 
       const node: CallGraphNode = {
         id: globalId,
@@ -627,8 +681,8 @@ export function buildCallGraph(
         callers: new Set(),
         isToolRegistration: false,
         dangerousOps: [],
-        // Use structural analysis + decorator analysis to determine if this is a policy gate
-        hasPolicyGate: hasStructuralGate || hasDecoratorGate,
+        // Use structural analysis + decorator analysis + known auth patterns to determine if this is a policy gate
+        hasPolicyGate: hasStructuralGate || hasDecoratorGate || hasKnownAuthDecorator,
         controlFlow: func.controlFlow,
         sourceFile: filePath,
       };
@@ -655,9 +709,11 @@ export function buildCallGraph(
 
         // A method has a policy gate if:
         // 1. Its own control flow is a structural gate, OR
-        // 2. It has a decorator that acts as a structural gate
+        // 2. It has a decorator that acts as a structural gate (from same file), OR
+        // 3. It has a decorator matching known authorization patterns (from any file)
         const hasStructuralGate = isStructuralPolicyGate(method.controlFlow);
         const hasDecoratorGate = method.hasDecoratorGate || false;
+        const hasKnownAuthDecorator = method.decorators.some(d => isKnownAuthorizationDecorator(d));
 
         const node: CallGraphNode = {
           id: globalId,
@@ -671,8 +727,8 @@ export function buildCallGraph(
           isToolRegistration: toolInfo !== null && (method.name === '_run' || method.name === 'run' || method.name === 'invoke' || method.name === '_execute' || method.name === 'execute'),
           framework: toolInfo?.framework,
           dangerousOps: [],
-          // Use structural analysis + decorator analysis to determine if this is a policy gate
-          hasPolicyGate: hasStructuralGate || hasDecoratorGate,
+          // Use structural analysis + decorator analysis + known auth patterns to determine if this is a policy gate
+          hasPolicyGate: hasStructuralGate || hasDecoratorGate || hasKnownAuthDecorator,
           controlFlow: method.controlFlow,
           sourceFile: filePath,
         };
