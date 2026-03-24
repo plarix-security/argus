@@ -2,7 +2,7 @@
   "version": "0.6.0",
   "scanned_path": "/home/knightler/wyscan/examples/langgraph-production",
   "files_analyzed": 12,
-  "runtime_ms": 897,
+  "runtime_ms": 392,
   "findings": [
     {
       "severity": "CRITICAL",
@@ -29,15 +29,6 @@
       "function": "shutil.rmtree",
       "tool_registration": "cleanup_temp_files",
       "description": "Tool \"cleanup_temp_files\" (langchain) can reach shutil.rmtree. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
-      "afb_type": "AFB04"
-    },
-    {
-      "severity": "CRITICAL",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/shell.py",
-      "line": 208,
-      "function": "shutil.rmtree",
-      "tool_registration": "force_cleanup_all_temp",
-      "description": "Tool \"force_cleanup_all_temp\" (langchain) can reach shutil.rmtree. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
       "afb_type": "AFB04"
     },
     {
@@ -78,15 +69,6 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/agents/data_pipeline_agent.py",
-      "line": 284,
-      "function": "customer.update",
-      "tool_registration": "enrich_and_store_customers",
-      "description": "Tool \"enrich_and_store_customers\" (langchain) can reach customer.update. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
-      "afb_type": "AFB04"
-    },
-    {
-      "severity": "WARNING",
       "file": "/home/knightler/wyscan/examples/langgraph-production/tools/crm.py",
       "line": 94,
       "function": "requests.patch",
@@ -110,6 +92,24 @@
       "function": "requests.post",
       "tool_registration": "bulk_sync_to_crm",
       "description": "Tool \"bulk_sync_to_crm\" (langchain) can reach requests.post. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/email.py",
+      "line": 91,
+      "function": "server.sendmail",
+      "tool_registration": "send_customer_email",
+      "description": "Tool \"send_customer_email\" (langchain) can reach server.sendmail. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/email.py",
+      "line": 147,
+      "function": "server.sendmail",
+      "tool_registration": "send_bulk_email",
+      "description": "Tool \"send_bulk_email\" (langchain) can reach server.sendmail. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
       "afb_type": "AFB04"
     },
     {
@@ -182,24 +182,6 @@
       "function": "shutil.copy2",
       "tool_registration": "create_processing_workspace",
       "description": "Tool \"create_processing_workspace\" (langchain) can reach shutil.copy2. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
-      "afb_type": "AFB04"
-    },
-    {
-      "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/shell.py",
-      "line": 209,
-      "function": "temp_path.mkdir",
-      "tool_registration": "force_cleanup_all_temp",
-      "description": "Tool \"force_cleanup_all_temp\" (langchain) can reach temp_path.mkdir. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
-      "afb_type": "AFB04"
-    },
-    {
-      "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/shell.py",
-      "line": 252,
-      "function": "env.update",
-      "tool_registration": "run_data_pipeline_script",
-      "description": "Tool \"run_data_pipeline_script\" (langchain) can reach env.update. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
       "afb_type": "AFB04"
     },
     {
@@ -285,24 +267,6 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/database.py",
-      "line": 193,
-      "function": "cursor.execute",
-      "tool_registration": "delete_customer_data",
-      "description": "Tool \"delete_customer_data\" (langchain) can reach cursor.execute. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
-      "afb_type": "AFB04"
-    },
-    {
-      "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/database.py",
-      "line": 198,
-      "function": "cursor.execute",
-      "tool_registration": "delete_customer_data",
-      "description": "Tool \"delete_customer_data\" (langchain) can reach cursor.execute. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
-      "afb_type": "AFB04"
-    },
-    {
-      "severity": "INFO",
       "file": "/home/knightler/wyscan/examples/langgraph-production/tools/files.py",
       "line": 43,
       "function": "full_path.read_text",
@@ -348,9 +312,9 @@
     }
   ],
   "summary": {
-    "critical": 5,
-    "warning": 19,
-    "info": 14,
+    "critical": 4,
+    "warning": 18,
+    "info": 12,
     "suppressed": 0
   }
 }
