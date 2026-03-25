@@ -5,28 +5,33 @@
  * from tools that an AI agent can call. Regular application code that uses
  * fetch() or query() is NOT an AFB04 issue.
  *
- * Without full call graph analysis (not yet implemented for TS), we can only
- * report findings if the file clearly contains agent tool patterns.
+ * Current status: TypeScript/JavaScript support is in progress.
+ * This detector returns empty findings and logs an INFO message.
  *
- * Current approach: Return empty findings for TypeScript/JavaScript.
- * This is intentional - we follow the principle:
+ * The principle we follow:
  * "A missed finding is acceptable. A false finding from pattern matching is not."
  *
- * Future iteration: Implement call graph analysis for TypeScript to properly
- * trace from tool registrations to dangerous operations.
+ * Full implementation requires call graph analysis for TypeScript, which is
+ * planned for a future release.
  */
 
 import { FileAnalysisResult } from "../../types";
 
+/**
+ * Analyzes a TypeScript/JavaScript file for AFB04 boundaries.
+ *
+ * Currently returns empty findings with an explicit notice that TypeScript
+ * support is in progress. This avoids false positives from pattern matching
+ * that cannot trace from tool registrations to dangerous operations.
+ */
 export function analyzeTypeScriptFile(filePath: string, sourceCode: string): FileAnalysisResult {
   const startTime = Date.now();
 
-  // TypeScript/JavaScript AFB04 detection is disabled until proper
-  // call graph analysis is implemented. Returning empty findings to
-  // avoid false positives from pattern matching regular application code.
-  //
-  // The Python detector has proper call graph analysis and should be
-  // the primary detection mechanism for now.
+  // Emit INFO-level message to stderr (not a finding, just notification)
+  // Only emit once per file, and only if the file is not empty
+  if (sourceCode.trim().length > 0) {
+    console.error(`INFO: TypeScript support is in progress. No findings will be reported for: ${filePath}`);
+  }
 
   return {
     file: filePath,
@@ -34,5 +39,7 @@ export function analyzeTypeScriptFile(filePath: string, sourceCode: string): Fil
     findings: [],
     success: true,
     analysisTimeMs: Date.now() - startTime,
+    skipped: true,
+    skipReason: "TypeScript/JavaScript detection not yet implemented. Full call graph analysis required.",
   };
 }
