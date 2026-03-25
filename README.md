@@ -5,7 +5,7 @@ Static analyzer for agentic AI codebases that detects unsafe tool boundaries.
 WyScan finds places in your Python agent code where tools can execute dangerous operations without authorization checks. It builds a call graph from tool registrations (like `@tool` decorators) and traces paths to dangerous operations (like `subprocess.run` or `shutil.rmtree`). If there is no policy gate in the path, WyScan reports it.
 
 ```
-wyscan  v0.7.0-beta  by Plarix
+wyscan  v1.0.0  by Plarix
 AFB Scanner
 
 Scanning: ./agent-project
@@ -39,8 +39,8 @@ It uses tree-sitter for real AST parsing and builds a call graph to trace from t
 
 - **Does not execute your code.** Static analysis only.
 - **Does not use LLMs or inference.** Pure call graph analysis.
-- **Does not scan TypeScript or JavaScript.** The TypeScript detector is disabled and returns no findings. Python is the only supported language.
-- **Does not resolve imports beyond one level.** If tool A calls helper B which calls helper C which calls subprocess.run, the path from A to subprocess.run may not be detected.
+- **Does not scan TypeScript or JavaScript.** The TypeScript detector emits an INFO notice and returns no findings. Python is the only supported language.
+- **Does not resolve imports beyond depth 3.** Cross-file resolution is transitive up to 3 levels deep. Deeper call chains may not be fully traced.
 - **Does not trace calls into external packages.** Only project files are analyzed.
 
 ## Why This Exists
@@ -111,7 +111,11 @@ fi
 
 ## What It Detects
 
-WyScan uses a severity model based on blast radius and reversibility.
+WyScan uses the CEE (Comprehensive Exposure Evaluation) severity model, which considers:
+
+1. **Reversibility**: Irreversible operations (delete, rmtree, eval) are always CRITICAL
+2. **Data Sensitivity**: Operations touching passwords, secrets, credentials, tokens, or PII are elevated one level
+3. **Validation Helpers**: Call paths through sanitize*, validate*, check_*, verify* functions are downgraded one level
 
 ### Severity Levels
 
@@ -169,7 +173,9 @@ WyScan recognizes these as structural policy gates:
 
 - Functions that raise `PermissionError`, `AuthorizationError`, `AccessDeniedError`, or similar
 - Functions with conditional branches that check parameters and can prevent execution
-- Known authorization decorators: `@require_permission`, `@permission_required`, `@login_required`, `@authenticated`, `@require_role`, `@role_required`, `@user_passes_test`
+- Known authorization decorators: `@require_permission`, `@permission_required`, `@login_required`, `@authenticated`, `@require_role`, `@role_required`, `@user_passes_test`, and any decorator matching patterns like `@*permission*`, `@*auth*`, `@*require*`
+- Framework-level authorization: `AgentExecutor(human_in_the_loop=True)`, `register_function(human_input_mode="ALWAYS")`
+- Validation helper functions: `sanitize*`, `validate*`, `check_*`, `verify*`, `is_valid*`, `is_allowed*`, `can_*` (heuristic-based, severity downgrade only)
 
 If a policy gate exists in the call path between a tool and a dangerous operation, the finding is not reported.
 
@@ -181,7 +187,7 @@ wyscan scan ./project --json
 
 ```json
 {
-  "version": "0.7.0-beta",
+  "version": "1.0.0",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,
@@ -201,6 +207,15 @@ wyscan scan ./project --json
     "warning": 3,
     "info": 5,
     "suppressed": 0
+  },
+  "coverage": {
+    "languages_scanned": ["python"],
+    "languages_skipped": ["typescript", "javascript"],
+    "frameworks_detected": ["langchain", "crewai"],
+    "files_analyzed": 34,
+    "files_skipped": 2,
+    "call_graph_depth_used": 3,
+    "confidence_note": "Non-comprehensive. Static analysis only. Runtime-generated tool wiring and external package internals are not traced."
   }
 }
 ```
@@ -247,15 +262,15 @@ The GitHub App uses the same scanner engine as the CLI. Findings are identical.
 
 These are honest limitations of the current version:
 
-1. **TypeScript/JavaScript detection is disabled.** The TypeScript detector returns no findings to avoid false positives from pattern matching. Python is the only working language.
+1. **TypeScript/JavaScript detection is disabled.** The TypeScript detector emits an INFO notice and returns no findings to avoid false positives from pattern matching. Python is the only working language.
 
-2. **Cross-file call resolution is single-level only.** If your tool calls a helper that calls another helper that calls subprocess.run, the path may not be detected. Only one level of imports is resolved.
+2. **Cross-file call resolution is limited to depth 3.** If your tool -> helper1 -> helper2 -> helper3 -> helper4 -> subprocess.run, the path may not be fully detected. Transitive import resolution stops at 3 levels to balance coverage and performance.
 
 3. **External package calls are not traced.** If your tool calls a function from a third-party package that internally calls subprocess.run, WyScan will not detect it.
 
 4. **AFB04 only.** This version detects Unauthorized Action boundaries only. AFB01 (Instruction Injection), AFB02 (Context Poisoning), and AFB03 (Constraint Bypass) require semantic analysis and are not implemented.
 
-5. **Call graph depth is limited to 10.** Very deep call chains may not be fully traced.
+5. **Call graph traversal is limited to 10 steps.** Very deep call chains may not be fully traced to prevent infinite recursion.
 
 ## Why Not Semgrep or Bandit?
 
@@ -277,11 +292,12 @@ The key difference: Semgrep might report 50 subprocess calls across your codebas
 These features are planned but not yet implemented:
 
 - [ ] Full TypeScript/JavaScript support with tree-sitter parsing
-- [ ] Multi-level transitive import resolution
+- [x] Multi-level transitive import resolution (implemented in v1.0.0)
 - [ ] Custom pattern definitions via configuration file
 - [ ] IDE plugins (VSCode, JetBrains)
 - [ ] AFB01-03 detection with semantic analysis
 - [ ] Configuration file support for include/exclude patterns
+- [ ] Runtime/hybrid analysis for dynamic tool registration
 
 ## Development
 
@@ -310,21 +326,22 @@ wyscan/
 │   ├── cli/                # CLI interface
 │   │   ├── index.ts        # Entry point and commands
 │   │   ├── formatter.ts    # Terminal output formatting
-│   │   └── version.ts      # Version constants
+│   │   └── version.ts      # Version metadata (reads from package.json)
 │   ├── analyzer/           # Scanner engine
 │   │   ├── index.ts        # Orchestrator
 │   │   ├── python/         # Python detector (working)
-│   │   │   ├── detector.ts
-│   │   │   ├── ast-parser.ts
-│   │   │   └── call-graph.ts
-│   │   └── typescript/     # TypeScript detector (disabled)
+│   │   │   ├── detector.ts # Main detector with CEE severity model
+│   │   │   ├── ast-parser.ts # Tree-sitter AST parsing
+│   │   │   └── call-graph.ts # Call graph builder with transitive resolution
+│   │   ├── typescript/     # TypeScript detector (gated)
+│   │   └── ast-walker.ts   # Language detection
+│   ├── afb/                # AFB taxonomy definitions
 │   ├── github/             # GitHub App integration
 │   ├── reporter/           # Output formatters
 │   └── types/              # TypeScript types
 ├── wasm/                   # Tree-sitter WASM binaries
-├── test/                   # Test files
-├── test-repos/             # Test fixtures
-├── examples/               # Example files
+├── test/                   # Validation reports
+├── examples/               # Example agent codebases
 ├── docs/                   # GitHub Pages documentation
 ├── package.json
 ├── tsconfig.json
