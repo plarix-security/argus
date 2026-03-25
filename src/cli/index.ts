@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * Argus CLI
+ * WyScan CLI
  *
  * Command-line interface for the AFB Scanner.
  * Wraps the existing scanner engine used by the GitHub App.
  *
  * Commands:
- *   argus scan <path> [flags]   Scan for AFB exposures
- *   argus check                 Verify dependencies
- *   argus version               Print version
- *   argus help [command]        Show usage
+ *   wyscan scan <path> [flags]   Scan for AFB exposures
+ *   wyscan check                 Verify dependencies
+ *   wyscan version               Print version
+ *   wyscan help [command]        Show usage
  *
  * Exit codes:
  *   0  No critical or warning findings
@@ -306,7 +306,7 @@ async function runScan(args: string[]): Promise<number> {
   if (error) {
     printError(error);
     console.error();
-    console.error('  Run "argus help scan" for usage.');
+    console.error('  Run "wyscan help scan" for usage.');
     return EXIT.ERROR;
   }
 
@@ -487,7 +487,7 @@ async function main(): Promise<void> {
   // Unknown command
   printError(`unknown command: ${command}`);
   console.error();
-  console.error('  Run "argus help" for usage.');
+  console.error('  Run "wyscan help" for usage.');
   process.exit(EXIT.ERROR);
 }
 

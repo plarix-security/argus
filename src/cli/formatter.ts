@@ -146,7 +146,7 @@ function formatSeverityLabel(severity: Severity): string {
  * Print header
  */
 export function printHeader(): void {
-  console.log(`  ${styled('argus', chalk.white)} v${VERSION}  ·  Plarix`);
+  console.log(`  ${styled('wyscan', chalk.white)} v${VERSION}  ·  Plarix`);
   console.log(`  ${styled(DIVIDER, chalk.dim)}`);
 }
 
