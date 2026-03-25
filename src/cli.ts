@@ -4,6 +4,7 @@ import * as path from 'path';
 import { AFBAnalyzer } from './analyzer';
 import { generatePRComment, generateJSONReport, generateTerminalReport } from './reporter/pr-comment';
 import { Severity } from './types';
+import { VERSION } from './cli/version';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -61,7 +62,7 @@ Examples:
       findingsBySeverity,
       findings: result.findings,
       metadata: {
-        scannerVersion: '1.0.0',
+        scannerVersion: VERSION,
         timestamp: new Date().toISOString(),
         totalTimeMs: result.analysisTimeMs,
         failedFiles: result.success ? [] : [result.file],
