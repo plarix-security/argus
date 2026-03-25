@@ -4,8 +4,8 @@ import { ASTWalker, astWalker } from './ast-walker';
 import { analyzePythonFile, ensureParserInitialized } from './python/detector';
 import { analyzeTypeScriptFile } from './typescript/detector';
 import { AFBFinding, AnalysisReport, AnalyzerConfig, FileAnalysisResult, SupportedLanguage, Severity } from '../types';
+import { VERSION } from '../cli/version';
 
-const SCANNER_VERSION = '0.6.0';
 const DEFAULT_CONFIG: Required<AnalyzerConfig> = {
   include: ['**/*.py', '**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
   exclude: ['**/node_modules/**', '**/.venv/**', '**/venv/**', '**/__pycache__/**', '**/dist/**', '**/build/**', '**/.git/**', '**/test/**', '**/tests/**', '**/*.test.*', '**/*.spec.*'],
@@ -114,7 +114,7 @@ export class AFBAnalyzer {
         suppressed: allFindings.filter(f => f.severity === Severity.SUPPRESSED).length,
       },
       findings: allFindings,
-      metadata: { scannerVersion: SCANNER_VERSION, timestamp: new Date().toISOString(), totalTimeMs: Date.now() - startTime, failedFiles },
+      metadata: { scannerVersion: VERSION, timestamp: new Date().toISOString(), totalTimeMs: Date.now() - startTime, failedFiles },
     };
   }
 }
