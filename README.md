@@ -341,7 +341,7 @@ wyscan/
 │   └── types/              # TypeScript types
 ├── wasm/                   # Tree-sitter WASM binaries
 ├── test/                   # Validation reports
-├── examples/               # Example agent codebases
+├── benchmark/              # Benchmark agent codebases
 ├── docs/                   # GitHub Pages documentation
 ├── package.json
 ├── tsconfig.json

@@ -1,12 +1,12 @@
 {
   "version": "0.6.0",
-  "scanned_path": "/home/knightler/wyscan/examples/langgraph-production",
+  "scanned_path": "/home/knightler/wyscan/benchmark/langgraph-production",
   "files_analyzed": 12,
   "runtime_ms": 392,
   "findings": [
     {
       "severity": "CRITICAL",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/shell.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/shell.py",
       "line": 56,
       "function": "subprocess.run",
       "tool_registration": "run_transformation_command",
@@ -15,7 +15,7 @@
     },
     {
       "severity": "CRITICAL",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/shell.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/shell.py",
       "line": 125,
       "function": "file_path.unlink",
       "tool_registration": "cleanup_temp_files",
@@ -24,7 +24,7 @@
     },
     {
       "severity": "CRITICAL",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/shell.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/shell.py",
       "line": 131,
       "function": "shutil.rmtree",
       "tool_registration": "cleanup_temp_files",
@@ -33,7 +33,7 @@
     },
     {
       "severity": "CRITICAL",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/shell.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/shell.py",
       "line": 254,
       "function": "subprocess.run",
       "tool_registration": "run_data_pipeline_script",
@@ -42,7 +42,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/agents/data_pipeline_agent.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/agents/data_pipeline_agent.py",
       "line": 74,
       "function": "requests.post",
       "tool_registration": "call_enrichment_api",
@@ -51,7 +51,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/agents/data_pipeline_agent.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/agents/data_pipeline_agent.py",
       "line": 213,
       "function": "temp_path.parent.mkdir",
       "tool_registration": "process_data_batch",
@@ -60,7 +60,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/agents/data_pipeline_agent.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/agents/data_pipeline_agent.py",
       "line": 214,
       "function": "temp_path.write_text",
       "tool_registration": "process_data_batch",
@@ -69,7 +69,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/crm.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/crm.py",
       "line": 94,
       "function": "requests.patch",
       "tool_registration": "sync_to_crm",
@@ -78,7 +78,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/crm.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/crm.py",
       "line": 104,
       "function": "requests.post",
       "tool_registration": "sync_to_crm",
@@ -87,7 +87,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/crm.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/crm.py",
       "line": 171,
       "function": "requests.post",
       "tool_registration": "bulk_sync_to_crm",
@@ -96,7 +96,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/email.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/email.py",
       "line": 91,
       "function": "server.sendmail",
       "tool_registration": "send_customer_email",
@@ -105,7 +105,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/email.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/email.py",
       "line": 147,
       "function": "server.sendmail",
       "tool_registration": "send_bulk_email",
@@ -114,7 +114,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/files.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/files.py",
       "line": 87,
       "function": "full_path.parent.mkdir",
       "tool_registration": "write_customer_document",
@@ -123,7 +123,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/files.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/files.py",
       "line": 89,
       "function": "full_path.write_text",
       "tool_registration": "write_customer_document",
@@ -132,7 +132,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/files.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/files.py",
       "line": 213,
       "function": "log_path.parent.mkdir",
       "tool_registration": "append_to_log",
@@ -141,7 +141,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/files.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/files.py",
       "line": 218,
       "function": "with open",
       "tool_registration": "append_to_log",
@@ -150,7 +150,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/files.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/files.py",
       "line": 219,
       "function": "f.write",
       "tool_registration": "append_to_log",
@@ -159,7 +159,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/shell.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/shell.py",
       "line": 54,
       "function": "Path",
       "tool_registration": "run_transformation_command",
@@ -168,7 +168,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/shell.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/shell.py",
       "line": 166,
       "function": "workspace_path.mkdir",
       "tool_registration": "create_processing_workspace",
@@ -177,7 +177,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/shell.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/shell.py",
       "line": 174,
       "function": "shutil.copy2",
       "tool_registration": "create_processing_workspace",
@@ -186,7 +186,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/tickets.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/tickets.py",
       "line": 77,
       "function": "requests.post",
       "tool_registration": "create_support_ticket",
@@ -195,7 +195,7 @@
     },
     {
       "severity": "WARNING",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/tickets.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/tickets.py",
       "line": 134,
       "function": "requests.put",
       "tool_registration": "update_support_ticket",
@@ -204,7 +204,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/crm.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/crm.py",
       "line": 77,
       "function": "requests.get",
       "tool_registration": "sync_to_crm",
@@ -213,7 +213,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/crm.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/crm.py",
       "line": 133,
       "function": "requests.get",
       "tool_registration": "get_crm_record",
@@ -222,7 +222,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/database.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/database.py",
       "line": 61,
       "function": "cursor.execute",
       "tool_registration": "query_customer_db",
@@ -231,7 +231,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/database.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/database.py",
       "line": 62,
       "function": "cursor.fetchone",
       "tool_registration": "query_customer_db",
@@ -240,7 +240,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/database.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/database.py",
       "line": 97,
       "function": "cursor.execute",
       "tool_registration": "execute_sql_query",
@@ -249,7 +249,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/database.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/database.py",
       "line": 101,
       "function": "cursor.fetchall",
       "tool_registration": "execute_sql_query",
@@ -258,7 +258,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/database.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/database.py",
       "line": 161,
       "function": "cursor.execute",
       "tool_registration": "write_to_database",
@@ -267,7 +267,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/files.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/files.py",
       "line": 43,
       "function": "full_path.read_text",
       "tool_registration": "read_customer_document",
@@ -276,7 +276,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/files.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/files.py",
       "line": 129,
       "function": "with open",
       "tool_registration": "read_csv_file",
@@ -285,7 +285,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/files.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/files.py",
       "line": 177,
       "function": "for file_path in base_path.glob",
       "tool_registration": "list_documents",
@@ -294,7 +294,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/shell.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/shell.py",
       "line": 116,
       "function": "for file_path in target_dir.glob",
       "tool_registration": "cleanup_temp_files",
@@ -303,7 +303,7 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/examples/langgraph-production/tools/tickets.py",
+      "file": "/home/knightler/wyscan/benchmark/langgraph-production/tools/tickets.py",
       "line": 176,
       "function": "requests.get",
       "tool_registration": "get_customer_tickets",
