@@ -70,6 +70,10 @@ export interface CallGraphNode {
   dangerousOps: DangerousOperation[];
   /** Whether this function is a structural policy gate */
   hasPolicyGate: boolean;
+  /** Whether this function has framework-level authorization (human_in_loop, etc.) */
+  hasFrameworkAuth: boolean;
+  /** Whether this function is a likely validation helper */
+  isValidationHelper: boolean;
   /** Control flow information */
   controlFlow?: ControlFlowInfo;
   /** Source file path */
@@ -114,12 +118,16 @@ export interface ExposedPath {
   path: string[];
   /** Whether any node in path has a policy gate */
   hasGateInPath: boolean;
+  /** Whether any node in path is a likely validation helper */
+  hasValidationHelperInPath: boolean;
   /** File path */
   file: string;
   /** Whether cross-file resolution was involved */
   involvesCrossFile?: boolean;
   /** If cross-file resolution failed, note it here */
   unresolvedCrossFileCalls?: string[];
+  /** Whether depth limit was hit during path tracing */
+  depthLimitHit?: boolean;
 }
 
 /**
@@ -359,6 +367,18 @@ const KNOWN_AUTHORIZATION_DECORATORS = [
   /^access_control$/i,
   /^authorize$/i,
   /^protected$/i,
+  // Additional patterns (Task 4)
+  /^guard$/i,
+  /^policy$/i,
+  /^secure$/i,
+  /^restricted$/i,
+  /^verified$/i,
+  /^requires$/i,
+  /^require$/i,
+  // Wildcard patterns - match anything containing these terms
+  /permission/i,
+  /auth(?:orize|enticate)?/i,
+  /require[sd]?_/i,
 ];
 
 /**
@@ -370,6 +390,48 @@ function isKnownAuthorizationDecorator(decoratorName: string): boolean {
   const baseName = decoratorName.split('(')[0].trim();
   return KNOWN_AUTHORIZATION_DECORATORS.some(pattern => pattern.test(baseName));
 }
+
+/**
+ * Patterns for helper functions that likely perform validation.
+ * If a call path passes through a function matching these patterns,
+ * we downgrade severity by one level (not suppress) because we cannot
+ * confirm it is a real gate, but it suggests validation may occur.
+ */
+const VALIDATION_HELPER_PATTERNS = [
+  /^sanitize/i,
+  /^validate/i,
+  /^check_/i,
+  /^verify/i,
+  /^is_valid/i,
+  /^is_allowed/i,
+  /^can_/i,
+  /^has_access/i,
+  /^ensure_/i,
+  /^assert_/i,
+];
+
+/**
+ * Check if a function name suggests it performs validation.
+ * Used to downgrade severity when a call path includes probable validation.
+ */
+export function isLikelyValidationHelper(functionName: string): boolean {
+  return VALIDATION_HELPER_PATTERNS.some(pattern => pattern.test(functionName));
+}
+
+/**
+ * Framework-level authorization indicators.
+ * If these are present in a tool registration's keyword arguments,
+ * the tool is considered to have framework-level authorization.
+ */
+const FRAMEWORK_AUTH_INDICATORS = [
+  'human_in_the_loop',
+  'require_approval',
+  'approval_callback',
+  'human_input_mode',
+  'user_confirm',
+  'await_user',
+  'confirm_action',
+];
 
 /**
  * Determine if a function is a structural policy gate.
@@ -705,6 +767,10 @@ export function buildCallGraph(
         dangerousOps: [],
         // Use structural analysis + decorator analysis + known auth patterns to determine if this is a policy gate
         hasPolicyGate: hasStructuralGate || hasDecoratorGate || hasKnownAuthDecorator,
+        // Framework-level auth is detected from tool registration kwargs (checked below)
+        hasFrameworkAuth: false,
+        // Check if this function name suggests it's a validation helper
+        isValidationHelper: isLikelyValidationHelper(func.name),
         controlFlow: func.controlFlow,
         sourceFile: filePath,
       };
@@ -751,6 +817,10 @@ export function buildCallGraph(
           dangerousOps: [],
           // Use structural analysis + decorator analysis + known auth patterns to determine if this is a policy gate
           hasPolicyGate: hasStructuralGate || hasDecoratorGate || hasKnownAuthDecorator,
+          // Framework-level auth not detected for class methods yet
+          hasFrameworkAuth: false,
+          // Check if this method name suggests it's a validation helper
+          isValidationHelper: isLikelyValidationHelper(method.name),
           controlFlow: method.controlFlow,
           sourceFile: filePath,
         };
@@ -851,14 +921,22 @@ export function buildCallGraph(
         }
       }
 
+      // Check if any node in the path is a validation helper
+      const hasValidationHelperInPath = path.some(nodeId => {
+        const node = nodes.get(nodeId);
+        return node?.isValidationHelper || false;
+      });
+
       exposedPaths.push({
         tool,
         operation,
         path,
         hasGateInPath: hasGate,
+        hasValidationHelperInPath,
         file,
         involvesCrossFile,
         unresolvedCrossFileCalls: unresolvedCalls,
+        depthLimitHit,
       });
     }
   }
