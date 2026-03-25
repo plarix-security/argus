@@ -158,6 +158,19 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
  * Generate JSON report
  */
 function generateJSON(report: AnalysisReport, scannedPath: string): string {
+  // Count files by language
+  const pythonFiles = report.filesAnalyzed.filter(f => f.endsWith('.py')).length;
+  const tsFiles = report.filesAnalyzed.filter(f => f.endsWith('.ts') || f.endsWith('.tsx')).length;
+  const jsFiles = report.filesAnalyzed.filter(f => f.endsWith('.js') || f.endsWith('.jsx')).length;
+
+  // Detect frameworks from findings
+  const frameworks = new Set<string>();
+  for (const finding of report.findings) {
+    if (finding.context?.framework) {
+      frameworks.add(finding.context.framework);
+    }
+  }
+
   const output = {
     version: VERSION,
     scanned_path: scannedPath,
@@ -177,6 +190,15 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
       warning: report.findingsBySeverity.warning,
       info: report.findingsBySeverity.info,
       suppressed: report.findingsBySeverity.suppressed,
+    },
+    coverage: {
+      languages_scanned: ['python'],
+      languages_skipped: tsFiles + jsFiles > 0 ? ['typescript', 'javascript'] : [],
+      frameworks_detected: Array.from(frameworks).sort(),
+      files_analyzed: pythonFiles,
+      files_skipped: tsFiles + jsFiles,
+      call_graph_depth_used: 3,
+      confidence_note: 'Non-comprehensive. Static analysis only. Runtime-generated tool wiring and external package internals are not traced.',
     },
   };
   return JSON.stringify(output, null, 2);
