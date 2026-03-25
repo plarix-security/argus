@@ -5,7 +5,7 @@ Static analyzer for agentic AI codebases that detects unsafe tool boundaries.
 WyScan finds places in your Python agent code where tools can execute dangerous operations without authorization checks. It builds a call graph from tool registrations (like `@tool` decorators) and traces paths to dangerous operations (like `subprocess.run` or `shutil.rmtree`). If there is no policy gate in the path, WyScan reports it.
 
 ```
-wyscan  v1.0.0  by Plarix
+wyscan  v0.8.0-beta  by Plarix
 AFB Scanner
 
 Scanning: ./agent-project
@@ -292,7 +292,7 @@ The key difference: Semgrep might report 50 subprocess calls across your codebas
 These features are planned but not yet implemented:
 
 - [ ] Full TypeScript/JavaScript support with tree-sitter parsing
-- [x] Multi-level transitive import resolution (implemented in v1.0.0)
+- [x] Multi-level transitive import resolution (implemented in v0.8.0-beta)
 - [ ] Custom pattern definitions via configuration file
 - [ ] IDE plugins (VSCode, JetBrains)
 - [ ] AFB01-03 detection with semantic analysis
