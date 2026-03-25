@@ -130,6 +130,10 @@ export interface FileAnalysisResult {
   error?: string;
   /** Time taken to analyze in milliseconds */
   analysisTimeMs: number;
+  /** Whether this file was skipped (e.g., unsupported language) */
+  skipped?: boolean;
+  /** Reason for skipping this file */
+  skipReason?: string;
 }
 
 /**
