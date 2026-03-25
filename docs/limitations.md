@@ -4,35 +4,35 @@ This page documents what WyScan cannot do. Understanding these limitations helps
 
 ## TypeScript/JavaScript Not Supported
 
-**The TypeScript/JavaScript detector is disabled.**
+**The TypeScript/JavaScript detector is gated.**
 
-WyScan will scan `.ts`, `.tsx`, `.js`, and `.jsx` files but will return no findings. The detector was disabled to avoid false positives from pattern matching.
+WyScan will scan `.ts`, `.tsx`, `.js`, and `.jsx` files and emit an INFO-level notice, but will return no findings. The detector is gated to avoid false positives from pattern matching without proper call graph analysis.
 
 If you have TypeScript agent code, WyScan will not detect any issues in it. Use other tools for TypeScript security scanning.
 
-## Single-Level Cross-File Resolution
+## Cross-File Resolution Limited to Depth 3
 
-WyScan resolves imports only one level deep.
+WyScan resolves imports transitively up to 3 levels deep.
 
 **Detected:**
 
 ```python
-# tools.py
+# tools.py -> helpers.py -> utils.py (3 levels)
 from helpers import do_stuff
 
 @tool
 def my_tool():
-    do_stuff()  # Traced to helpers.py
+    do_stuff()  # Traced through 3 levels of imports
 ```
 
 **Not Detected:**
 
 ```python
-# tools.py calls helpers.py calls utils.py calls subprocess.run
-# The path from tools.py to subprocess.run may not be detected
+# tools.py -> a.py -> b.py -> c.py -> d.py (4+ levels)
+# The path beyond depth 3 may not be fully traced
 ```
 
-If your tool calls a helper that calls another helper that calls a dangerous operation, WyScan may not trace the full path.
+If your tool calls through more than 3 levels of helper functions across files, WyScan may not trace the full path.
 
 ## External Packages Not Traced
 
@@ -90,16 +90,27 @@ for func in get_functions():
 
 ## Framework-Specific Authorization
 
-Some frameworks have built-in authorization mechanisms that WyScan does not recognize.
+WyScan recognizes some framework-level authorization mechanisms (added in v1.0.0):
 
-**May Report False Positive:**
+**Recognized:**
 
 ```python
-# LangChain with built-in approval callback
-agent = create_agent(tools=tools, require_approval=True)
+# LangChain with human_in_the_loop
+AgentExecutor(agent=agent, tools=tools, human_in_the_loop=True)
+
+# AutoGen with approval
+register_function(func, human_input_mode="ALWAYS")
 ```
 
-WyScan checks for explicit policy gates in code, not framework configuration.
+**May Still Miss:**
+
+```python
+# Framework-specific config in separate files
+# Authorization set via environment variables
+# Runtime-configured approval mechanisms
+```
+
+WyScan checks for explicit policy gates in code and some framework configuration patterns, but may not catch all authorization mechanisms.
 
 ## What To Do About These Limitations
 

@@ -110,7 +110,7 @@ wyscan scan ./src --json > report.json
 
 ```json
 {
-  "version": "0.7.0-beta",
+  "version": "1.0.0",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,
@@ -130,6 +130,15 @@ wyscan scan ./src --json > report.json
     "warning": 3,
     "info": 5,
     "suppressed": 0
+  },
+  "coverage": {
+    "languages_scanned": ["python"],
+    "languages_skipped": ["typescript", "javascript"],
+    "frameworks_detected": ["langchain", "crewai"],
+    "files_analyzed": 34,
+    "files_skipped": 2,
+    "call_graph_depth_used": 3,
+    "confidence_note": "Non-comprehensive. Static analysis only. Runtime-generated tool wiring and external package internals are not traced."
   }
 }
 ```

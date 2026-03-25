@@ -6,6 +6,16 @@ WyScan detects AFB04 (Unauthorized Action) boundaries in Python agent codebases.
 
 WyScan traces from tool registration points to dangerous operations. If there is no policy gate in the call path, it reports a finding.
 
+## CEE Severity Model
+
+WyScan uses the **CEE (Comprehensive Exposure Evaluation)** severity model which considers three factors:
+
+1. **Reversibility**: Irreversible operations (delete, rmtree, eval) are always CRITICAL
+2. **Data Sensitivity**: Operations touching passwords, secrets, credentials, tokens, or PII are elevated one level
+3. **Validation Helpers**: Call paths through sanitize*, validate*, check_*, verify* functions are downgraded one level (heuristic-based)
+
+The base severity is determined by operation type, then adjusted based on these factors.
+
 ## Severity Levels
 
 ### CRITICAL
