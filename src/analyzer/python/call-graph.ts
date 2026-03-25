@@ -135,6 +135,22 @@ export interface CrossFileImportMap {
 }
 
 /**
+ * Configuration for cross-file import resolution
+ */
+export interface ImportResolutionConfig {
+  /** Maximum depth for transitive import resolution (default: 3) */
+  maxDepth: number;
+  /** Whether to emit SUPPRESSED findings when depth limit is hit (default: true) */
+  emitSuppressedOnLimit: boolean;
+}
+
+/** Default import resolution configuration */
+export const DEFAULT_IMPORT_CONFIG: ImportResolutionConfig = {
+  maxDepth: 3,
+  emitSuppressedOnLimit: true,
+};
+
+/**
  * Framework detection patterns for tool registration
  */
 const TOOL_REGISTRATION_PATTERNS: {
@@ -425,7 +441,8 @@ function isStructuralPolicyGate(controlFlow: ControlFlowInfo | undefined): boole
  * Given a module path like "utils.auth" and a base directory,
  * returns the resolved file path like "/project/utils/auth.py".
  *
- * Only resolves one level deep - does not follow transitive imports.
+ * This supports transitive resolution when used as part of the
+ * cross-file import map building process.
  */
 function resolveModulePath(
   modulePath: string,
@@ -635,12 +652,17 @@ function resolveCrossFileCall(
 /**
  * Build a call graph from parsed Python files
  *
- * Supports cross-file resolution for one level of imports.
+ * Supports transitive cross-file resolution up to configurable depth (default: 3).
  * When a function call cannot be resolved in the current file,
  * it tries to resolve through imports to find the definition.
+ * Resolution continues transitively through imported modules.
+ *
+ * When the depth limit is hit on an unresolved call path, a SUPPRESSED
+ * finding is emitted with a note explaining that deeper tracing was not performed.
  */
 export function buildCallGraph(
-  files: Map<string, ParsedPythonFile>
+  files: Map<string, ParsedPythonFile>,
+  config: ImportResolutionConfig = DEFAULT_IMPORT_CONFIG
 ): CallGraphAnalysis {
   const nodes = new Map<string, CallGraphNode>();
   const toolRegistrations: CallGraphNode[] = [];
@@ -804,10 +826,12 @@ export function buildCallGraph(
       nodes,
       visited,
       [tool.id],
-      []
+      [],
+      config,
+      0
     );
 
-    for (const { operation, path, hasGate, involvesCrossFile, unresolvedCalls } of paths) {
+    for (const { operation, path, hasGate, involvesCrossFile, unresolvedCalls, depthLimitHit } of paths) {
       // Find the file containing this operation
       // With cross-file IDs, we can extract the file from the path nodes
       let file = tool.sourceFile || '<unknown>';
@@ -967,14 +991,20 @@ function detectDangerousOperation(call: CallSite): DangerousOperation | null {
 /**
  * Find all dangerous operation paths from a starting node.
  * Tracks cross-file resolution and unresolved calls.
+ *
+ * Cross-file depth is tracked separately and limited by config.maxDepth.
+ * When the cross-file depth limit is hit, a SUPPRESSED finding is emitted
+ * with a note explaining that deeper tracing was not performed.
  */
 function findDangerousPathsFromNode(
   node: CallGraphNode,
   allNodes: Map<string, CallGraphNode>,
   visited: Set<string>,
   currentPath: string[],
-  foundPaths: { operation: DangerousOperation; path: string[]; hasGate: boolean; involvesCrossFile: boolean; unresolvedCalls: string[] }[]
-): { operation: DangerousOperation; path: string[]; hasGate: boolean; involvesCrossFile: boolean; unresolvedCalls: string[] }[] {
+  foundPaths: { operation: DangerousOperation; path: string[]; hasGate: boolean; involvesCrossFile: boolean; unresolvedCalls: string[]; depthLimitHit?: boolean }[],
+  config: ImportResolutionConfig = DEFAULT_IMPORT_CONFIG,
+  currentCrossFileDepth: number = 0
+): { operation: DangerousOperation; path: string[]; hasGate: boolean; involvesCrossFile: boolean; unresolvedCalls: string[]; depthLimitHit?: boolean }[] {
   // Prevent infinite loops
   if (visited.has(node.id)) {
     return foundPaths;
@@ -1010,18 +1040,58 @@ function findDangerousPathsFromNode(
     });
   }
 
-  // Recursively check callees (limit depth to prevent stack overflow)
+  // Recursively check callees (limit total depth to 10, cross-file depth to config.maxDepth)
   if (currentPath.length < 10) {
     for (const calleeId of node.callees) {
       const calleeNode = allNodes.get(calleeId);
+
+      // Determine if this call crosses a file boundary
+      const currentFile = node.id.includes(':') ? node.id.split(':')[0] : '';
+      const calleeFile = calleeId.includes(':') ? calleeId.split(':')[0] : '';
+      const crossesFileBoundary = currentFile !== calleeFile && calleeFile !== '';
+      const newCrossFileDepth = crossesFileBoundary ? currentCrossFileDepth + 1 : currentCrossFileDepth;
+
       if (calleeNode) {
-        findDangerousPathsFromNode(
-          calleeNode,
-          allNodes,
-          new Set(visited),
-          [...currentPath, calleeId],
-          foundPaths
-        );
+        // Check if we've hit the cross-file depth limit
+        if (newCrossFileDepth > config.maxDepth) {
+          // Emit a SUPPRESSED finding indicating depth limit was hit
+          if (config.emitSuppressedOnLimit) {
+            // Check if callee has any dangerous ops that we won't trace
+            const calleeHasDangerousOps = calleeNode.dangerousOps.length > 0 ||
+              Array.from(calleeNode.callees).some(c => {
+                const n = allNodes.get(c);
+                return n && n.dangerousOps && n.dangerousOps.length > 0;
+              });
+
+            if (calleeHasDangerousOps || !allNodes.has(calleeId)) {
+              foundPaths.push({
+                operation: {
+                  callee: calleeId,
+                  category: ExecutionCategory.TOOL_CALL,
+                  severity: Severity.SUPPRESSED,
+                  line: calleeNode.startLine,
+                  column: 1,
+                  codeSnippet: `Cross-file resolution limit (depth ${config.maxDepth}) reached. Manual review recommended for: ${calleeId}`,
+                },
+                path: [...currentPath, calleeId],
+                hasGate: hasGateInPath,
+                involvesCrossFile: true,
+                unresolvedCalls: [calleeId],
+                depthLimitHit: true,
+              });
+            }
+          }
+        } else {
+          findDangerousPathsFromNode(
+            calleeNode,
+            allNodes,
+            new Set(visited),
+            [...currentPath, calleeId],
+            foundPaths,
+            config,
+            newCrossFileDepth
+          );
+        }
       } else {
         // Track unresolved cross-file calls (not in our node map)
         // These are calls we couldn't resolve - mark as potentially gated
