@@ -38,6 +38,152 @@ import {
   Severity,
 } from '../../types';
 
+/**
+ * SEVERITY MODEL (CEE - Comprehensive Exposure Evaluation)
+ *
+ * Severity is determined by three factors:
+ *
+ * 1. REVERSIBILITY
+ *    - Irreversible operations (delete, rmtree, DROP TABLE, unlink) are always CRITICAL
+ *    - Reversible mutations (write, POST, INSERT) stay WARNING unless other factors apply
+ *
+ * 2. DATA SENSITIVITY CONTEXT
+ *    - If the dangerous operation is inside a function whose name or parameters
+ *      suggest PII, auth tokens, credentials, secrets, or keys:
+ *      elevate severity by one level
+ *
+ * 3. VALIDATION HELPER HEURISTIC
+ *    - If a call path passes through a function named sanitize*, validate*,
+ *      check*, verify*, etc.: downgrade severity by one level
+ *    - This is a heuristic, not confirmation of a gate
+ *
+ * Severity cap: CRITICAL (cannot elevate beyond CRITICAL)
+ * Severity floor: SUPPRESSED (cannot downgrade beyond SUPPRESSED)
+ */
+
+/** Irreversible operations that are always CRITICAL severity */
+const IRREVERSIBLE_OPS = new Set([
+  'shutil.rmtree',
+  'os.remove',
+  'os.unlink',
+  'os.rmdir',
+  'Path.unlink',
+  'Path.rmdir',
+  'pathlib.Path.unlink',
+  'pathlib.Path.rmdir',
+  'eval',
+  'exec',
+  'subprocess.run',
+  'subprocess.Popen',
+  'subprocess.call',
+  'os.system',
+  'os.popen',
+  'asyncio.create_subprocess_exec',
+  'asyncio.create_subprocess_shell',
+]);
+
+/** Patterns that suggest sensitive data is involved */
+const SENSITIVE_DATA_PATTERNS = [
+  /password/i,
+  /secret/i,
+  /credential/i,
+  /api[_-]?key/i,
+  /token/i,
+  /private[_-]?key/i,
+  /pii/i,
+  /ssn/i,
+  /credit[_-]?card/i,
+  /auth/i,
+];
+
+/**
+ * Calculate the final severity for an exposed path.
+ *
+ * Applies the CEE (Comprehensive Exposure Evaluation) model:
+ * 1. Start with operation's base severity
+ * 2. Elevate to CRITICAL if operation is irreversible
+ * 3. Elevate one level if sensitive data context detected
+ * 4. Downgrade one level if validation helper in path
+ */
+function calculateSeverity(
+  baseSeverity: Severity,
+  operation: DangerousOperation,
+  exposed: ExposedPath
+): Severity {
+  let severity = baseSeverity;
+
+  // 1. Irreversibility: always CRITICAL
+  if (isIrreversibleOperation(operation.callee)) {
+    return Severity.CRITICAL;
+  }
+
+  // 2. Data sensitivity: elevate one level
+  const enclosingFunc = exposed.tool.name;
+  if (touchesSensitiveData(operation.codeSnippet, enclosingFunc)) {
+    severity = elevateSeverity(severity);
+  }
+
+  // 3. Validation helper in path: downgrade one level
+  if (exposed.hasValidationHelperInPath) {
+    severity = downgradeSeverity(severity);
+  }
+
+  return severity;
+}
+
+/** Check if an operation is irreversible */
+function isIrreversibleOperation(callee: string): boolean {
+  // Check exact match
+  if (IRREVERSIBLE_OPS.has(callee)) {
+    return true;
+  }
+  // Check if callee ends with a known irreversible operation
+  for (const op of IRREVERSIBLE_OPS) {
+    if (callee.endsWith(op) || callee.endsWith(op.split('.').pop() || '')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Check if code or function name suggests sensitive data */
+function touchesSensitiveData(codeSnippet: string, functionName: string): boolean {
+  const combined = `${codeSnippet} ${functionName}`;
+  return SENSITIVE_DATA_PATTERNS.some(pattern => pattern.test(combined));
+}
+
+/** Elevate severity by one level (cap at CRITICAL) */
+function elevateSeverity(severity: Severity): Severity {
+  switch (severity) {
+    case Severity.SUPPRESSED:
+      return Severity.INFO;
+    case Severity.INFO:
+      return Severity.WARNING;
+    case Severity.WARNING:
+      return Severity.CRITICAL;
+    case Severity.CRITICAL:
+      return Severity.CRITICAL;
+    default:
+      return severity;
+  }
+}
+
+/** Downgrade severity by one level (floor at SUPPRESSED) */
+function downgradeSeverity(severity: Severity): Severity {
+  switch (severity) {
+    case Severity.CRITICAL:
+      return Severity.WARNING;
+    case Severity.WARNING:
+      return Severity.INFO;
+    case Severity.INFO:
+      return Severity.SUPPRESSED;
+    case Severity.SUPPRESSED:
+      return Severity.SUPPRESSED;
+    default:
+      return severity;
+  }
+}
+
 let parserInitialized = false;
 
 /**
@@ -216,8 +362,9 @@ export function analyzeProject(
 /**
  * Create a finding from an exposed path
  *
- * STRICT SEVERITY: Use the operation's intrinsic severity.
- * No elevation. The pattern definitions encode the true risk.
+ * Applies the CEE (Comprehensive Exposure Evaluation) severity model:
+ * - Starts with operation's base severity
+ * - Adjusts based on reversibility, data sensitivity, and validation helpers
  */
 function createFindingFromExposedPath(
   filePath: string,
@@ -226,8 +373,8 @@ function createFindingFromExposedPath(
 ): AFBFinding {
   const op = exposed.operation;
 
-  // Use the operation's intrinsic severity - no elevation
-  const severity = op.severity;
+  // Apply CEE severity model
+  const severity = calculateSeverity(op.severity, op, exposed);
 
   // Find the call that contains this operation
   const call = parsed.calls.find((c) => c.startLine === op.line && c.callee === op.callee);
@@ -270,6 +417,11 @@ function buildExplanation(exposed: ExposedPath, op: DangerousOperation): string 
 
   if (!exposed.hasGateInPath) {
     explanation += 'No policy gate or authorization check detected in call path. ';
+
+    if (exposed.hasValidationHelperInPath) {
+      explanation += 'Path includes probable validation helper (severity downgraded). ';
+    }
+
     explanation += 'Agent can execute this operation without authorization basis.';
   }
 
