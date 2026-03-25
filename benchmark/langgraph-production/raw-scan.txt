@@ -1,7 +1,7 @@
   argus v0.6.0  ·  Plarix
   ─────────────────────────────────────────────────────
 
-  Scanning  examples/langgraph-production
+  Scanning  benchmark/langgraph-production
 
   ─────────────────────────────────────────────────────
   4 critical  ·  18 warning  ·  12 info
