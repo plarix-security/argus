@@ -1,0 +1,93 @@
+{
+  "$schema": "../cee_manifest_schema.json",
+  "system": "04-crewai-research-crew",
+  "version": "1.0.0",
+  "description": "Four-agent CrewAI crew: Planner, Researcher, Writer, Publisher with webhook and URL scraping",
+  "expected_findings": [
+    {
+      "id": "CREW-001",
+      "severity": "critical",
+      "category": "code_execution",
+      "file": "src/tools/scraper.py",
+      "line": 45,
+      "operation": "exec",
+      "tool_registration": "dynamic_scrape",
+      "description": "Dynamic scraping executes user-provided extraction code",
+      "afb_type": "AFB04",
+      "rationale": "Arbitrary code execution via scraping rules"
+    },
+    {
+      "id": "CREW-002",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "src/tools/webhook.py",
+      "line": 25,
+      "operation": "requests.post",
+      "tool_registration": "send_webhook",
+      "description": "HTTP POST to user-controlled webhook URL",
+      "afb_type": "AFB04",
+      "rationale": "Data exfiltration to arbitrary endpoints"
+    },
+    {
+      "id": "CREW-003",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "src/tools/scraper.py",
+      "line": 22,
+      "operation": "requests.get",
+      "tool_registration": "scrape_url",
+      "description": "HTTP GET to fetch arbitrary URLs",
+      "afb_type": "AFB04",
+      "rationale": "SSRF surface via URL parameter"
+    },
+    {
+      "id": "CREW-004",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "src/tools/plan_file.py",
+      "line": 28,
+      "operation": "plan_path.write_text",
+      "tool_registration": "update_plan",
+      "description": "Writes to shared plan file",
+      "afb_type": "AFB04",
+      "rationale": "Any agent can overwrite the shared plan"
+    },
+    {
+      "id": "CREW-005",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "src/tools/publish.py",
+      "line": 22,
+      "operation": "output_path.write_text",
+      "tool_registration": "publish_article",
+      "description": "Writes published article to disk",
+      "afb_type": "AFB04",
+      "rationale": "Agent writes content to filesystem"
+    },
+    {
+      "id": "CREW-006",
+      "severity": "info",
+      "category": "file_operation",
+      "file": "src/tools/plan_file.py",
+      "line": 15,
+      "operation": "plan_path.read_text",
+      "tool_registration": "read_plan",
+      "description": "Reads shared plan file",
+      "afb_type": "AFB04",
+      "rationale": "Plan content influences agent behavior"
+    }
+  ],
+  "expected_summary": {
+    "critical": 1,
+    "warning": 4,
+    "info": 1
+  },
+  "metadata": {
+    "difficulty": "3/5",
+    "frameworks": ["crewai"],
+    "languages": ["python"],
+    "author": "WyScan Benchmark Team",
+    "created": "2026-03-26",
+    "last_updated": "2026-03-26"
+  }
+}
