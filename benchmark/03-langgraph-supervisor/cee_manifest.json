@@ -1,0 +1,107 @@
+{
+  "$schema": "../cee_manifest_schema.json",
+  "system": "03-langgraph-supervisor",
+  "version": "1.0.0",
+  "description": "Supervisor/worker multi-agent system with researcher, coder, and critic agents",
+  "expected_findings": [
+    {
+      "id": "SUPER-001",
+      "severity": "critical",
+      "category": "shell_execution",
+      "file": "src/agents/coder_agent.py",
+      "line": 42,
+      "operation": "subprocess.run",
+      "tool_registration": "execute_code",
+      "description": "Code execution via subprocess.run with shell=True",
+      "afb_type": "AFB04",
+      "rationale": "LLM-generated code runs in host shell with no sandbox",
+      "cwe": "CWE-78"
+    },
+    {
+      "id": "SUPER-002",
+      "severity": "critical",
+      "category": "code_execution",
+      "file": "src/agents/coder_agent.py",
+      "line": 58,
+      "operation": "exec",
+      "tool_registration": "execute_python",
+      "description": "Direct Python execution via exec()",
+      "afb_type": "AFB04",
+      "rationale": "Fallback executor runs Python in host process memory",
+      "cwe": "CWE-94"
+    },
+    {
+      "id": "SUPER-003",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "src/agents/researcher_agent.py",
+      "line": 35,
+      "operation": "requests.get",
+      "tool_registration": "web_research",
+      "description": "HTTP GET for research queries",
+      "afb_type": "AFB04",
+      "rationale": "Outbound requests with agent-controlled parameters"
+    },
+    {
+      "id": "SUPER-004",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "src/agents/coder_agent.py",
+      "line": 75,
+      "operation": "Path.write_text",
+      "tool_registration": "save_code",
+      "description": "Writes generated code to files",
+      "afb_type": "AFB04",
+      "rationale": "Agent can write code files to disk"
+    },
+    {
+      "id": "SUPER-005",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "src/tools/shared_state.py",
+      "line": 28,
+      "operation": "state_file.write_text",
+      "tool_registration": "update_shared_state",
+      "description": "Writes to shared state file visible to all agents",
+      "afb_type": "AFB04",
+      "rationale": "Any agent can modify shared state"
+    },
+    {
+      "id": "SUPER-006",
+      "severity": "info",
+      "category": "file_operation",
+      "file": "src/agents/coder_agent.py",
+      "line": 68,
+      "operation": "Path.read_text",
+      "tool_registration": "read_code",
+      "description": "Reads code files from disk",
+      "afb_type": "AFB04",
+      "rationale": "Code file read access"
+    },
+    {
+      "id": "SUPER-007",
+      "severity": "info",
+      "category": "file_operation",
+      "file": "src/tools/shared_state.py",
+      "line": 18,
+      "operation": "state_file.read_text",
+      "tool_registration": "get_shared_state",
+      "description": "Reads shared state file",
+      "afb_type": "AFB04",
+      "rationale": "Shared state read access"
+    }
+  ],
+  "expected_summary": {
+    "critical": 2,
+    "warning": 3,
+    "info": 2
+  },
+  "metadata": {
+    "difficulty": "3/5",
+    "frameworks": ["langgraph"],
+    "languages": ["python"],
+    "author": "WyScan Benchmark Team",
+    "created": "2026-03-26",
+    "last_updated": "2026-03-26"
+  }
+}
