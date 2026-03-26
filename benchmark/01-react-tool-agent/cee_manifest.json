@@ -1,0 +1,116 @@
+{
+  "$schema": "../cee_manifest_schema.json",
+  "system": "01-react-tool-agent",
+  "version": "1.0.0",
+  "description": "Minimal ReAct-pattern agent using OpenAI SDK with web search, calculator (eval), and file writer (path traversal)",
+  "expected_findings": [
+    {
+      "id": "REACT-001",
+      "severity": "critical",
+      "category": "code_execution",
+      "file": "src/tools/calculator.py",
+      "line": 25,
+      "operation": "eval",
+      "tool_registration": "calculate",
+      "description": "Calculator tool uses eval() on user-provided mathematical expression",
+      "afb_type": "AFB04",
+      "rationale": "Arbitrary code execution via calculator parameter injection (e.g., __import__('os').system('rm -rf /'))",
+      "cwe": "CWE-95"
+    },
+    {
+      "id": "REACT-002",
+      "severity": "critical",
+      "category": "shell_execution",
+      "file": "src/tools/calculator.py",
+      "line": 38,
+      "operation": "subprocess.run",
+      "tool_registration": "calculate_subprocess",
+      "description": "Calculator subprocess fallback executes Python via shell",
+      "afb_type": "AFB04",
+      "rationale": "Shell execution of LLM-generated expression via subprocess",
+      "cwe": "CWE-78"
+    },
+    {
+      "id": "REACT-003",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "src/tools/file_writer.py",
+      "line": 32,
+      "operation": "Path.write_text",
+      "tool_registration": "write_file",
+      "description": "File writer accepts arbitrary paths without validation",
+      "afb_type": "AFB04",
+      "rationale": "Path traversal allows writing to ../../../etc/passwd or other sensitive locations",
+      "cwe": "CWE-22"
+    },
+    {
+      "id": "REACT-004",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "src/tools/file_writer.py",
+      "line": 30,
+      "operation": "filepath.parent.mkdir",
+      "tool_registration": "write_file",
+      "description": "Creates parent directories for file write path",
+      "afb_type": "AFB04",
+      "rationale": "Agent can create arbitrary directory structures"
+    },
+    {
+      "id": "REACT-005",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "src/tools/web_search.py",
+      "line": 28,
+      "operation": "httpx.get",
+      "tool_registration": "web_search",
+      "description": "HTTP GET to external search API",
+      "afb_type": "AFB04",
+      "rationale": "Outbound API call with agent-controlled query parameter"
+    },
+    {
+      "id": "REACT-006",
+      "severity": "info",
+      "category": "file_operation",
+      "file": "src/tools/file_writer.py",
+      "line": 48,
+      "operation": "Path.read_text",
+      "tool_registration": "read_file",
+      "description": "File reader can access any path",
+      "afb_type": "AFB04",
+      "rationale": "Agent can read arbitrary files on the system"
+    },
+    {
+      "id": "REACT-007",
+      "severity": "info",
+      "category": "file_operation",
+      "file": "src/tools/file_writer.py",
+      "line": 62,
+      "operation": "base_path.glob",
+      "tool_registration": "list_files",
+      "description": "Directory listing via glob pattern",
+      "afb_type": "AFB04",
+      "rationale": "Agent can enumerate directory contents"
+    }
+  ],
+  "expected_true_negatives": [
+    {
+      "id": "REACT-TN-001",
+      "file": "src/tools/safe_calculator.py",
+      "reason": "Calculator with @require_permission decorator should not be flagged as ungated",
+      "gate_type": "decorator"
+    }
+  ],
+  "expected_summary": {
+    "critical": 2,
+    "warning": 3,
+    "info": 2
+  },
+  "metadata": {
+    "difficulty": "1/5",
+    "frameworks": ["openai"],
+    "languages": ["python"],
+    "author": "WyScan Benchmark Team",
+    "created": "2026-03-26",
+    "last_updated": "2026-03-26"
+  }
+}
