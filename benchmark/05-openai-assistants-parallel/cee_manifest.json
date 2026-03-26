@@ -1,0 +1,82 @@
+{
+  "$schema": "../cee_manifest_schema.json",
+  "system": "05-openai-assistants-parallel",
+  "version": "1.0.0",
+  "description": "OpenAI Assistants v2 customer support with parallel tool calls, SQL injection, and email exfiltration",
+  "expected_findings": [
+    {
+      "id": "ASST-001",
+      "severity": "critical",
+      "category": "database_operation",
+      "file": "src/tools/database.ts",
+      "line": 25,
+      "operation": "db.exec",
+      "tool_registration": "query_orders",
+      "description": "SQL query with string interpolation enables injection",
+      "afb_type": "AFB04",
+      "rationale": "LLM-generated parameters directly interpolated into SQL",
+      "cwe": "CWE-89"
+    },
+    {
+      "id": "ASST-002",
+      "severity": "critical",
+      "category": "database_operation",
+      "file": "src/tools/database.ts",
+      "line": 42,
+      "operation": "db.exec",
+      "tool_registration": "process_refund",
+      "description": "UPDATE query with SQL injection surface",
+      "afb_type": "AFB04",
+      "rationale": "Refund amount and order ID from untrusted input"
+    },
+    {
+      "id": "ASST-003",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "src/tools/email.ts",
+      "line": 28,
+      "operation": "transporter.sendMail",
+      "tool_registration": "send_email",
+      "description": "Email sent to address from conversation context",
+      "afb_type": "AFB04",
+      "rationale": "No allowlist validation on recipient address"
+    },
+    {
+      "id": "ASST-004",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "src/tools/escalation.ts",
+      "line": 22,
+      "operation": "fs.appendFileSync",
+      "tool_registration": "escalate_to_human",
+      "description": "Writes escalation details to queue file",
+      "afb_type": "AFB04",
+      "rationale": "Agent can write to filesystem"
+    },
+    {
+      "id": "ASST-005",
+      "severity": "info",
+      "category": "database_operation",
+      "file": "src/tools/database.ts",
+      "line": 58,
+      "operation": "db.prepare",
+      "tool_registration": "get_customer",
+      "description": "Customer lookup query",
+      "afb_type": "AFB04",
+      "rationale": "Database read access"
+    }
+  ],
+  "expected_summary": {
+    "critical": 2,
+    "warning": 2,
+    "info": 1
+  },
+  "metadata": {
+    "difficulty": "3/5",
+    "frameworks": ["openai"],
+    "languages": ["typescript"],
+    "author": "WyScan Benchmark Team",
+    "created": "2026-03-26",
+    "last_updated": "2026-03-26"
+  }
+}
