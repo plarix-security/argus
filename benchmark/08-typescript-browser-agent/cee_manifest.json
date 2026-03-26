@@ -1,0 +1,67 @@
+{
+  "$schema": "../cee_manifest_schema.json",
+  "system": "08-typescript-browser-agent",
+  "version": "1.0.0",
+  "description": "Browser automation agent using Playwright with JS execution and SSRF vulnerabilities",
+  "expected_findings": [
+    {
+      "id": "BROWSER-001",
+      "severity": "critical",
+      "category": "code_execution",
+      "file": "src/tools/browser.ts",
+      "line": 45,
+      "operation": "page.evaluate",
+      "tool_registration": "execute_js",
+      "description": "Arbitrary JavaScript execution in page context via page.evaluate()",
+      "afb_type": "AFB04",
+      "cwe": "CWE-94"
+    },
+    {
+      "id": "BROWSER-002",
+      "severity": "critical",
+      "category": "api_call",
+      "file": "src/tools/navigate.ts",
+      "line": 28,
+      "operation": "page.goto",
+      "tool_registration": "navigate",
+      "description": "SSRF via browser navigation to LLM-controlled URL",
+      "afb_type": "AFB04",
+      "cwe": "CWE-918"
+    },
+    {
+      "id": "BROWSER-003",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "src/tools/forms.ts",
+      "line": 35,
+      "operation": "page.fill",
+      "tool_registration": "fill_form",
+      "description": "Form filling including credential fields",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "BROWSER-004",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "src/tools/screenshot.ts",
+      "line": 22,
+      "operation": "page.screenshot",
+      "tool_registration": "take_screenshot",
+      "description": "Screenshot capture of arbitrary pages",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "BROWSER-005",
+      "severity": "info",
+      "category": "api_call",
+      "file": "src/tools/browser.ts",
+      "line": 68,
+      "operation": "page.content",
+      "tool_registration": "get_page_content",
+      "description": "Page content extraction feeding LLM context",
+      "afb_type": "AFB04"
+    }
+  ],
+  "expected_summary": {"critical": 2, "warning": 2, "info": 1},
+  "metadata": {"difficulty": "4/5", "frameworks": ["playwright", "openai"], "languages": ["typescript"], "created": "2026-03-26"}
+}

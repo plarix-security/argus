@@ -1,0 +1,87 @@
+{
+  "$schema": "../cee_manifest_schema.json",
+  "system": "12-heterogeneous-multi-framework",
+  "version": "1.0.0",
+  "description": "Multi-service orchestration across LangGraph, CrewAI, and Vercel AI SDK",
+  "expected_findings": [
+    {
+      "id": "HETERO-001",
+      "severity": "critical",
+      "category": "api_call",
+      "file": "orchestrator/src/delegate.py",
+      "line": 32,
+      "operation": "httpx.post",
+      "tool_registration": "delegate_to_crewai",
+      "description": "Unsigned inter-service delegation to CrewAI",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "HETERO-002",
+      "severity": "critical",
+      "category": "api_call",
+      "file": "orchestrator/src/delegate.py",
+      "line": 48,
+      "operation": "httpx.post",
+      "tool_registration": "delegate_to_vercel",
+      "description": "Unsigned inter-service delegation to Vercel service",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "HETERO-003",
+      "severity": "critical",
+      "category": "database_operation",
+      "file": "crewai-service/src/tools/database.py",
+      "line": 25,
+      "operation": "cursor.execute",
+      "tool_registration": "write_shared_db",
+      "description": "Shared database write without transaction isolation",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "HETERO-004",
+      "severity": "warning",
+      "category": "database_operation",
+      "file": "orchestrator/src/state.py",
+      "line": 42,
+      "operation": "cursor.execute",
+      "tool_registration": "read_shared_state",
+      "description": "Shared state read from potentially corrupted database",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "HETERO-005",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "crewai-service/src/tools/webhook.py",
+      "line": 28,
+      "operation": "requests.post",
+      "tool_registration": "send_result",
+      "description": "Result callback to orchestrator without authentication",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "HETERO-006",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "orchestrator/src/logging.py",
+      "line": 35,
+      "operation": "Path.write_text",
+      "tool_registration": "write_audit_log",
+      "description": "Audit log write (incomplete cross-framework trace)",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "HETERO-007",
+      "severity": "info",
+      "category": "api_call",
+      "file": "vercel-service/src/tools/callback.ts",
+      "line": 22,
+      "operation": "fetch",
+      "tool_registration": "callback_orchestrator",
+      "description": "Bidirectional callback to orchestrator",
+      "afb_type": "AFB04"
+    }
+  ],
+  "expected_summary": {"critical": 3, "warning": 3, "info": 1},
+  "metadata": {"difficulty": "5/5", "frameworks": ["langgraph", "crewai", "vercel-ai"], "languages": ["python", "typescript"], "created": "2026-03-26"}
+}

@@ -1,0 +1,64 @@
+{
+  "$schema": "../cee_manifest_schema.json",
+  "system": "10-rust-agent-runtime",
+  "version": "1.0.0",
+  "description": "Rust-native ReAct agent using async-openai with shell execution",
+  "expected_findings": [
+    {
+      "id": "RUST-001",
+      "severity": "critical",
+      "category": "shell_execution",
+      "file": "src/tools/shell.rs",
+      "line": 25,
+      "operation": "Command::new",
+      "tool_registration": "execute_shell",
+      "description": "Shell command execution via std::process::Command",
+      "afb_type": "AFB04",
+      "cwe": "CWE-78"
+    },
+    {
+      "id": "RUST-002",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "src/tools/http.rs",
+      "line": 38,
+      "operation": "reqwest::get",
+      "tool_registration": "http_get",
+      "description": "HTTP GET with redirect following (SSRF surface)",
+      "afb_type": "AFB04",
+      "cwe": "CWE-918"
+    },
+    {
+      "id": "RUST-003",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "src/tools/files.rs",
+      "line": 22,
+      "operation": "fs::write",
+      "tool_registration": "write_file",
+      "description": "File write without path validation",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "RUST-004",
+      "severity": "info",
+      "category": "file_operation",
+      "file": "src/tools/files.rs",
+      "line": 35,
+      "operation": "fs::read_to_string",
+      "tool_registration": "read_file",
+      "description": "File read access",
+      "afb_type": "AFB04"
+    }
+  ],
+  "expected_false_negatives": [
+    {
+      "id": "RUST-FN-001",
+      "reason": "WyScan does not support Rust language analysis",
+      "file": "src/tools/shell.rs",
+      "description": "All Rust findings will be false negatives until Rust support is added"
+    }
+  ],
+  "expected_summary": {"critical": 1, "warning": 2, "info": 1},
+  "metadata": {"difficulty": "5/5", "frameworks": ["custom"], "languages": ["rust"], "created": "2026-03-26"}
+}
