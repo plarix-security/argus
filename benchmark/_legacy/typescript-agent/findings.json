@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "scanned_path": "/home/knightler/wyscan/benchmark/10-rust-agent-runtime",
-  "files_analyzed": 0,
+  "scanned_path": "/home/knightler/wyscan/benchmark/_legacy/typescript-agent",
+  "files_analyzed": 1,
   "runtime_ms": 15,
   "findings": [],
   "summary": {
@@ -14,10 +14,13 @@
     "languages_scanned": [
       "python"
     ],
-    "languages_skipped": [],
+    "languages_skipped": [
+      "typescript",
+      "javascript"
+    ],
     "frameworks_detected": [],
     "files_analyzed": 0,
-    "files_skipped": 0,
+    "files_skipped": 1,
     "call_graph_depth_used": 3,
     "confidence_note": "Non-comprehensive. Static analysis only. Runtime-generated tool wiring and external package internals are not traced."
   }

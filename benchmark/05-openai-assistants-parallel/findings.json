@@ -1,1 +1,24 @@
-[]
+{
+  "version": "1.0.0",
+  "scanned_path": "/home/knightler/wyscan/benchmark/05-openai-assistants-parallel",
+  "files_analyzed": 0,
+  "runtime_ms": 4,
+  "findings": [],
+  "summary": {
+    "critical": 0,
+    "warning": 0,
+    "info": 0,
+    "suppressed": 0
+  },
+  "coverage": {
+    "languages_scanned": [
+      "python"
+    ],
+    "languages_skipped": [],
+    "frameworks_detected": [],
+    "files_analyzed": 0,
+    "files_skipped": 0,
+    "call_graph_depth_used": 3,
+    "confidence_note": "Non-comprehensive. Static analysis only. Runtime-generated tool wiring and external package internals are not traced."
+  }
+}

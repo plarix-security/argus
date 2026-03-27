@@ -1,1 +1,135 @@
-[]
+{
+  "version": "1.0.0",
+  "scanned_path": "/home/knightler/wyscan/benchmark/04-crewai-research-crew",
+  "files_analyzed": 9,
+  "runtime_ms": 241,
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/scraper.py",
+      "line": 50,
+      "function": "exec",
+      "tool_registration": "dynamic_scrape",
+      "description": "Tool \"dynamic_scrape\" (langchain) can reach exec. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/plan_file.py",
+      "line": 16,
+      "function": "PLAN_PATH.parent.mkdir",
+      "tool_registration": "read_plan",
+      "description": "Tool \"read_plan\" (langchain) can reach PLAN_PATH.parent.mkdir. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/plan_file.py",
+      "line": 38,
+      "function": "PLAN_PATH.parent.mkdir",
+      "tool_registration": "update_plan",
+      "description": "Tool \"update_plan\" (langchain) can reach PLAN_PATH.parent.mkdir. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/plan_file.py",
+      "line": 40,
+      "function": "PLAN_PATH.write_text",
+      "tool_registration": "update_plan",
+      "description": "Tool \"update_plan\" (langchain) can reach PLAN_PATH.write_text. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/publish.py",
+      "line": 21,
+      "function": "OUTPUT_DIR.mkdir",
+      "tool_registration": "publish_article",
+      "description": "Tool \"publish_article\" (langchain) can reach OUTPUT_DIR.mkdir. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/publish.py",
+      "line": 26,
+      "function": "output_path.write_text",
+      "tool_registration": "publish_article",
+      "description": "Tool \"publish_article\" (langchain) can reach output_path.write_text. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/webhook.py",
+      "line": 24,
+      "function": "requests.post",
+      "tool_registration": "send_webhook",
+      "description": "Tool \"send_webhook\" (langchain) can reach requests.post. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/webhook.py",
+      "line": 41,
+      "function": "requests.post",
+      "tool_registration": "publish_to_default_webhook",
+      "description": "Tool \"publish_to_default_webhook\" (langchain) can reach requests.post. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "INFO",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/plan_file.py",
+      "line": 21,
+      "function": "PLAN_PATH.read_text",
+      "tool_registration": "read_plan",
+      "description": "Tool \"read_plan\" (langchain) can reach PLAN_PATH.read_text. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "INFO",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/scraper.py",
+      "line": 21,
+      "function": "requests.get",
+      "tool_registration": "scrape_url",
+      "description": "Tool \"scrape_url\" (langchain) can reach requests.get. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "INFO",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/scraper.py",
+      "line": 45,
+      "function": "requests.get",
+      "tool_registration": "dynamic_scrape",
+      "description": "Tool \"dynamic_scrape\" (langchain) can reach requests.get. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "INFO",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/webhook.py",
+      "line": 40,
+      "function": "os.getenv",
+      "tool_registration": "publish_to_default_webhook",
+      "description": "Tool \"publish_to_default_webhook\" (langchain) can reach os.getenv. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    }
+  ],
+  "summary": {
+    "critical": 1,
+    "warning": 7,
+    "info": 4,
+    "suppressed": 0
+  },
+  "coverage": {
+    "languages_scanned": [
+      "python"
+    ],
+    "languages_skipped": [],
+    "frameworks_detected": [
+      "langchain"
+    ],
+    "files_analyzed": 9,
+    "files_skipped": 0,
+    "call_graph_depth_used": 3,
+    "confidence_note": "Non-comprehensive. Static analysis only. Runtime-generated tool wiring and external package internals are not traced."
+  }
+}
