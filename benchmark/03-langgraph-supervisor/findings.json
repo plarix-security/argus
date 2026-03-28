@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "scanned_path": "/home/knightler/wyscan/benchmark/03-langgraph-supervisor",
   "files_analyzed": 8,
-  "runtime_ms": 118,
+  "runtime_ms": 140,
   "findings": [
     {
       "severity": "CRITICAL",

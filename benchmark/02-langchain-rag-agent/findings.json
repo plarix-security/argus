@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "scanned_path": "/home/knightler/wyscan/benchmark/02-langchain-rag-agent",
   "files_analyzed": 6,
-  "runtime_ms": 244,
+  "runtime_ms": 121,
   "findings": [
     {
       "severity": "CRITICAL",

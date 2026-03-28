@@ -294,11 +294,11 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.read_bytes$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Binary file read' },
   { pattern: /\.read$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read' },
 
-  // HTTP GET - reading from external APIs (various client styles)
-  { pattern: /^requests\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP GET request' },
-  { pattern: /^httpx\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP GET request' },
-  { pattern: /^urllib\.request\.(urlopen|urlretrieve)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'URL fetch' },
-  { pattern: /^aiohttp\.ClientSession\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'Async HTTP GET' },
+  // HTTP GET - outbound API calls can exfiltrate data, elevated to WARNING
+  { pattern: /^requests\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP GET request' },
+  { pattern: /^httpx\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP GET request' },
+  { pattern: /^urllib\.request\.(urlopen|urlretrieve)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'URL fetch' },
+  { pattern: /^aiohttp\.ClientSession\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Async HTTP GET' },
   // Generic .get() is too common (dict.get, etc.) - don't match it
 
   // Database reads
@@ -308,12 +308,13 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.query$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database query' },
   { pattern: /\.select$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database select' },
 
-  // Environment access
-  { pattern: /^os\.getenv$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Environment variable read' },
-  { pattern: /^os\.environ$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Environment access' },
+  // Directory operations (read-only)
   { pattern: /\.listdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory listing' },
   { pattern: /^os\.listdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory listing' },
   { pattern: /\.glob$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File glob' },
+
+  // NOTE: os.getenv and os.environ removed - reading environment variables is not dangerous
+  // The application's own API keys being read is not a security issue from the agent's perspective
 ];
 
 /**

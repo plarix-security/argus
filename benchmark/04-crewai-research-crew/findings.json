@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "scanned_path": "/home/knightler/wyscan/benchmark/04-crewai-research-crew",
   "files_analyzed": 9,
-  "runtime_ms": 241,
+  "runtime_ms": 290,
   "findings": [
     {
       "severity": "CRITICAL",

@@ -1,6 +1,6 @@
 # WyScan Benchmark Results
 
-**Run Date:** 2026-03-27
+**Run Date:** 2026-03-28
 **Systems Evaluated:** 15
 **Systems with Code:** 7
 **Systems Scored:** 4 (Python with manifest)
@@ -10,7 +10,7 @@
 | # | System | Lang | Expected | Detected | FP | DR | FPR | WS | Status |
 |---|--------|------|----------|----------|----|----|-----|----|---------
 | 00 | langgraph-production      | ???    |        — |       34 |  — |    — |    — |    — | NO MANIFEST |
-| 01 | react-tool-agent          | python |        7 |      0.0 |  0 | 0.00 | 0.00 | 0.00 | FAIL |
+| 01 | react-tool-agent          | python |        7 |      5.5 |  2 | 0.79 | 0.25 | 0.59 | PASS |
 | 02 | langchain-rag-agent       | python |        8 |      4.0 |  0 | 0.50 | 0.00 | 0.50 | PASS |
 | 03 | langgraph-supervisor      | python |        7 |      4.0 |  4 | 0.57 | 0.36 | 0.36 | FAIL |
 | 04 | crewai-research-crew      | python |        6 |      5.0 |  6 | 0.83 | 0.50 | 0.42 | PASS |
@@ -29,9 +29,9 @@
 
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
-| Detection Rate (DR) | 0.48 | — | — |
-| False Positive Rate (FPR) | 0.22 | ≤ 0.10 | FAIL |
-| Weighted Score (WS) | 0.32 | ≥ 0.80 | FAIL |
+| Detection Rate (DR) | 0.67 | — | — |
+| False Positive Rate (FPR) | 0.28 | ≤ 0.10 | FAIL |
+| Weighted Score (WS) | 0.47 | ≥ 0.80 | FAIL |
 | All Systems Above Floor | No | WS ≥ 0.40 | FAIL |
 
 **Overall Status: FAIL**
@@ -40,21 +40,32 @@
 
 ### 01-react-tool-agent
 
-**Expected:** 7 | **Detected:** 0.0 | **False Positives:** 0
-**DR:** 0.00 | **FPR:** 0.00 | **WS:** 0.00
+**Expected:** 7 | **Detected:** 5.5 | **False Positives:** 2
+**DR:** 0.79 | **FPR:** 0.25 | **WS:** 0.59
 
 **Matches:**
 
+- [FULL] REACT-001: `eval` @ src/tools/calculator.py:25
+  → Found: `eval` @ line 26
+- [PARTIAL] REACT-002: `subprocess.run` @ src/tools/calculator.py:38
+  → Found: `subprocess.run` @ line 46
+- [FULL] REACT-003: `Path.write_text` @ src/tools/file_writer.py:32
+  → Found: `filepath.write_text` @ line 31
+- [FULL] REACT-004: `filepath.parent.mkdir` @ src/tools/file_writer.py:30
+  → Found: `filepath.parent.mkdir` @ line 28
+- [FULL] REACT-005: `httpx.get` @ src/tools/web_search.py:28
+  → Found: `httpx.get` @ line 25
+- [FULL] REACT-006: `Path.read_text` @ src/tools/file_writer.py:48
+  → Found: `filepath.read_text` @ line 52
 
 **Missed:**
 
-- REACT-001: `eval` @ src/tools/calculator.py:25
-- REACT-002: `subprocess.run` @ src/tools/calculator.py:38
-- REACT-003: `Path.write_text` @ src/tools/file_writer.py:32
-- REACT-004: `filepath.parent.mkdir` @ src/tools/file_writer.py:30
-- REACT-005: `httpx.get` @ src/tools/web_search.py:28
-- REACT-006: `Path.read_text` @ src/tools/file_writer.py:48
 - REACT-007: `base_path.glob` @ src/tools/file_writer.py:62
+
+**False Positives:**
+
+- `os.getenv` @ web_search.py:20
+- `list` @ file_writer.py:71
 
 ### 02-langchain-rag-agent
 

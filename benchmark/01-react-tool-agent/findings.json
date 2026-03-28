@@ -1,12 +1,8 @@
-
-> wyscan@1.0.0 wyscan
-> npx ts-node src/cli/index.ts scan ./benchmark/01-react-tool-agent --json
-
 {
   "version": "1.0.0",
   "scanned_path": "/home/knightler/wyscan/benchmark/01-react-tool-agent",
   "files_analyzed": 8,
-  "runtime_ms": 177,
+  "runtime_ms": 197,
   "findings": [
     {
       "severity": "CRITICAL",
@@ -98,3 +94,6 @@
     "files_analyzed": 8,
     "files_skipped": 0,
     "call_graph_depth_used": 3,
+    "confidence_note": "Non-comprehensive. Static analysis only. Runtime-generated tool wiring and external package internals are not traced."
+  }
+}
