@@ -22,6 +22,8 @@ import {
   ImportInfo,
   ControlFlowInfo,
   DecoratorDef,
+  OpenAIToolSchema,
+  FunctionDispatchMapping,
 } from './ast-parser';
 import { ExecutionCategory, Severity } from '../../types';
 import * as path from 'path';
@@ -776,7 +778,7 @@ export function buildCallGraph(
       };
 
       // Check if this is a tool registration
-      const toolInfo = detectToolRegistration(func, parsed.imports);
+      const toolInfo = detectToolRegistration(func, parsed.imports, parsed.openaiToolSchemas, parsed.dispatchMappings);
       if (toolInfo) {
         node.isToolRegistration = true;
         node.framework = toolInfo.framework;
@@ -949,11 +951,32 @@ export function buildCallGraph(
 }
 
 /**
- * Detect if a function is a tool registration
+ * Check if imports include OpenAI SDK
+ */
+function hasOpenAIImport(imports: ImportInfo[]): boolean {
+  return imports.some(imp =>
+    imp.module.toLowerCase().includes('openai') ||
+    imp.names.some(n => n.name.toLowerCase().includes('openai'))
+  );
+}
+
+/**
+ * Detect if a function is a tool registration.
+ *
+ * Supports:
+ * 1. Decorator-based detection (LangChain @tool, CrewAI @task, etc.)
+ * 2. Function name heuristics with framework imports
+ * 3. OpenAI SDK dictionary-based schemas (NEW)
+ *
+ * Note: For OpenAI schemas, the presence of the schema pattern itself
+ * ({"type": "function", "function": {"name": "..."}}) is strong enough
+ * evidence that we don't require the openai import in the same file.
  */
 function detectToolRegistration(
   func: FunctionDef,
-  imports: ImportInfo[]
+  imports: ImportInfo[],
+  openaiToolSchemas: OpenAIToolSchema[] = [],
+  dispatchMappings: FunctionDispatchMapping[] = []
 ): { framework: string } | null {
   // Check decorators
   for (const decorator of func.decorators) {
@@ -964,6 +987,32 @@ function detectToolRegistration(
         }
       } else if (pattern.pattern.test(decorator)) {
         return { framework: pattern.framework };
+      }
+    }
+  }
+
+  // Check if function appears in OpenAI tool schemas
+  // The schema pattern {"type": "function", "function": {"name": "..."}} is unique enough
+  // that we trust it even without requiring openai import in the same file
+  for (const schema of openaiToolSchemas) {
+    if (schema.toolNames.includes(func.name)) {
+      return { framework: 'openai' };
+    }
+  }
+
+  // Check if function appears in dispatch mappings
+  for (const mapping of dispatchMappings) {
+    for (const [toolName, funcRef] of mapping.mappings) {
+      if (funcRef === func.name) {
+        // If the tool name appears in a schema, it's definitely an OpenAI tool
+        const inSchema = openaiToolSchemas.some(s => s.toolNames.includes(toolName));
+        if (inSchema) {
+          return { framework: 'openai' };
+        }
+        // If we have openai imports, trust the dispatch mapping
+        if (hasOpenAIImport(imports)) {
+          return { framework: 'openai' };
+        }
       }
     }
   }

@@ -83,6 +83,32 @@ export interface DecoratorDef {
 }
 
 /**
+ * OpenAI tool schema extracted from dictionary definitions
+ * Detects patterns like: TOOLS = [{"type": "function", "function": {"name": "calculate"}}]
+ */
+export interface OpenAIToolSchema {
+  /** Variable name holding the tool definitions (e.g., "CALCULATOR_TOOLS") */
+  variableName: string;
+  /** Line where defined */
+  startLine: number;
+  /** Tool names extracted from the schema */
+  toolNames: string[];
+}
+
+/**
+ * Function dispatch mapping (string -> function reference)
+ * Detects patterns like: tool_functions = {"calculate": calculate, "delete": delete_file}
+ */
+export interface FunctionDispatchMapping {
+  /** Variable name holding the mapping (e.g., "tool_functions") */
+  variableName: string;
+  /** Line where defined */
+  startLine: number;
+  /** Map of tool name strings to function identifiers */
+  mappings: Map<string, string>;
+}
+
+/**
  * Class definition with metadata
  */
 export interface ClassDef {
@@ -126,6 +152,10 @@ export interface ParsedPythonFile {
   imports: ImportInfo[];
   /** Decorator functions defined in this file (for cross-file resolution) */
   decoratorDefs: DecoratorDef[];
+  /** OpenAI tool schemas extracted from list/dict literals */
+  openaiToolSchemas: OpenAIToolSchema[];
+  /** Function dispatch mappings (string -> function) */
+  dispatchMappings: FunctionDispatchMapping[];
   success: boolean;
   error?: string;
 }
@@ -641,6 +671,206 @@ function checkDecoratorGates(
 }
 
 /**
+ * Extract string value from a string literal node.
+ * Handles both single and double quoted strings.
+ */
+function extractStringValue(node: Parser.SyntaxNode): string | null {
+  if (node.type === 'string') {
+    const text = node.text;
+    // Handle various string formats: "str", 'str', """str""", '''str'''
+    if (text.startsWith('"""') && text.endsWith('"""')) {
+      return text.slice(3, -3);
+    }
+    if (text.startsWith("'''") && text.endsWith("'''")) {
+      return text.slice(3, -3);
+    }
+    if ((text.startsWith('"') && text.endsWith('"')) ||
+        (text.startsWith("'") && text.endsWith("'"))) {
+      return text.slice(1, -1);
+    }
+  }
+  return null;
+}
+
+/**
+ * Extract a nested string value from a dictionary for a specific key.
+ * Used to find "name" inside {"function": {"name": "..."}}
+ */
+function extractNestedDictStringValue(dictNode: Parser.SyntaxNode, targetKey: string): string | null {
+  for (const child of dictNode.children) {
+    if (child.type === 'pair') {
+      const keyNode = child.children.find(c => c.type === 'string');
+      const valueNode = child.children.find(c => c.type === 'string' && c !== keyNode);
+
+      if (keyNode && extractStringValue(keyNode) === targetKey && valueNode) {
+        return extractStringValue(valueNode);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Check if a dictionary node matches OpenAI tool schema pattern:
+ * {"type": "function", "function": {"name": "tool_name", ...}}
+ * Returns the tool name if found, null otherwise.
+ */
+function extractToolNameFromOpenAISchema(dictNode: Parser.SyntaxNode): string | null {
+  let hasTypeFunctionPair = false;
+  let toolName: string | null = null;
+
+  for (const child of dictNode.children) {
+    if (child.type === 'pair') {
+      // Get key and value - pair structure: key, ':', value
+      const children = child.children.filter(c => c.type !== ':');
+      if (children.length < 2) continue;
+
+      const keyNode = children[0];
+      const valueNode = children[1];
+
+      const keyText = extractStringValue(keyNode);
+
+      // Check for "type": "function"
+      if (keyText === 'type') {
+        const valueText = extractStringValue(valueNode);
+        if (valueText === 'function') {
+          hasTypeFunctionPair = true;
+        }
+      }
+
+      // Check for "function": {...} containing "name"
+      if (keyText === 'function' && valueNode.type === 'dictionary') {
+        toolName = extractNestedDictStringValue(valueNode, 'name');
+      }
+    }
+  }
+
+  return hasTypeFunctionPair && toolName ? toolName : null;
+}
+
+/**
+ * Extract OpenAI tool schemas from an assignment node.
+ * Detects: TOOLS = [{"type": "function", "function": {"name": "calculate"}}]
+ */
+function extractOpenAIToolSchema(assignmentNode: Parser.SyntaxNode): OpenAIToolSchema | null {
+  // Handle both simple assignment and augmented assignment
+  let leftNode: Parser.SyntaxNode | null = null;
+  let rightNode: Parser.SyntaxNode | null = null;
+
+  if (assignmentNode.type === 'assignment') {
+    leftNode = assignmentNode.childForFieldName('left');
+    rightNode = assignmentNode.childForFieldName('right');
+  } else if (assignmentNode.type === 'expression_statement') {
+    // Find assignment within expression statement
+    const assignment = assignmentNode.children.find(c => c.type === 'assignment');
+    if (assignment) {
+      leftNode = assignment.childForFieldName('left');
+      rightNode = assignment.childForFieldName('right');
+    }
+  }
+
+  if (!leftNode || !rightNode) return null;
+
+  // Get variable name - handle both identifier and attribute (e.g., self.tools)
+  let variableName = '';
+  if (leftNode.type === 'identifier') {
+    variableName = leftNode.text;
+  } else if (leftNode.type === 'attribute') {
+    variableName = leftNode.text;
+  } else {
+    return null;
+  }
+
+  // Check if right side is a list
+  if (rightNode.type !== 'list') return null;
+
+  const toolNames: string[] = [];
+
+  // Iterate through list items looking for OpenAI schema dicts
+  for (const item of rightNode.children) {
+    if (item.type === 'dictionary') {
+      const toolName = extractToolNameFromOpenAISchema(item);
+      if (toolName) {
+        toolNames.push(toolName);
+      }
+    }
+  }
+
+  if (toolNames.length === 0) return null;
+
+  return {
+    variableName,
+    startLine: assignmentNode.startPosition.row + 1,
+    toolNames,
+  };
+}
+
+/**
+ * Extract function dispatch mapping from an assignment node.
+ * Detects: tool_functions = {"calculate": calculate, "delete": delete_file}
+ */
+function extractDispatchMapping(assignmentNode: Parser.SyntaxNode): FunctionDispatchMapping | null {
+  let leftNode: Parser.SyntaxNode | null = null;
+  let rightNode: Parser.SyntaxNode | null = null;
+
+  if (assignmentNode.type === 'assignment') {
+    leftNode = assignmentNode.childForFieldName('left');
+    rightNode = assignmentNode.childForFieldName('right');
+  } else if (assignmentNode.type === 'expression_statement') {
+    const assignment = assignmentNode.children.find(c => c.type === 'assignment');
+    if (assignment) {
+      leftNode = assignment.childForFieldName('left');
+      rightNode = assignment.childForFieldName('right');
+    }
+  }
+
+  if (!leftNode || !rightNode) return null;
+
+  // Get variable name
+  let variableName = '';
+  if (leftNode.type === 'identifier') {
+    variableName = leftNode.text;
+  } else if (leftNode.type === 'attribute') {
+    variableName = leftNode.text;
+  } else {
+    return null;
+  }
+
+  // Check if right side is a dictionary
+  if (rightNode.type !== 'dictionary') return null;
+
+  const mappings = new Map<string, string>();
+
+  for (const child of rightNode.children) {
+    if (child.type === 'pair') {
+      // Get key and value
+      const children = child.children.filter(c => c.type !== ':');
+      if (children.length < 2) continue;
+
+      const keyNode = children[0];
+      const valueNode = children[1];
+
+      // Key must be a string literal
+      const keyStr = extractStringValue(keyNode);
+      if (!keyStr) continue;
+
+      // Value must be an identifier (function reference)
+      if (valueNode.type === 'identifier') {
+        mappings.set(keyStr, valueNode.text);
+      }
+    }
+  }
+
+  if (mappings.size === 0) return null;
+
+  return {
+    variableName,
+    startLine: assignmentNode.startPosition.row + 1,
+    mappings,
+  };
+}
+
+/**
  * Parse a Python source file and extract structural information
  */
 export function parsePythonSource(sourceCode: string): ParsedPythonFile {
@@ -651,6 +881,8 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       calls: [],
       imports: [],
       decoratorDefs: [],
+      openaiToolSchemas: [],
+      dispatchMappings: [],
       success: false,
       error: 'Parser not initialized. Call initParser() first.',
     };
@@ -907,12 +1139,34 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       }
     }
 
+    // Process assignments for OpenAI tool schema detection
+    // Find all expression_statement nodes that contain assignments
+    const expressionStatements = findAllNodes(root, new Set(['expression_statement']));
+    const openaiToolSchemas: OpenAIToolSchema[] = [];
+    const dispatchMappings: FunctionDispatchMapping[] = [];
+
+    for (const exprStmt of expressionStatements) {
+      // Try to extract OpenAI tool schema
+      const schema = extractOpenAIToolSchema(exprStmt);
+      if (schema) {
+        openaiToolSchemas.push(schema);
+      }
+
+      // Try to extract dispatch mapping
+      const mapping = extractDispatchMapping(exprStmt);
+      if (mapping) {
+        dispatchMappings.push(mapping);
+      }
+    }
+
     return {
       functions,
       classes,
       calls,
       imports,
       decoratorDefs,
+      openaiToolSchemas,
+      dispatchMappings,
       success: true,
     };
   } catch (error) {
@@ -922,6 +1176,8 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       calls: [],
       imports: [],
       decoratorDefs: [],
+      openaiToolSchemas: [],
+      dispatchMappings: [],
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
