@@ -6,22 +6,22 @@
   "expected_findings": [
     {
       "id": "MEMORY-001",
-      "severity": "critical",
-      "category": "file_operation",
+      "severity": "warning",
+      "category": "database_operation",
       "file": "src/tools/memory.py",
-      "line": 35,
-      "operation": "redis.set",
+      "line": 31,
+      "operation": "redis_client.set",
       "tool_registration": "store_memory",
       "description": "Persistent memory write to Redis without namespace isolation",
       "afb_type": "AFB04"
     },
     {
       "id": "MEMORY-002",
-      "severity": "warning",
-      "category": "file_operation",
+      "severity": "info",
+      "category": "database_operation",
       "file": "src/tools/memory.py",
-      "line": 52,
-      "operation": "redis.get",
+      "line": 49,
+      "operation": "redis_client.get",
       "tool_registration": "retrieve_memory",
       "description": "Memory retrieval from potentially poisoned global store",
       "afb_type": "AFB04"
@@ -29,37 +29,37 @@
     {
       "id": "MEMORY-003",
       "severity": "warning",
-      "category": "file_operation",
+      "category": "database_operation",
       "file": "src/tools/memory.py",
-      "line": 68,
-      "operation": "redis.delete",
+      "line": 67,
+      "operation": "redis_client.delete",
       "tool_registration": "delete_memory",
       "description": "Memory deletion without ownership verification",
       "afb_type": "AFB04"
     },
     {
       "id": "MEMORY-004",
-      "severity": "warning",
-      "category": "file_operation",
+      "severity": "info",
+      "category": "database_operation",
       "file": "src/tools/reflect.py",
-      "line": 25,
-      "operation": "redis.keys",
+      "line": 23,
+      "operation": "redis_client.keys",
       "tool_registration": "reflect",
       "description": "Memory enumeration for self-reflection loop",
       "afb_type": "AFB04"
     },
     {
       "id": "MEMORY-005",
-      "severity": "info",
+      "severity": "warning",
       "category": "api_call",
       "file": "src/agent.py",
-      "line": 45,
+      "line": 38,
       "operation": "httpx.get",
       "tool_registration": "fetch_context",
       "description": "External context fetch for memory augmentation",
       "afb_type": "AFB04"
     }
   ],
-  "expected_summary": {"critical": 1, "warning": 3, "info": 1},
+  "expected_summary": {"critical": 0, "warning": 3, "info": 2},
   "metadata": {"difficulty": "4/5", "frameworks": ["langgraph"], "languages": ["python"], "created": "2026-03-26"}
 }

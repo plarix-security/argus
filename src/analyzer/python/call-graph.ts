@@ -281,6 +281,16 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.bulk_create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM bulk create' },
   { pattern: /\.insert$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database insert' },
 
+  // Redis/cache operations - can read/write/delete persistent data
+  // Use specific patterns to avoid matching common methods like dict.get()
+  // Patterns ending in _client.method or redis.method are more reliable
+  { pattern: /redis.*\.set$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Redis write' },
+  { pattern: /cache.*\.set$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Cache write' },
+  { pattern: /redis.*\.delete$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Redis delete' },
+  { pattern: /cache.*\.delete$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Cache delete' },
+  { pattern: /redis.*\.get$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Redis read' },
+  { pattern: /redis.*\.keys$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Redis key enumeration' },
+
   // Email sending
   { pattern: /\.send_message$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Send message/email' },
   { pattern: /\.send_email$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Send email' },
