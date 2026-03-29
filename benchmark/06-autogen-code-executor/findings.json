@@ -1,13 +1,59 @@
 {
   "version": "1.0.0",
   "scanned_path": "/home/knightler/wyscan/benchmark/06-autogen-code-executor",
-  "files_analyzed": 0,
-  "runtime_ms": 4,
-  "findings": [],
+  "files_analyzed": 1,
+  "runtime_ms": 1643,
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "file": "/home/knightler/wyscan/benchmark/06-autogen-code-executor/src/executor.py",
+      "line": 26,
+      "function": "exec",
+      "tool_registration": "execute_code",
+      "description": "Tool \"execute_code\" (autogen) can reach exec. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "CRITICAL",
+      "file": "/home/knightler/wyscan/benchmark/06-autogen-code-executor/src/executor.py",
+      "line": 44,
+      "function": "eval",
+      "tool_registration": "evaluate_expression",
+      "description": "Tool \"evaluate_expression\" (autogen) can reach eval. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/06-autogen-code-executor/src/executor.py",
+      "line": 54,
+      "function": "output_dir.mkdir",
+      "tool_registration": "save_result",
+      "description": "Tool \"save_result\" (autogen) can reach output_dir.mkdir. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/06-autogen-code-executor/src/executor.py",
+      "line": 58,
+      "function": "filepath.write_text",
+      "tool_registration": "save_result",
+      "description": "Tool \"save_result\" (autogen) can reach filepath.write_text. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "INFO",
+      "file": "/home/knightler/wyscan/benchmark/06-autogen-code-executor/src/executor.py",
+      "line": 73,
+      "function": "filepath.read_text",
+      "tool_registration": "load_data",
+      "description": "Tool \"load_data\" (autogen) can reach filepath.read_text. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    }
+  ],
   "summary": {
-    "critical": 0,
-    "warning": 0,
-    "info": 0,
+    "critical": 2,
+    "warning": 2,
+    "info": 1,
     "suppressed": 0
   },
   "coverage": {
@@ -15,8 +61,10 @@
       "python"
     ],
     "languages_skipped": [],
-    "frameworks_detected": [],
-    "files_analyzed": 0,
+    "frameworks_detected": [
+      "autogen"
+    ],
+    "files_analyzed": 1,
     "files_skipped": 0,
     "call_graph_depth_used": 3,
     "confidence_note": "Non-comprehensive. Static analysis only. Runtime-generated tool wiring and external package internals are not traced."

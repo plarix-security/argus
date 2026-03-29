@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "scanned_path": "/home/knightler/wyscan/benchmark/03-langgraph-supervisor",
   "files_analyzed": 8,
-  "runtime_ms": 140,
+  "runtime_ms": 406,
   "findings": [
     {
       "severity": "CRITICAL",
@@ -38,6 +38,15 @@
       "function": "code_path.write_text",
       "tool_registration": "save_code",
       "description": "Tool \"save_code\" (langchain) can reach code_path.write_text. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/03-langgraph-supervisor/src/agents/researcher_agent.py",
+      "line": 20,
+      "function": "requests.get",
+      "tool_registration": "web_research",
+      "description": "Tool \"web_research\" (langchain) can reach requests.get. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
       "afb_type": "AFB04"
     },
     {
@@ -78,15 +87,6 @@
     },
     {
       "severity": "INFO",
-      "file": "/home/knightler/wyscan/benchmark/03-langgraph-supervisor/src/agents/researcher_agent.py",
-      "line": 20,
-      "function": "requests.get",
-      "tool_registration": "web_research",
-      "description": "Tool \"web_research\" (langchain) can reach requests.get. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
-      "afb_type": "AFB04"
-    },
-    {
-      "severity": "INFO",
       "file": "/home/knightler/wyscan/benchmark/03-langgraph-supervisor/src/tools/shared_state.py",
       "line": 25,
       "function": "STATE_FILE.read_text",
@@ -106,8 +106,8 @@
   ],
   "summary": {
     "critical": 2,
-    "warning": 5,
-    "info": 4,
+    "warning": 6,
+    "info": 3,
     "suppressed": 0
   },
   "coverage": {

@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "scanned_path": "/home/knightler/wyscan/benchmark/04-crewai-research-crew",
   "files_analyzed": 9,
-  "runtime_ms": 290,
+  "runtime_ms": 115,
   "findings": [
     {
       "severity": "CRITICAL",
@@ -60,6 +60,24 @@
     },
     {
       "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/scraper.py",
+      "line": 21,
+      "function": "requests.get",
+      "tool_registration": "scrape_url",
+      "description": "Tool \"scrape_url\" (langchain) can reach requests.get. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/scraper.py",
+      "line": 45,
+      "function": "requests.get",
+      "tool_registration": "dynamic_scrape",
+      "description": "Tool \"dynamic_scrape\" (langchain) can reach requests.get. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
       "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/webhook.py",
       "line": 24,
       "function": "requests.post",
@@ -84,39 +102,12 @@
       "tool_registration": "read_plan",
       "description": "Tool \"read_plan\" (langchain) can reach PLAN_PATH.read_text. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
       "afb_type": "AFB04"
-    },
-    {
-      "severity": "INFO",
-      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/scraper.py",
-      "line": 21,
-      "function": "requests.get",
-      "tool_registration": "scrape_url",
-      "description": "Tool \"scrape_url\" (langchain) can reach requests.get. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
-      "afb_type": "AFB04"
-    },
-    {
-      "severity": "INFO",
-      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/scraper.py",
-      "line": 45,
-      "function": "requests.get",
-      "tool_registration": "dynamic_scrape",
-      "description": "Tool \"dynamic_scrape\" (langchain) can reach requests.get. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
-      "afb_type": "AFB04"
-    },
-    {
-      "severity": "INFO",
-      "file": "/home/knightler/wyscan/benchmark/04-crewai-research-crew/src/tools/webhook.py",
-      "line": 40,
-      "function": "os.getenv",
-      "tool_registration": "publish_to_default_webhook",
-      "description": "Tool \"publish_to_default_webhook\" (langchain) can reach os.getenv. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
-      "afb_type": "AFB04"
     }
   ],
   "summary": {
     "critical": 1,
-    "warning": 7,
-    "info": 4,
+    "warning": 9,
+    "info": 1,
     "suppressed": 0
   },
   "coverage": {

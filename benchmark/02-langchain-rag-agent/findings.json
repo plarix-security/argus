@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "scanned_path": "/home/knightler/wyscan/benchmark/02-langchain-rag-agent",
   "files_analyzed": 6,
-  "runtime_ms": 121,
+  "runtime_ms": 472,
   "findings": [
     {
       "severity": "CRITICAL",
@@ -32,16 +32,7 @@
       "afb_type": "AFB04"
     },
     {
-      "severity": "INFO",
-      "file": "/home/knightler/wyscan/benchmark/02-langchain-rag-agent/src/tools/document_rewriter.py",
-      "line": 23,
-      "function": "doc_path.read_text",
-      "tool_registration": "read_document",
-      "description": "Tool \"read_document\" (langchain) can reach doc_path.read_text. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
-      "afb_type": "AFB04"
-    },
-    {
-      "severity": "INFO",
+      "severity": "WARNING",
       "file": "/home/knightler/wyscan/benchmark/02-langchain-rag-agent/src/tools/web_search.py",
       "line": 23,
       "function": "requests.get",
@@ -50,19 +41,28 @@
       "afb_type": "AFB04"
     },
     {
-      "severity": "INFO",
+      "severity": "WARNING",
       "file": "/home/knightler/wyscan/benchmark/02-langchain-rag-agent/src/tools/web_search.py",
       "line": 42,
       "function": "requests.get",
       "tool_registration": "fetch_url",
       "description": "Tool \"fetch_url\" (langchain) can reach requests.get. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
       "afb_type": "AFB04"
+    },
+    {
+      "severity": "INFO",
+      "file": "/home/knightler/wyscan/benchmark/02-langchain-rag-agent/src/tools/document_rewriter.py",
+      "line": 23,
+      "function": "doc_path.read_text",
+      "tool_registration": "read_document",
+      "description": "Tool \"read_document\" (langchain) can reach doc_path.read_text. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
     }
   ],
   "summary": {
     "critical": 1,
-    "warning": 2,
-    "info": 3,
+    "warning": 4,
+    "info": 1,
     "suppressed": 0
   },
   "coverage": {

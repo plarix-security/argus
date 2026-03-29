@@ -9,77 +9,127 @@
       "severity": "critical",
       "category": "code_execution",
       "file": "src/tools/scraper.py",
-      "line": 45,
+      "line": 50,
       "operation": "exec",
       "tool_registration": "dynamic_scrape",
       "description": "Dynamic scraping executes user-provided extraction code",
       "afb_type": "AFB04",
-      "rationale": "Arbitrary code execution via scraping rules"
+      "cwe": "CWE-94"
     },
     {
       "id": "CREW-002",
       "severity": "warning",
-      "category": "api_call",
-      "file": "src/tools/webhook.py",
-      "line": 25,
-      "operation": "requests.post",
-      "tool_registration": "send_webhook",
-      "description": "HTTP POST to user-controlled webhook URL",
-      "afb_type": "AFB04",
-      "rationale": "Data exfiltration to arbitrary endpoints"
+      "category": "file_operation",
+      "file": "src/tools/plan_file.py",
+      "line": 16,
+      "operation": "PLAN_PATH.parent.mkdir",
+      "tool_registration": "read_plan",
+      "description": "Creates plan directory on read",
+      "afb_type": "AFB04"
     },
     {
       "id": "CREW-003",
       "severity": "warning",
-      "category": "api_call",
-      "file": "src/tools/scraper.py",
-      "line": 22,
-      "operation": "requests.get",
-      "tool_registration": "scrape_url",
-      "description": "HTTP GET to fetch arbitrary URLs",
-      "afb_type": "AFB04",
-      "rationale": "SSRF surface via URL parameter"
+      "category": "file_operation",
+      "file": "src/tools/plan_file.py",
+      "line": 38,
+      "operation": "PLAN_PATH.parent.mkdir",
+      "tool_registration": "update_plan",
+      "description": "Creates plan directory on write",
+      "afb_type": "AFB04"
     },
     {
       "id": "CREW-004",
       "severity": "warning",
       "category": "file_operation",
       "file": "src/tools/plan_file.py",
-      "line": 28,
-      "operation": "plan_path.write_text",
+      "line": 40,
+      "operation": "PLAN_PATH.write_text",
       "tool_registration": "update_plan",
       "description": "Writes to shared plan file",
-      "afb_type": "AFB04",
-      "rationale": "Any agent can overwrite the shared plan"
+      "afb_type": "AFB04"
     },
     {
       "id": "CREW-005",
       "severity": "warning",
       "category": "file_operation",
       "file": "src/tools/publish.py",
-      "line": 22,
-      "operation": "output_path.write_text",
+      "line": 21,
+      "operation": "OUTPUT_DIR.mkdir",
       "tool_registration": "publish_article",
-      "description": "Writes published article to disk",
-      "afb_type": "AFB04",
-      "rationale": "Agent writes content to filesystem"
+      "description": "Creates output directory for articles",
+      "afb_type": "AFB04"
     },
     {
       "id": "CREW-006",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "src/tools/publish.py",
+      "line": 26,
+      "operation": "output_path.write_text",
+      "tool_registration": "publish_article",
+      "description": "Writes published article to disk",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "CREW-007",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "src/tools/scraper.py",
+      "line": 21,
+      "operation": "requests.get",
+      "tool_registration": "scrape_url",
+      "description": "HTTP GET to fetch arbitrary URLs",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "CREW-008",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "src/tools/scraper.py",
+      "line": 45,
+      "operation": "requests.get",
+      "tool_registration": "dynamic_scrape",
+      "description": "HTTP GET for dynamic scraper",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "CREW-009",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "src/tools/webhook.py",
+      "line": 24,
+      "operation": "requests.post",
+      "tool_registration": "send_webhook",
+      "description": "HTTP POST to user-controlled webhook URL",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "CREW-010",
+      "severity": "warning",
+      "category": "api_call",
+      "file": "src/tools/webhook.py",
+      "line": 41,
+      "operation": "requests.post",
+      "tool_registration": "publish_to_default_webhook",
+      "description": "HTTP POST to default webhook endpoint",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "CREW-011",
       "severity": "info",
       "category": "file_operation",
       "file": "src/tools/plan_file.py",
-      "line": 15,
-      "operation": "plan_path.read_text",
+      "line": 21,
+      "operation": "PLAN_PATH.read_text",
       "tool_registration": "read_plan",
       "description": "Reads shared plan file",
-      "afb_type": "AFB04",
-      "rationale": "Plan content influences agent behavior"
+      "afb_type": "AFB04"
     }
   ],
   "expected_summary": {
     "critical": 1,
-    "warning": 4,
+    "warning": 9,
     "info": 1
   },
   "metadata": {
@@ -88,6 +138,6 @@
     "languages": ["python"],
     "author": "WyScan Benchmark Team",
     "created": "2026-03-26",
-    "last_updated": "2026-03-26"
+    "last_updated": "2026-03-29"
   }
 }

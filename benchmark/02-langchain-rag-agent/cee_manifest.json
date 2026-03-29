@@ -2,109 +2,80 @@
   "$schema": "../cee_manifest_schema.json",
   "system": "02-langchain-rag-agent",
   "version": "1.0.0",
-  "description": "RAG-augmented agent with FAISS vector store, document rewrite capability, and unsanitized web content",
+  "description": "RAG retrieval agent with document rewriting, web search fetching, and dynamic code execution",
   "expected_findings": [
     {
       "id": "RAG-001",
       "severity": "critical",
       "category": "code_execution",
       "file": "src/tools/document_rewriter.py",
-      "line": 35,
+      "line": 42,
       "operation": "exec",
       "tool_registration": "execute_transform",
-      "description": "Document transformation executes dynamic code",
+      "description": "Execute user-provided transformation code",
       "afb_type": "AFB04",
-      "rationale": "Allows arbitrary code execution via transform scripts"
+      "cwe": "CWE-94"
     },
     {
       "id": "RAG-002",
       "severity": "warning",
       "category": "file_operation",
       "file": "src/tools/document_rewriter.py",
-      "line": 55,
+      "line": 63,
       "operation": "doc_path.write_text",
       "tool_registration": "rewrite_document",
-      "description": "Agent can modify source documents in the RAG store",
-      "afb_type": "AFB04",
-      "rationale": "Self-poisoning: agent modifies its own knowledge base"
+      "description": "Rewrite document content",
+      "afb_type": "AFB04"
     },
     {
       "id": "RAG-003",
       "severity": "warning",
-      "category": "api_call",
-      "file": "src/tools/web_search.py",
-      "line": 28,
-      "operation": "requests.get",
-      "tool_registration": "search_web",
-      "description": "HTTP GET to arbitrary URL for web search",
-      "afb_type": "AFB04",
-      "rationale": "SSRF: search_url parameter allows targeting internal endpoints"
+      "category": "file_operation",
+      "file": "src/tools/document_rewriter.py",
+      "line": 80,
+      "operation": "new_doc_path.write_text",
+      "tool_registration": "add_document",
+      "description": "Add new document to store",
+      "afb_type": "AFB04"
     },
     {
       "id": "RAG-004",
       "severity": "warning",
       "category": "api_call",
       "file": "src/tools/web_search.py",
-      "line": 48,
+      "line": 23,
       "operation": "requests.get",
-      "tool_registration": "fetch_url",
-      "description": "Fetches raw HTML from arbitrary URL",
-      "afb_type": "AFB04",
-      "rationale": "Content passed directly to LLM context enables indirect injection"
+      "tool_registration": "search_web",
+      "description": "HTTP GET for web search",
+      "afb_type": "AFB04"
     },
     {
       "id": "RAG-005",
       "severity": "warning",
-      "category": "file_operation",
-      "file": "src/tools/document_rewriter.py",
-      "line": 70,
-      "operation": "new_doc_path.write_text",
-      "tool_registration": "add_document",
-      "description": "Adds new documents to the RAG store",
-      "afb_type": "AFB04",
-      "rationale": "Agent can expand its knowledge base without oversight"
+      "category": "api_call",
+      "file": "src/tools/web_search.py",
+      "line": 42,
+      "operation": "requests.get",
+      "tool_registration": "fetch_url",
+      "description": "HTTP GET to fetch URLs",
+      "afb_type": "AFB04"
     },
     {
       "id": "RAG-006",
       "severity": "info",
       "category": "file_operation",
       "file": "src/tools/document_rewriter.py",
-      "line": 25,
+      "line": 23,
       "operation": "doc_path.read_text",
       "tool_registration": "read_document",
-      "description": "Reads documents from store",
-      "afb_type": "AFB04",
-      "rationale": "Read access to document store"
-    },
-    {
-      "id": "RAG-007",
-      "severity": "info",
-      "category": "file_operation",
-      "file": "src/agent.py",
-      "line": 45,
-      "operation": "Path.read_text",
-      "tool_registration": "load_documents",
-      "description": "Loads documents during RAG initialization",
-      "afb_type": "AFB04",
-      "rationale": "Bulk file read for vector store"
-    },
-    {
-      "id": "RAG-008",
-      "severity": "info",
-      "category": "file_operation",
-      "file": "src/agent.py",
-      "line": 82,
-      "operation": "Path.glob",
-      "tool_registration": "load_documents",
-      "description": "Enumerates documents directory",
-      "afb_type": "AFB04",
-      "rationale": "Directory listing for document discovery"
+      "description": "Read document from store",
+      "afb_type": "AFB04"
     }
   ],
   "expected_summary": {
     "critical": 1,
     "warning": 4,
-    "info": 3
+    "info": 1
   },
   "metadata": {
     "difficulty": "2/5",
@@ -112,6 +83,6 @@
     "languages": ["python"],
     "author": "WyScan Benchmark Team",
     "created": "2026-03-26",
-    "last_updated": "2026-03-26"
+    "last_updated": "2026-03-29"
   }
 }

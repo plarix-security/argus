@@ -9,12 +9,11 @@
       "severity": "critical",
       "category": "code_execution",
       "file": "src/tools/calculator.py",
-      "line": 25,
+      "line": 26,
       "operation": "eval",
       "tool_registration": "calculate",
       "description": "Calculator tool uses eval() on user-provided mathematical expression",
       "afb_type": "AFB04",
-      "rationale": "Arbitrary code execution via calculator parameter injection (e.g., __import__('os').system('rm -rf /'))",
       "cwe": "CWE-95"
     },
     {
@@ -22,12 +21,11 @@
       "severity": "critical",
       "category": "shell_execution",
       "file": "src/tools/calculator.py",
-      "line": 38,
+      "line": 46,
       "operation": "subprocess.run",
       "tool_registration": "calculate_subprocess",
       "description": "Calculator subprocess fallback executes Python via shell",
       "afb_type": "AFB04",
-      "rationale": "Shell execution of LLM-generated expression via subprocess",
       "cwe": "CWE-78"
     },
     {
@@ -35,61 +33,56 @@
       "severity": "warning",
       "category": "file_operation",
       "file": "src/tools/file_writer.py",
-      "line": 32,
-      "operation": "Path.write_text",
+      "line": 28,
+      "operation": "filepath.parent.mkdir",
       "tool_registration": "write_file",
-      "description": "File writer accepts arbitrary paths without validation",
-      "afb_type": "AFB04",
-      "rationale": "Path traversal allows writing to ../../../etc/passwd or other sensitive locations",
-      "cwe": "CWE-22"
+      "description": "Creates parent directories for file write path",
+      "afb_type": "AFB04"
     },
     {
       "id": "REACT-004",
       "severity": "warning",
       "category": "file_operation",
       "file": "src/tools/file_writer.py",
-      "line": 30,
-      "operation": "filepath.parent.mkdir",
+      "line": 31,
+      "operation": "filepath.write_text",
       "tool_registration": "write_file",
-      "description": "Creates parent directories for file write path",
+      "description": "File writer accepts arbitrary paths without validation",
       "afb_type": "AFB04",
-      "rationale": "Agent can create arbitrary directory structures"
+      "cwe": "CWE-22"
     },
     {
       "id": "REACT-005",
       "severity": "warning",
       "category": "api_call",
       "file": "src/tools/web_search.py",
-      "line": 28,
+      "line": 25,
       "operation": "httpx.get",
       "tool_registration": "web_search",
       "description": "HTTP GET to external search API",
-      "afb_type": "AFB04",
-      "rationale": "Outbound API call with agent-controlled query parameter"
+      "afb_type": "AFB04"
     },
     {
       "id": "REACT-006",
       "severity": "info",
       "category": "file_operation",
       "file": "src/tools/file_writer.py",
-      "line": 48,
-      "operation": "Path.read_text",
+      "line": 52,
+      "operation": "filepath.read_text",
       "tool_registration": "read_file",
       "description": "File reader can access any path",
-      "afb_type": "AFB04",
-      "rationale": "Agent can read arbitrary files on the system"
+      "afb_type": "AFB04"
     },
     {
       "id": "REACT-007",
       "severity": "info",
       "category": "file_operation",
       "file": "src/tools/file_writer.py",
-      "line": 62,
-      "operation": "base_path.glob",
+      "line": 71,
+      "operation": "list",
       "tool_registration": "list_files",
       "description": "Directory listing via glob pattern",
-      "afb_type": "AFB04",
-      "rationale": "Agent can enumerate directory contents"
+      "afb_type": "AFB04"
     }
   ],
   "expected_true_negatives": [
@@ -111,6 +104,6 @@
     "languages": ["python"],
     "author": "WyScan Benchmark Team",
     "created": "2026-03-26",
-    "last_updated": "2026-03-26"
+    "last_updated": "2026-03-29"
   }
 }

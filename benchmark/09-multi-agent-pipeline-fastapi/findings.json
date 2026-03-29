@@ -1,13 +1,77 @@
 {
   "version": "1.0.0",
   "scanned_path": "/home/knightler/wyscan/benchmark/09-multi-agent-pipeline-fastapi",
-  "files_analyzed": 0,
-  "runtime_ms": 3,
-  "findings": [],
+  "files_analyzed": 7,
+  "runtime_ms": 742,
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "file": "/home/knightler/wyscan/benchmark/09-multi-agent-pipeline-fastapi/src/agents/data_analyst.py",
+      "line": 37,
+      "function": "eval",
+      "tool_registration": "execute_pandas",
+      "description": "Tool \"execute_pandas\" (langchain) can reach eval. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "CRITICAL",
+      "file": "/home/knightler/wyscan/benchmark/09-multi-agent-pipeline-fastapi/src/agents/orchestrator.py",
+      "line": 50,
+      "function": "subprocess.run",
+      "tool_registration": "run_script",
+      "description": "Tool \"run_script\" (langchain) can reach subprocess.run. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/09-multi-agent-pipeline-fastapi/src/agents/content_generator.py",
+      "line": 41,
+      "function": "requests.post",
+      "tool_registration": "publish_content",
+      "description": "Tool \"publish_content\" (langchain) can reach requests.post. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "WARNING",
+      "file": "/home/knightler/wyscan/benchmark/09-multi-agent-pipeline-fastapi/src/agents/orchestrator.py",
+      "line": 76,
+      "function": "httpx.post",
+      "tool_registration": "spawn_sub_agent",
+      "description": "Tool \"spawn_sub_agent\" (langchain) can reach httpx.post. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "INFO",
+      "file": "/home/knightler/wyscan/benchmark/09-multi-agent-pipeline-fastapi/src/agents/data_analyst.py",
+      "line": 66,
+      "function": "cursor.execute",
+      "tool_registration": "query_data",
+      "description": "Tool \"query_data\" (langchain) can reach cursor.execute. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "INFO",
+      "file": "/home/knightler/wyscan/benchmark/09-multi-agent-pipeline-fastapi/src/agents/data_analyst.py",
+      "line": 67,
+      "function": "cursor.fetchall",
+      "tool_registration": "query_data",
+      "description": "Tool \"query_data\" (langchain) can reach cursor.fetchall. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    },
+    {
+      "severity": "INFO",
+      "file": "/home/knightler/wyscan/benchmark/09-multi-agent-pipeline-fastapi/src/api/routes.py",
+      "line": 31,
+      "function": "config_path.read_text",
+      "tool_registration": "load_agent_config",
+      "description": "Tool \"load_agent_config\" (langchain) can reach config_path.read_text. No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "afb_type": "AFB04"
+    }
+  ],
   "summary": {
-    "critical": 0,
-    "warning": 0,
-    "info": 0,
+    "critical": 2,
+    "warning": 2,
+    "info": 3,
     "suppressed": 0
   },
   "coverage": {
@@ -15,8 +79,10 @@
       "python"
     ],
     "languages_skipped": [],
-    "frameworks_detected": [],
-    "files_analyzed": 0,
+    "frameworks_detected": [
+      "langchain"
+    ],
+    "files_analyzed": 7,
     "files_skipped": 0,
     "call_graph_depth_used": 3,
     "confidence_note": "Non-comprehensive. Static analysis only. Runtime-generated tool wiring and external package internals are not traced."

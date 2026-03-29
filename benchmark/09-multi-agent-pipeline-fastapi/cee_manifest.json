@@ -9,7 +9,7 @@
       "severity": "critical",
       "category": "code_execution",
       "file": "src/agents/data_analyst.py",
-      "line": 42,
+      "line": 37,
       "operation": "eval",
       "tool_registration": "execute_pandas",
       "description": "Pandas operations via eval for data analysis",
@@ -21,7 +21,7 @@
       "severity": "critical",
       "category": "shell_execution",
       "file": "src/agents/orchestrator.py",
-      "line": 65,
+      "line": 50,
       "operation": "subprocess.run",
       "tool_registration": "run_script",
       "description": "Script execution via subprocess",
@@ -31,9 +31,9 @@
     {
       "id": "FASTAPI-003",
       "severity": "warning",
-      "category": "tool_call",
+      "category": "api_call",
       "file": "src/agents/orchestrator.py",
-      "line": 88,
+      "line": 76,
       "operation": "httpx.post",
       "tool_registration": "spawn_sub_agent",
       "description": "Recursive agent spawning without depth limit",
@@ -42,24 +42,23 @@
     {
       "id": "FASTAPI-004",
       "severity": "warning",
-      "category": "file_operation",
-      "file": "src/api/routes.py",
-      "line": 35,
-      "operation": "Path.read_text",
-      "tool_registration": "load_agent_config",
-      "description": "Path traversal via agent_id parameter",
-      "afb_type": "AFB04",
-      "cwe": "CWE-22"
-    },
-    {
-      "id": "FASTAPI-005",
-      "severity": "warning",
       "category": "api_call",
       "file": "src/agents/content_generator.py",
-      "line": 52,
+      "line": 41,
       "operation": "requests.post",
       "tool_registration": "publish_content",
       "description": "Content publishing to external endpoint",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "FASTAPI-005",
+      "severity": "info",
+      "category": "database_operation",
+      "file": "src/agents/data_analyst.py",
+      "line": 66,
+      "operation": "cursor.execute",
+      "tool_registration": "query_data",
+      "description": "Database query execution",
       "afb_type": "AFB04"
     },
     {
@@ -67,13 +66,25 @@
       "severity": "info",
       "category": "database_operation",
       "file": "src/agents/data_analyst.py",
-      "line": 75,
-      "operation": "cursor.execute",
+      "line": 67,
+      "operation": "cursor.fetchall",
       "tool_registration": "query_data",
-      "description": "Database query execution",
+      "description": "Database result retrieval",
       "afb_type": "AFB04"
+    },
+    {
+      "id": "FASTAPI-007",
+      "severity": "info",
+      "category": "file_operation",
+      "file": "src/api/routes.py",
+      "line": 31,
+      "operation": "config_path.read_text",
+      "tool_registration": "load_agent_config",
+      "description": "Path traversal via agent_id parameter",
+      "afb_type": "AFB04",
+      "cwe": "CWE-22"
     }
   ],
-  "expected_summary": {"critical": 2, "warning": 3, "info": 1},
+  "expected_summary": {"critical": 2, "warning": 2, "info": 3},
   "metadata": {"difficulty": "5/5", "frameworks": ["fastapi", "langgraph"], "languages": ["python"], "created": "2026-03-26"}
 }
