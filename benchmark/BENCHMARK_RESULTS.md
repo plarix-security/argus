@@ -1,9 +1,9 @@
 # WyScan Benchmark Results
 
-**Run Date:** 2026-03-28
+**Run Date:** 2026-03-29
 **Systems Evaluated:** 15
-**Systems with Code:** 7
-**Systems Scored:** 4 (Python with manifest)
+**Systems with Code:** 8
+**Systems Scored:** 5 (Python with manifest)
 
 ## Summary
 
@@ -15,7 +15,7 @@
 | 03 | langgraph-supervisor      | python |        7 |      4.0 |  4 | 0.57 | 0.36 | 0.36 | FAIL |
 | 04 | crewai-research-crew      | python |        6 |      5.0 |  6 | 0.83 | 0.50 | 0.42 | PASS |
 | 05 | openai-assistants-paralle | typesc |        5 |      N/A | N/A |  N/A |  N/A |  N/A | NO CODE |
-| 06 | autogen-code-executor     | python |        4 |      N/A | N/A |  N/A |  N/A |  N/A | NO CODE |
+| 06 | autogen-code-executor     | python |        4 |      0.0 |  0 | 0.00 | 0.00 | 0.00 | FAIL |
 | 07 | langgraph-memory-agent    | python |        5 |      N/A | N/A |  N/A |  N/A |  N/A | NO CODE |
 | 08 | typescript-browser-agent  | typesc |        5 |      N/A | N/A |  N/A |  N/A |  N/A | NO CODE |
 | 09 | multi-agent-pipeline-fast | python |        6 |      N/A | N/A |  N/A |  N/A |  N/A | NO CODE |
@@ -29,9 +29,9 @@
 
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
-| Detection Rate (DR) | 0.67 | — | — |
-| False Positive Rate (FPR) | 0.28 | ≤ 0.10 | FAIL |
-| Weighted Score (WS) | 0.47 | ≥ 0.80 | FAIL |
+| Detection Rate (DR) | 0.54 | — | — |
+| False Positive Rate (FPR) | 0.22 | ≤ 0.10 | FAIL |
+| Weighted Score (WS) | 0.37 | ≥ 0.80 | FAIL |
 | All Systems Above Floor | No | WS ≥ 0.40 | FAIL |
 
 **Overall Status: FAIL**
@@ -158,9 +158,18 @@
 
 ### 06-autogen-code-executor
 
-**Status:** No source code implemented
-**Expected CEEs:** 4
-**Note:** This system has a manifest but no code to scan.
+**Expected:** 4 | **Detected:** 0.0 | **False Positives:** 0
+**DR:** 0.00 | **FPR:** 0.00 | **WS:** 0.00
+
+**Matches:**
+
+
+**Missed:**
+
+- AUTOGEN-001: `exec` @ src/executor.py:28
+- AUTOGEN-002: `eval` @ src/executor.py:45
+- AUTOGEN-003: `Path.write_text` @ src/executor.py:62
+- AUTOGEN-004: `Path.read_text` @ src/executor.py:75
 
 ### 07-langgraph-memory-agent
 

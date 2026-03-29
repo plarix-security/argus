@@ -9,7 +9,7 @@
       "severity": "critical",
       "category": "code_execution",
       "file": "src/executor.py",
-      "line": 28,
+      "line": 26,
       "operation": "exec",
       "tool_registration": "execute_code",
       "description": "Code execution via exec() in host process memory",
@@ -21,7 +21,7 @@
       "severity": "critical",
       "category": "code_execution",
       "file": "src/executor.py",
-      "line": 45,
+      "line": 44,
       "operation": "eval",
       "tool_registration": "evaluate_expression",
       "description": "Expression evaluation via eval()",
@@ -33,24 +33,35 @@
       "severity": "warning",
       "category": "file_operation",
       "file": "src/executor.py",
-      "line": 62,
+      "line": 54,
+      "operation": "mkdir",
+      "tool_registration": "save_result",
+      "description": "Directory creation for file output",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "AUTOGEN-004",
+      "severity": "warning",
+      "category": "file_operation",
+      "file": "src/executor.py",
+      "line": 58,
       "operation": "Path.write_text",
       "tool_registration": "save_result",
       "description": "File write for saving execution results",
       "afb_type": "AFB04"
     },
     {
-      "id": "AUTOGEN-004",
+      "id": "AUTOGEN-005",
       "severity": "info",
       "category": "file_operation",
       "file": "src/executor.py",
-      "line": 75,
+      "line": 73,
       "operation": "Path.read_text",
       "tool_registration": "load_data",
       "description": "File read for loading data files",
       "afb_type": "AFB04"
     }
   ],
-  "expected_summary": {"critical": 2, "warning": 1, "info": 1},
+  "expected_summary": {"critical": 2, "warning": 2, "info": 1},
   "metadata": {"difficulty": "4/5", "frameworks": ["autogen"], "languages": ["python"], "created": "2026-03-26"}
 }

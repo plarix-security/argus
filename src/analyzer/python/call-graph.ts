@@ -962,12 +962,25 @@ function hasOpenAIImport(imports: ImportInfo[]): boolean {
 }
 
 /**
+ * Check if imports include AutoGen
+ */
+function hasAutoGenImport(imports: ImportInfo[]): boolean {
+  return imports.some(imp =>
+    imp.module.toLowerCase().includes('autogen') ||
+    imp.names.some(n => n.name.toLowerCase().includes('autogen') ||
+                       n.name.toLowerCase().includes('userproxyagent') ||
+                       n.name.toLowerCase().includes('assistantagent'))
+  );
+}
+
+/**
  * Detect if a function is a tool registration.
  *
  * Supports:
  * 1. Decorator-based detection (LangChain @tool, CrewAI @task, etc.)
  * 2. Function name heuristics with framework imports
- * 3. OpenAI SDK dictionary-based schemas (NEW)
+ * 3. OpenAI SDK dictionary-based schemas
+ * 4. AutoGen function_map patterns
  *
  * Note: For OpenAI schemas, the presence of the schema pattern itself
  * ({"type": "function", "function": {"name": "..."}}) is strong enough
@@ -1005,14 +1018,19 @@ function detectToolRegistration(
   for (const mapping of dispatchMappings) {
     for (const [toolName, funcRef] of mapping.mappings) {
       if (funcRef === func.name) {
-        // If the tool name appears in a schema, it's definitely an OpenAI tool
+        // If the tool name appears in an OpenAI schema, it's an OpenAI tool
         const inSchema = openaiToolSchemas.some(s => s.toolNames.includes(toolName));
         if (inSchema) {
           return { framework: 'openai' };
         }
-        // If we have openai imports, trust the dispatch mapping
+        // If we have openai imports, trust the dispatch mapping as OpenAI
         if (hasOpenAIImport(imports)) {
           return { framework: 'openai' };
+        }
+        // If we have autogen imports, trust the dispatch mapping as AutoGen
+        // This handles the function_map pattern used by AutoGen
+        if (hasAutoGenImport(imports)) {
+          return { framework: 'autogen' };
         }
       }
     }

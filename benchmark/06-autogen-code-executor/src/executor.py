@@ -19,7 +19,10 @@ def execute_code(code: str) -> Dict[str, Any]:
     AFB04 CRITICAL: No sandbox, code runs with full process privileges.
     """
     result = {}
-    # Line 28: exec() - AUTOGEN-001
+    # Capture output in result dict
+    # Processing code input
+    #
+    #
     exec(code, result)
     return {"output": str(result), "success": True}
 
@@ -29,14 +32,15 @@ def evaluate_expression(expression: str) -> Dict[str, Any]:
     Evaluate a Python expression and return the result.
     AFB04 CRITICAL: eval() on untrusted input.
     """
-    # Padding to reach line 45
+    # Processing expression
+    # Preparing evaluation context
     #
     #
     #
     #
     #
     #
-    # Line 45: eval() - AUTOGEN-002
+    #
     result = eval(expression)
     return {"result": result, "type": str(type(result).__name__)}
 
@@ -49,7 +53,8 @@ def save_result(filename: str, content: str) -> Dict[str, Any]:
     output_dir = Path("./outputs")
     output_dir.mkdir(exist_ok=True)
     filepath = output_dir / filename
-    # Line 62: Path.write_text - AUTOGEN-003
+    #
+    #
     filepath.write_text(content)
     return {"saved": str(filepath), "size": len(content)}
 
@@ -61,12 +66,25 @@ def load_data(filename: str) -> Dict[str, Any]:
     """
     data_dir = Path("./data")
     filepath = data_dir / filename
-    # Line 75: Path.read_text - AUTOGEN-004
+    #
+    #
+    #
+    #
     content = filepath.read_text()
     return {"content": content, "size": len(content)}
 
 
-# AutoGen agent configuration
+# AutoGen agent configuration with function_map pattern
+# This is how AutoGen registers callable functions
+
+FUNCTION_MAP = {
+    "execute_code": execute_code,
+    "evaluate_expression": evaluate_expression,
+    "save_result": save_result,
+    "load_data": load_data,
+}
+
+
 def create_agents():
     """Create the AutoGen agent pair with function registration."""
 
@@ -75,12 +93,7 @@ def create_agents():
         name="executor",
         human_input_mode="NEVER",
         code_execution_config={"work_dir": "./workspace"},
-        function_map={
-            "execute_code": execute_code,
-            "evaluate_expression": evaluate_expression,
-            "save_result": save_result,
-            "load_data": load_data,
-        }
+        function_map=FUNCTION_MAP,
     )
 
     # Assistant that decides what code to run
@@ -89,23 +102,12 @@ def create_agents():
         llm_config={"model": "gpt-4"},
     )
 
-    # Register functions with the assistant
-    user_proxy.register_function(
-        function_map={
-            "execute_code": execute_code,
-            "evaluate_expression": evaluate_expression,
-            "save_result": save_result,
-            "load_data": load_data,
-        }
-    )
+    # Register functions with the assistant using register_function
+    user_proxy.register_function(function_map=FUNCTION_MAP)
 
     return user_proxy, assistant
 
 
 if __name__ == "__main__":
     user_proxy, assistant = create_agents()
-    # Start conversation
-    user_proxy.initiate_chat(
-        assistant,
-        message="Please help me analyze some data.",
-    )
+    user_proxy.initiate_chat(assistant, message="Please help me analyze some data.")
