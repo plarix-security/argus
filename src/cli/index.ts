@@ -120,11 +120,11 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
     // Flags with values
     if (arg === '-l' || arg === '--level') {
       if (!args[i + 1] || args[i + 1].startsWith('-')) {
-        return { targetPath: null, options, error: `${arg} requires a value (critical|warning|info)` };
+        return { targetPath: null, options, error: `Missing value for ${arg}. Use: --level critical, --level warning, or --level info` };
       }
       const level = parseSeverity(args[i + 1]);
       if (!level) {
-        return { targetPath: null, options, error: `invalid level: ${args[i + 1]} (use critical|warning|info)` };
+        return { targetPath: null, options, error: `"${args[i + 1]}" is not a valid level. Choose from: critical, warning, info` };
       }
       options.level = level;
       i += 2;
@@ -132,7 +132,7 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
     }
     if (arg === '-o' || arg === '--output') {
       if (!args[i + 1] || args[i + 1].startsWith('-')) {
-        return { targetPath: null, options, error: `${arg} requires a filename` };
+        return { targetPath: null, options, error: `Missing value for ${arg}. Provide an output filename.` };
       }
       options.output = args[i + 1];
       i += 2;
@@ -141,7 +141,7 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
 
     // Unknown flag
     if (arg.startsWith('-')) {
-      return { targetPath: null, options, error: `unknown flag: ${arg}` };
+      return { targetPath: null, options, error: `Unknown flag "${arg}". Run "wyscan help" for available options.` };
     }
 
     // Positional argument (path)
@@ -335,7 +335,7 @@ async function runScan(args: string[]): Promise<number> {
   const resolvedPath = path.resolve(targetPath || '.');
 
   if (!fs.existsSync(resolvedPath)) {
-    printError(`path does not exist: ${resolvedPath}`);
+    printError(`Path not found: ${resolvedPath}`);
     return EXIT.ERROR;
   }
 
@@ -348,7 +348,7 @@ async function runScan(args: string[]): Promise<number> {
     if (options.debug) {
       console.error(err);
     }
-    printError('failed to initialize scanner', err instanceof Error ? err.message : 'unknown error');
+    printError('Scanner initialization failed. Run "wyscan check" to diagnose.', err instanceof Error ? err.message : undefined);
     return EXIT.ERROR;
   }
 
@@ -389,7 +389,7 @@ async function runScan(args: string[]): Promise<number> {
     if (options.debug) {
       console.error(err);
     }
-    printError('scan failed', err instanceof Error ? err.message : 'unknown error');
+    printError('Scan failed', err instanceof Error ? err.message : undefined);
     return EXIT.ERROR;
   }
 
