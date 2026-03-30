@@ -162,12 +162,17 @@ export const DEFAULT_IMPORT_CONFIG: ImportResolutionConfig = {
 
 /**
  * Framework detection patterns for tool registration
+ *
+ * These patterns identify functions that can be invoked by an LLM/agent.
+ * Detection uses both explicit framework patterns and generic heuristics.
  */
 const TOOL_REGISTRATION_PATTERNS: {
   pattern: RegExp;
   framework: string;
   decoratorCheck?: (decorator: string) => boolean;
 }[] = [
+  // ================== KNOWN FRAMEWORKS ==================
+
   // LangChain
   { pattern: /^@tool$/i, framework: 'langchain', decoratorCheck: (d) => d === 'tool' || d.startsWith('tool(') },
   { pattern: /BaseTool/i, framework: 'langchain' },
@@ -204,6 +209,57 @@ const TOOL_REGISTRATION_PATTERNS: {
   { pattern: /function_call/i, framework: 'openai' },
   { pattern: /tool_choice/i, framework: 'openai' },
   { pattern: /"type"\s*:\s*"function"/i, framework: 'openai' },
+
+  // Anthropic Claude tool use
+  { pattern: /tool_use/i, framework: 'anthropic' },
+  { pattern: /anthropic.*tools/i, framework: 'anthropic' },
+
+  // Google Gemini function calling
+  { pattern: /FunctionDeclaration/i, framework: 'gemini' },
+  { pattern: /genai.*tools/i, framework: 'gemini' },
+
+  // Hugging Face Transformers Agents
+  { pattern: /transformers.*Tool/i, framework: 'transformers' },
+  { pattern: /HfAgent/i, framework: 'transformers' },
+
+  // Smolagents
+  { pattern: /smolagents/i, framework: 'smolagents' },
+  { pattern: /CodeAgent/i, framework: 'smolagents' },
+  { pattern: /ToolCallingAgent/i, framework: 'smolagents' },
+
+  // DSPy
+  { pattern: /dspy\.Signature/i, framework: 'dspy' },
+  { pattern: /dspy\.Module/i, framework: 'dspy' },
+
+  // ================== GENERIC PATTERNS ==================
+  // These catch custom agentic frameworks that don't use known decorators
+
+  // Generic tool decorator patterns
+  { pattern: /^@.*tool$/i, framework: 'custom', decoratorCheck: (d) => d.endsWith('tool') || d.endsWith('Tool') },
+  { pattern: /^@.*_tool$/i, framework: 'custom', decoratorCheck: (d) => d.endsWith('_tool') },
+  { pattern: /^@tool_/i, framework: 'custom', decoratorCheck: (d) => d.startsWith('tool_') || d.startsWith('tool(') },
+
+  // Action/capability patterns
+  { pattern: /^@action$/i, framework: 'custom', decoratorCheck: (d) => d === 'action' || d.startsWith('action(') },
+  { pattern: /^@capability$/i, framework: 'custom', decoratorCheck: (d) => d === 'capability' || d.startsWith('capability(') },
+  { pattern: /^@skill$/i, framework: 'custom', decoratorCheck: (d) => d === 'skill' || d.startsWith('skill(') },
+  { pattern: /^@command$/i, framework: 'custom', decoratorCheck: (d) => d === 'command' || d.startsWith('command(') },
+  { pattern: /^@handler$/i, framework: 'custom', decoratorCheck: (d) => d === 'handler' || d.startsWith('handler(') },
+
+  // Registration patterns
+  { pattern: /^@register$/i, framework: 'custom', decoratorCheck: (d) => d === 'register' || d.startsWith('register(') },
+  { pattern: /^@expose$/i, framework: 'custom', decoratorCheck: (d) => d === 'expose' || d.startsWith('expose(') },
+  { pattern: /^@callable$/i, framework: 'custom', decoratorCheck: (d) => d === 'callable' || d.startsWith('callable(') },
+
+  // Agent/AI prefixed patterns
+  { pattern: /^@agent_/i, framework: 'custom', decoratorCheck: (d) => d.startsWith('agent_') },
+  { pattern: /^@ai_/i, framework: 'custom', decoratorCheck: (d) => d.startsWith('ai_') },
+  { pattern: /^@llm_/i, framework: 'custom', decoratorCheck: (d) => d.startsWith('llm_') },
+
+  // Class inheritance patterns
+  { pattern: /AgentTool/i, framework: 'custom' },
+  { pattern: /BaseAction/i, framework: 'custom' },
+  { pattern: /CustomTool/i, framework: 'custom' },
 ];
 
 /**
