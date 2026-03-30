@@ -35,17 +35,17 @@ function getDescription(finding: AFBFinding): string {
   // CRITICAL operations
   if (finding.severity === Severity.CRITICAL) {
     if (finding.category === ExecutionCategory.SHELL_EXECUTION) {
-      return 'Shell command execution. No policy gate in call path.';
+      return 'Executes shell commands. Agent can run arbitrary system commands.';
     }
     if (finding.category === ExecutionCategory.CODE_EXECUTION) {
       if (snippet.includes('eval')) {
-        return 'Arbitrary code execution via eval(). No policy gate in call path.';
+        return 'Evaluates arbitrary code. Agent can execute any Python expression.';
       }
-      return 'Dynamic code execution. No policy gate in call path.';
+      return 'Executes dynamic code. Agent can run arbitrary operations.';
     }
     if (finding.category === ExecutionCategory.FILE_OPERATION) {
       if (snippet.includes('rmtree') || snippet.includes('remove') || snippet.includes('unlink')) {
-        return 'Recursive directory deletion. No policy gate in call path.';
+        return 'Deletes files or directories. Agent can remove data permanently.';
       }
     }
   }
@@ -54,57 +54,57 @@ function getDescription(finding: AFBFinding): string {
   if (finding.severity === Severity.WARNING) {
     if (finding.category === ExecutionCategory.FILE_OPERATION) {
       if (snippet.includes('write')) {
-        return 'File write operation. No policy gate in call path.';
+        return 'Writes to files. Agent can modify or create files.';
       }
       if (snippet.includes('mkdir')) {
-        return 'Directory creation. No policy gate in call path.';
+        return 'Creates directories. Agent can modify filesystem structure.';
       }
       if (snippet.includes('copy') || snippet.includes('move')) {
-        return 'File copy/move operation. No policy gate in call path.';
+        return 'Moves or copies files. Agent can reorganize filesystem.';
       }
-      return 'File system modification. No policy gate in call path.';
+      return 'Modifies filesystem. Agent can change files or directories.';
     }
     if (finding.category === ExecutionCategory.API_CALL) {
       if (snippet.includes('post')) {
-        return 'HTTP POST to external endpoint. No policy gate in call path.';
+        return 'Sends HTTP POST requests. Agent can submit data externally.';
       }
       if (snippet.includes('put') || snippet.includes('patch')) {
-        return 'HTTP mutation to external endpoint. No policy gate in call path.';
+        return 'Sends HTTP mutation requests. Agent can modify external data.';
       }
       if (snippet.includes('delete')) {
-        return 'HTTP DELETE to external endpoint. No policy gate in call path.';
+        return 'Sends HTTP DELETE requests. Agent can delete external resources.';
       }
-      return 'External API mutation. No policy gate in call path.';
+      return 'Mutates external API. Agent can modify external state.';
     }
     if (finding.category === ExecutionCategory.DATABASE_OPERATION) {
-      return 'Database write operation. No policy gate in call path.';
+      return 'Writes to database. Agent can modify stored data.';
     }
   }
 
   // INFO operations
   if (finding.severity === Severity.INFO) {
     if (finding.category === ExecutionCategory.API_CALL) {
-      return 'External HTTP read. No policy gate in call path.';
+      return 'Reads from external API. Agent can access external data.';
     }
     if (finding.category === ExecutionCategory.DATABASE_OPERATION) {
       if (snippet.includes('execute')) {
-        return 'Database query execution. No policy gate in call path.';
+        return 'Executes database queries. Agent can run SQL statements.';
       }
-      return 'Database read operation. No policy gate in call path.';
+      return 'Reads from database. Agent can access stored data.';
     }
     if (finding.category === ExecutionCategory.FILE_OPERATION) {
       if (snippet.includes('read') || snippet.includes('open')) {
-        return 'File read operation. No policy gate in call path.';
+        return 'Reads files. Agent can access file contents.';
       }
       if (snippet.includes('listdir') || snippet.includes('glob')) {
-        return 'Directory listing. No policy gate in call path.';
+        return 'Lists directories. Agent can discover files.';
       }
-      return 'File system access. No policy gate in call path.';
+      return 'Accesses filesystem. Agent can read file metadata.';
     }
   }
 
   // Default
-  return 'Operation reachable from tool. No policy gate in call path.';
+  return 'Reachable from agent tool without authorization check.';
 }
 
 /**
@@ -194,14 +194,15 @@ export function printSummaryCounts(report: AnalysisReport): void {
  */
 export function formatFinding(finding: AFBFinding): string {
   const filename = path.basename(finding.file);
-  const location = `${styled(filename, chalk.white.bold)}${styled(`:${finding.line}`, chalk.dim)}`;
+  const col = finding.column || 0;
+  const location = `${styled(filename, chalk.white.bold)}${styled(`:${finding.line}:${col}`, chalk.dim)}`;
   const snippet = formatSnippet(finding.codeSnippet);
   const description = getDescription(finding);
 
   const lines = [
     `  ${formatSeverityLabel(finding.severity)} ${location}`,
     `    ${styled(snippet, chalk.white)}`,
-    `    ${styled(description, chalk.dim)}`,
+    `    ${styled(description, chalk.gray)}`,
   ];
 
   return lines.join('\n');
@@ -244,7 +245,7 @@ export function printFooter(report: AnalysisReport): void {
 
   console.log();
   console.log(`  ${styled(DIVIDER, chalk.dim)}`);
-  console.log(`  ${styled(`${fileCount} ${fileLabel}  ·  ${runtimeSec}s  ·  AFB04 coverage only`, chalk.dim)}`);
+  console.log(`  ${styled(`${fileCount} ${fileLabel}  ·  ${runtimeSec}s`, chalk.dim)}`);
 }
 
 /**
