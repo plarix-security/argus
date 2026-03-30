@@ -38,5 +38,3 @@ const pkg = loadPackageJson();
 
 export const VERSION = pkg.version;
 export const NAME = pkg.name;
-export const AUTHOR = typeof pkg.author === 'string' ? pkg.author : pkg.author?.name || 'Plarix';
-export const REPO = 'github.com/plarix-security/wyscan';

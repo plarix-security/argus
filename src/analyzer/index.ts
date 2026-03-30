@@ -119,5 +119,4 @@ export class AFBAnalyzer {
   }
 }
 
-export const analyzer = new AFBAnalyzer();
 export { ASTWalker } from './ast-walker';

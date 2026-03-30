@@ -200,9 +200,6 @@ export async function ensureParserInitialized(): Promise<void> {
 /**
  * Analyze a single Python file for AFB04 boundaries.
  *
- * This is the simplified single-file analysis for CLI use.
- * For full call graph analysis across multiple files, use analyzeProject().
- *
  * IMPORTANT: If parsing fails, this returns a failure result with an error
  * message. We do NOT fall back to regex-based detection.
  */
@@ -273,90 +270,6 @@ export function analyzePythonFile(
     success: true,
     analysisTimeMs: Date.now() - startTime,
   };
-}
-
-/**
- * Analyze multiple Python files with cross-file call graph analysis.
- *
- * IMPORTANT: If any file fails to parse, it is recorded as a failed file
- * in the results. We do NOT fall back to regex-based detection.
- */
-export function analyzeProject(
-  files: Map<string, string>
-): Map<string, FileAnalysisResult> {
-  const results = new Map<string, FileAnalysisResult>();
-  const startTime = Date.now();
-
-  // Parse all files - track failures separately
-  const parsedFiles = new Map<string, ParsedPythonFile>();
-  for (const [filePath, sourceCode] of files) {
-    const parsed = parsePythonSource(sourceCode);
-    if (parsed.success) {
-      parsedFiles.set(filePath, parsed);
-    } else {
-      // Record the failure - do NOT fall back to regex
-      results.set(filePath, {
-        file: filePath,
-        language: 'python',
-        findings: [],
-        success: false,
-        error: `Tree-sitter parse failed: ${parsed.error || 'Unknown parse error'}`,
-        analysisTimeMs: Date.now() - startTime,
-      });
-    }
-  }
-
-  // Build cross-file call graph from successfully parsed files
-  const callGraph = buildCallGraph(parsedFiles);
-
-  // Group exposed paths by file
-  const pathsByFile = new Map<string, ExposedPath[]>();
-  for (const exposed of callGraph.exposedPaths) {
-    const existing = pathsByFile.get(exposed.file) || [];
-    existing.push(exposed);
-    pathsByFile.set(exposed.file, existing);
-  }
-
-  // Generate findings per file with deduplication
-  for (const [filePath, parsed] of parsedFiles) {
-    const findings: AFBFinding[] = [];
-    const exposedPaths = pathsByFile.get(filePath) || [];
-
-    // Deduplicate: same file + line + callee = same finding
-    const seenOperations = new Set<string>();
-
-    for (const exposed of exposedPaths) {
-      if (exposed.hasGateInPath) continue;
-
-      const opKey = `${filePath}:${exposed.operation.line}:${exposed.operation.callee}`;
-      if (seenOperations.has(opKey)) {
-        continue;
-      }
-      seenOperations.add(opKey);
-
-      findings.push(createFindingFromExposedPath(filePath, exposed, parsed));
-    }
-
-    // NOTE: Removed tool-registration-only findings for project analysis too.
-    // Tools without dangerous operations don't generate findings.
-
-    findings.sort((a, b) => {
-      const severityOrder = { critical: 0, warning: 1, info: 2, suppressed: 3 };
-      const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
-      if (sevDiff !== 0) return sevDiff;
-      return a.line - b.line;
-    });
-
-    results.set(filePath, {
-      file: filePath,
-      language: 'python',
-      findings,
-      success: true,
-      analysisTimeMs: Date.now() - startTime,
-    });
-  }
-
-  return results;
 }
 
 /**
@@ -441,39 +354,4 @@ function getCategoryDescription(category: ExecutionCategory): string {
     [ExecutionCategory.CODE_EXECUTION]: 'Dynamic code execution',
   };
   return descriptions[category] || category;
-}
-
-/**
- * Quick check if Python code likely contains agent-related patterns.
- */
-export function likelyContainsAgentCode(sourceCode: string): boolean {
-  const agentIndicators = [
-    'langchain',
-    'crewai',
-    'autogen',
-    'llama_index',
-    'llamaindex',
-    '@tool',
-    '@task',
-    '@agent',
-    'BaseTool',
-    'StructuredTool',
-    'DynamicTool',
-    'Agent',
-    'AgentExecutor',
-    'Tool(',
-    'tools=',
-    'FunctionTool',
-    'register_function',
-    'function_map',
-    'mcp.server',
-    '@server.tool',
-    'openai.ChatCompletion',
-    'tool_choice',
-  ];
-
-  const lowerCode = sourceCode.toLowerCase();
-  return agentIndicators.some((indicator) =>
-    lowerCode.includes(indicator.toLowerCase())
-  );
 }

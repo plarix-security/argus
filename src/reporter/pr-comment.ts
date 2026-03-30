@@ -185,30 +185,6 @@ export function generateJSONReport(report: AnalysisReport): string {
 }
 
 /**
- * Generate a concise summary line for commit status.
- */
-export function generateStatusSummary(report: AnalysisReport): string {
-  const { totalFindings, findingsBySeverity } = report;
-
-  if (totalFindings === 0) {
-    return 'AFB Scanner: No AFB04 exposures detected';
-  }
-
-  const parts: string[] = [];
-  if (findingsBySeverity.critical > 0) {
-    parts.push(`${findingsBySeverity.critical} critical`);
-  }
-  if (findingsBySeverity.warning > 0) {
-    parts.push(`${findingsBySeverity.warning} warning`);
-  }
-  if (findingsBySeverity.info > 0) {
-    parts.push(`${findingsBySeverity.info} info`);
-  }
-
-  return `AFB Scanner: ${totalFindings} AFB04 exposures (${parts.join(', ')})`;
-}
-
-/**
  * Generate terminal output with ANSI colors
  */
 export function generateTerminalReport(report: AnalysisReport): string {

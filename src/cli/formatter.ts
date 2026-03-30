@@ -299,17 +299,6 @@ export function printCheckStatus(name: string, ok: boolean, detail?: string): vo
 }
 
 /**
- * Full scan output
- */
-export function printScanReport(report: AnalysisReport, targetPath: string, level: Severity): void {
-  printHeader();
-  printScanTarget(targetPath);
-  printSummaryCounts(report);
-  printFindings(report.findings, level);
-  printFooter(report);
-}
-
-/**
  * Zero findings output
  */
 export function printZeroFindings(report: AnalysisReport, targetPath: string): void {
