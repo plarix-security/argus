@@ -211,59 +211,57 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
 function printHelp(command?: string): void {
   if (command === 'scan') {
     console.log(`
-  ${NAME} scan <path> [flags]
+  ${NAME} scan <path> [options]
 
-  Scan a file or directory for AFB exposures.
+  Find dangerous operations in AI agent tools.
 
-  Flags:
-    -l, --level <level>   Minimum severity (critical|warning|info)
+  Options:
+    -l, --level <level>   Show only findings at this level or higher
+                          Values: critical, warning, info (default: info)
+    -j, --json            Output as JSON
     -o, --output <file>   Write output to file
-    -j, --json            JSON output
-    -s, --summary         One-line summary only
-    -r, --recursive       Scan recursively (default: true)
-    -q, --quiet           Suppress output, exit code only
+    -s, --summary         Show counts only, no details
+    -q, --quiet           No output, exit code only
     -d, --debug           Show debug information
 
   Examples:
-    ${NAME} scan .
-    ${NAME} scan ./agent.py -l critical
-    ${NAME} scan . -j -o findings.json
+    ${NAME} scan .                        Scan current directory
+    ${NAME} scan ./agent.py               Scan single file
+    ${NAME} scan . -l critical            Only critical findings
+    ${NAME} scan . -j -o report.json      Save JSON report
 `);
     return;
   }
 
   console.log(`
-  ${NAME} v${VERSION}  ·  Plarix
-  AFB Scanner — Static analysis for AI agent codebases.
+  ${NAME} v${VERSION}
+
+  Find dangerous operations in AI agent tools before they reach production.
+  Detects unsafe tool boundaries in LangChain, CrewAI, AutoGen, and more.
 
   Usage:
-    ${NAME} scan <path> [flags]
-    ${NAME} check
-    ${NAME} version
-    ${NAME} help [command]
+    ${NAME} scan <path>     Scan files for dangerous operations
+    ${NAME} check           Verify scanner dependencies
+    ${NAME} help [command]  Show help
 
-  Flags:
-    -l, --level <level>   Minimum severity to report
-                          (critical|warning|info)
-    -o, --output <file>   Write output to file
-    -j, --json            JSON output
-    -s, --summary         One-line summary only
-    -r, --recursive       Scan recursively
-    -q, --quiet           Suppress output, exit code only
-    -d, --debug           Show debug information
+  Supported frameworks:
+    Python: LangChain, LangGraph, CrewAI, AutoGen, LlamaIndex,
+            smolagents, MCP servers, OpenAI function calling
+
+  Options:
+    -l, --level <level>   Filter by severity (critical|warning|info)
+    -j, --json            JSON output format
+    -o, --output <file>   Write to file
+    -s, --summary         Counts only
+    -q, --quiet           Exit code only
 
   Exit codes:
-    0   No findings at warning or critical level
-    1   Warning findings detected
-    2   Critical findings detected
-    3   Scanner or dependency error
+    0 = No issues    1 = Warnings    2 = Critical    3 = Error
 
   Examples:
     ${NAME} scan .
-    ${NAME} scan ./agent.py -l critical
-    ${NAME} scan . -j -o findings.json
-    ${NAME} scan . -s
-    ${NAME} check
+    ${NAME} scan ./agents -l critical
+    ${NAME} scan . -j > report.json
 `);
 }
 
