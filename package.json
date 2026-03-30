@@ -13,8 +13,7 @@
     "dev": "npx ts-node src/app.ts",
     "lint": "npx eslint src/**/*.ts",
     "test": "npx jest",
-    "wyscan": "npx ts-node src/cli/index.ts",
-    "analyze": "npx ts-node src/cli.ts"
+    "wyscan": "npx ts-node src/cli/index.ts"
   },
   "keywords": [
     "security",
