@@ -180,10 +180,13 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
       severity: f.severity.toUpperCase(),
       file: f.file,
       line: f.line,
-      function: f.codeSnippet.split('(')[0].trim().replace(/^[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*/, ''),
-      tool_registration: f.context?.enclosingFunction || null,
+      column: f.column || 0,
+      operation: f.operation || f.codeSnippet.split('(')[0].trim(),
+      tool: f.context?.enclosingFunction || null,
+      framework: f.context?.framework || null,
       description: f.explanation,
-      afb_type: f.type,
+      code_snippet: f.codeSnippet,
+      category: f.category,
     })),
     summary: {
       critical: report.findingsBySeverity.critical,
@@ -197,8 +200,6 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
       frameworks_detected: Array.from(frameworks).sort(),
       files_analyzed: pythonFiles,
       files_skipped: tsFiles + jsFiles,
-      call_graph_depth_used: 3,
-      confidence_note: 'Non-comprehensive. Static analysis only. Runtime-generated tool wiring and external package internals are not traced.',
     },
   };
   return JSON.stringify(output, null, 2);
