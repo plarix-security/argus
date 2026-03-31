@@ -124,13 +124,14 @@ describe('CLI behavior honesty', () => {
     expect(report.findings).toHaveLength(1);
     expect(report.cees[0].gate_status).toBe('absent');
     expect(report.cees[0].afb_type).toBe('AFB04');
+    expect(report.findings[0].tool).toBe('cleanup_agent');
     expect(report.findings[0].operation).toContain('shutil.rmtree');
     expect(report.findings[0].involves_cross_file).toBe(true);
     expect(report.findings[0].tool_file).toContain('tools.py');
     expect(report.findings[0].call_path).toHaveLength(2);
   });
 
-  test('gated execution events stay in CEE inventory but not findings', () => {
+  test('authorization-like decorator names without structure do not suppress findings', () => {
     const projectDir = makeTempProject({
       'auth.py': [
         'def login_required(fn):',
@@ -153,15 +154,16 @@ describe('CLI behavior honesty', () => {
     const result = runCli(['scan', projectDir, '--json']);
     const report = JSON.parse(result.stdout);
 
-    expect(result.status).toBe(0);
+    expect(result.status).toBe(2);
     expect(report.total_cees).toBe(1);
     expect(report.cees).toHaveLength(1);
-    expect(report.findings).toEqual([]);
-    expect(report.cees[0].gate_status).toBe('present');
-    expect(report.cees[0].afb_type).toBeNull();
+    expect(report.findings).toHaveLength(1);
+    expect(report.cees[0].gate_status).toBe('absent');
+    expect(report.cees[0].afb_type).toBe('AFB04');
+    expect(report.findings[0].description).toContain('Authorization-like decorator names were present');
   });
 
-  test('full terminal output shows unclassified CEEs when no AFB04 findings exist', () => {
+  test('full terminal output reports name-only auth decorators honestly', () => {
     const projectDir = makeTempProject({
       'auth.py': [
         'def login_required(fn):',
@@ -183,10 +185,43 @@ describe('CLI behavior honesty', () => {
 
     const result = runCli(['scan', projectDir]);
 
+    expect(result.status).toBe(2);
+    expect(result.stdout).toContain('1 critical');
+    expect(result.stdout).toContain('Authorization-like decorator names were present');
+  });
+
+  test('structural decorator gates keep CEEs but suppress AFB04 findings', () => {
+    const projectDir = makeTempProject({
+      'auth.py': [
+        'def login_required(fn):',
+        '    def wrapper(user, target):',
+        '        if not user:',
+        '            raise PermissionError("denied")',
+        '        return fn(user, target)',
+        '    return wrapper',
+        '',
+      ].join('\n'),
+      'tools.py': [
+        'import shutil',
+        'from auth import login_required',
+        'from langchain.tools import tool',
+        '',
+        '@login_required',
+        '@tool',
+        'def cleanup_agent(user, target: str):',
+        '    shutil.rmtree(target)',
+        '',
+      ].join('\n'),
+    });
+
+    const result = runCli(['scan', projectDir, '--json']);
+    const report = JSON.parse(result.stdout);
+
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('No findings reported.');
-    expect(result.stdout).toContain('Unclassified CEEs');
-    expect(result.stdout).toContain('Policy gate detected in the analyzed call path');
+    expect(report.total_cees).toBe(1);
+    expect(report.findings).toEqual([]);
+    expect(report.cees[0].gate_status).toBe('present');
+    expect(report.cees[0].afb_type).toBeNull();
   });
 
   test('syntax-error Python files fail explicitly', () => {
