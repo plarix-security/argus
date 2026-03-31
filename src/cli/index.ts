@@ -413,6 +413,7 @@ async function runScan(args: string[]): Promise<number> {
         repository: path.basename(path.dirname(resolvedPath)),
         filesAnalyzed: result.success ? [result.file] : [],
         totalFindings: result.findings.length,
+        totalCEEs: (result.cees || []).length,
         findingsBySeverity: {
           critical: result.findings.filter(f => f.severity === Severity.CRITICAL).length,
           warning: result.findings.filter(f => f.severity === Severity.WARNING).length,
@@ -420,6 +421,7 @@ async function runScan(args: string[]): Promise<number> {
           suppressed: result.findings.filter(f => f.severity === Severity.SUPPRESSED).length,
         },
         findings: result.findings,
+        cees: result.cees || [],
         metadata: {
           scannerVersion: VERSION,
           timestamp: new Date().toISOString(),
@@ -430,6 +432,9 @@ async function runScan(args: string[]): Promise<number> {
             language: result.language,
             reason: result.skipReason || 'File skipped.',
           }] : [],
+          fileLimitHit: false,
+          fileLimit: undefined,
+          totalFilesDiscovered: 1,
         },
       };
 

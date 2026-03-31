@@ -77,6 +77,32 @@ export enum ExecutionCategory {
   CODE_EXECUTION = 'code_execution',
 }
 
+export type GateStatus = 'present' | 'absent';
+
+/**
+ * A canonical execution event detected in the analyzed code.
+ */
+export interface CEERecord {
+  file: string;
+  line: number;
+  column: number;
+  operation: string;
+  codeSnippet: string;
+  category: ExecutionCategory;
+  severity: Severity;
+  tool: string;
+  framework?: string;
+  toolFile?: string;
+  toolLine?: number;
+  callPath: string[];
+  gateStatus: GateStatus;
+  afbType: AFBType | null;
+  classificationNote: string;
+  involvesCrossFile?: boolean;
+  unresolvedCalls?: string[];
+  depthLimitHit?: boolean;
+}
+
 /**
  * A detected AFB04 execution point in the codebase.
  */
@@ -136,6 +162,8 @@ export interface FileAnalysisResult {
   language: SupportedLanguage;
   /** All AFB findings in this file */
   findings: AFBFinding[];
+  /** All canonical execution events in this file */
+  cees?: CEERecord[];
   /** Whether analysis completed successfully */
   success: boolean;
   /** Error message if analysis failed */
@@ -162,6 +190,8 @@ export interface AnalysisReport {
   filesAnalyzed: string[];
   /** Total number of findings */
   totalFindings: number;
+  /** Total canonical execution events */
+  totalCEEs: number;
   /** Findings grouped by severity */
   findingsBySeverity: {
     critical: number;
@@ -171,6 +201,8 @@ export interface AnalysisReport {
   };
   /** All individual findings */
   findings: AFBFinding[];
+  /** All canonical execution events */
+  cees: CEERecord[];
   /** Analysis metadata */
   metadata: {
     /** Scanner version */

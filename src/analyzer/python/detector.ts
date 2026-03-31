@@ -32,6 +32,7 @@ import {
 } from './call-graph';
 import {
   AFBFinding,
+  CEERecord,
   FileAnalysisResult,
   AFBType,
   ExecutionCategory,
@@ -214,6 +215,7 @@ export function analyzePythonFile(
 ): FileAnalysisResult {
   const startTime = Date.now();
   const findings: AFBFinding[] = [];
+  const cees: CEERecord[] = [];
 
   // Parse the file using tree-sitter
   const parsed = parsePythonSource(sourceCode);
@@ -236,24 +238,22 @@ export function analyzePythonFile(
   const callGraph = buildCallGraph(fileMap);
 
   // Convert exposed paths to findings with deduplication
-  // Key: file:line:callee - same dangerous operation should only be reported once
-  const seenOperations = new Set<string>();
+  // Key: tool:file:line:callee - same reachable tool event should only be reported once
+  const seenEvents = new Set<string>();
 
   for (const exposed of callGraph.exposedPaths) {
-    // Skip if there's a policy gate in the path
-    if (exposed.hasGateInPath) {
+    const eventKey = buildCEEKey(filePath, exposed);
+    if (seenEvents.has(eventKey)) {
       continue;
     }
+    seenEvents.add(eventKey);
 
-    // Deduplicate: same file + line + callee = same finding
-    const opKey = `${filePath}:${exposed.operation.line}:${exposed.operation.callee}`;
-    if (seenOperations.has(opKey)) {
-      continue;
+    const cee = createCEEFromPath(filePath, exposed, parsed);
+    cees.push(cee);
+
+    if (cee.afbType === AFBType.UNAUTHORIZED_ACTION) {
+      findings.push(createFindingFromCEE(cee, parsed));
     }
-    seenOperations.add(opKey);
-
-    const finding = createFindingFromExposedPath(filePath, exposed, parsed);
-    findings.push(finding);
   }
 
   // NOTE: Removed tool-registration-only findings.
@@ -272,6 +272,7 @@ export function analyzePythonFile(
     file: filePath,
     language: 'python',
     findings,
+    cees,
     success: true,
     analysisTimeMs: Date.now() - startTime,
   };
@@ -297,6 +298,7 @@ export function analyzePythonFiles(inputs: PythonSourceInput[]): FileAnalysisRes
         file: input.filePath,
         language: 'python',
         findings: [],
+        cees: [],
         success: false,
         error: `Tree-sitter parse failed: ${parsed.error || 'Unknown parse failure.'}`,
         analysisTimeMs: Date.now() - startTime,
@@ -309,6 +311,7 @@ export function analyzePythonFiles(inputs: PythonSourceInput[]): FileAnalysisRes
       file: input.filePath,
       language: 'python',
       findings: [],
+      cees: [],
       success: true,
       analysisTimeMs: Date.now() - startTime,
     });
@@ -319,6 +322,7 @@ export function analyzePythonFiles(inputs: PythonSourceInput[]): FileAnalysisRes
       file: input.filePath,
       language: 'python',
       findings: [],
+      cees: [],
       success: false,
       error: 'Python file was not analyzed.',
       analysisTimeMs: 0,
@@ -326,30 +330,47 @@ export function analyzePythonFiles(inputs: PythonSourceInput[]): FileAnalysisRes
   }
 
   const findingsByFile = new Map<string, AFBFinding[]>();
-  const seenOperations = new Set<string>();
+  const ceesByFile = new Map<string, CEERecord[]>();
+  const seenEvents = new Set<string>();
   const callGraph = buildCallGraph(parsedByFile);
 
   for (const exposed of callGraph.exposedPaths) {
-    if (exposed.hasGateInPath) {
-      continue;
-    }
-
     const operationFile = exposed.file;
     const parsed = parsedByFile.get(operationFile);
     if (!parsed) {
       continue;
     }
 
-    const opKey = `${operationFile}:${exposed.operation.line}:${exposed.operation.callee}`;
-    if (seenOperations.has(opKey)) {
+    const eventKey = buildCEEKey(operationFile, exposed);
+    if (seenEvents.has(eventKey)) {
       continue;
     }
-    seenOperations.add(opKey);
+    seenEvents.add(eventKey);
 
-    const finding = createFindingFromExposedPath(operationFile, exposed, parsed);
-    const fileFindings = findingsByFile.get(operationFile) || [];
-    fileFindings.push(finding);
-    findingsByFile.set(operationFile, fileFindings);
+    const cee = createCEEFromPath(operationFile, exposed, parsed);
+    const fileCEEs = ceesByFile.get(operationFile) || [];
+    fileCEEs.push(cee);
+    ceesByFile.set(operationFile, fileCEEs);
+
+    if (cee.afbType === AFBType.UNAUTHORIZED_ACTION) {
+      const fileFindings = findingsByFile.get(operationFile) || [];
+      fileFindings.push(createFindingFromCEE(cee, parsed));
+      findingsByFile.set(operationFile, fileFindings);
+    }
+  }
+
+  for (const [filePath, fileCEEs] of ceesByFile) {
+    fileCEEs.sort((a, b) => {
+      const severityOrder = { critical: 0, warning: 1, info: 2, suppressed: 3 };
+      const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
+      if (sevDiff !== 0) return sevDiff;
+      return a.line - b.line;
+    });
+
+    const result = parseResults.get(filePath);
+    if (result) {
+      result.cees = fileCEEs;
+    }
   }
 
   for (const [filePath, fileFindings] of findingsByFile) {
@@ -370,10 +391,81 @@ export function analyzePythonFiles(inputs: PythonSourceInput[]): FileAnalysisRes
     file: input.filePath,
     language: 'python',
     findings: [],
+    cees: [],
     success: false,
     error: 'Python file was not analyzed.',
     analysisTimeMs: 0,
   });
+}
+
+function buildCEEKey(filePath: string, exposed: ExposedPath): string {
+  return [
+    exposed.tool.sourceFile || filePath,
+    exposed.tool.name,
+    filePath,
+    exposed.operation.line,
+    exposed.operation.callee,
+  ].join(':');
+}
+
+function createCEEFromPath(
+  filePath: string,
+  exposed: ExposedPath,
+  parsed: ParsedPythonFile
+): CEERecord {
+  const op = exposed.operation;
+  const severity = calculateSeverity(op.severity, op, exposed);
+  const callPath = exposed.path.map((nodeId) => nodeId.includes(':') ? nodeId : `${filePath}:${nodeId}`);
+
+  return {
+    file: filePath,
+    line: op.line,
+    column: op.column,
+    operation: `${getCategoryDescription(op.category)}: ${op.callee}`,
+    codeSnippet: op.codeSnippet,
+    category: op.category,
+    severity,
+    tool: exposed.tool.name,
+    framework: exposed.tool.framework,
+    toolFile: exposed.tool.sourceFile,
+    toolLine: exposed.tool.startLine,
+    callPath,
+    gateStatus: exposed.hasGateInPath ? 'present' : 'absent',
+    afbType: exposed.hasGateInPath ? null : AFBType.UNAUTHORIZED_ACTION,
+    classificationNote: buildCEEClassificationNote(exposed),
+    involvesCrossFile: exposed.involvesCrossFile,
+    unresolvedCalls: exposed.unresolvedCrossFileCalls,
+    depthLimitHit: exposed.depthLimitHit,
+  };
+}
+
+function createFindingFromCEE(cee: CEERecord, parsed: ParsedPythonFile): AFBFinding {
+  const call = parsed.calls.find((c) => c.startLine === cee.line && cee.operation.endsWith(c.callee));
+
+  return {
+    type: AFBType.UNAUTHORIZED_ACTION,
+    severity: cee.severity,
+    category: cee.category,
+    file: cee.file,
+    line: cee.line,
+    column: cee.column,
+    codeSnippet: cee.codeSnippet,
+    operation: cee.operation,
+    explanation: cee.classificationNote,
+    confidence: 0.95,
+    context: {
+      enclosingFunction: call?.enclosingFunction,
+      enclosingClass: call?.enclosingClass,
+      isToolDefinition: true,
+      framework: cee.framework,
+      toolFile: cee.toolFile,
+      toolLine: cee.toolLine,
+      callPath: cee.callPath,
+      involvesCrossFile: cee.involvesCrossFile,
+      unresolvedCalls: cee.unresolvedCalls,
+      depthLimitHit: cee.depthLimitHit,
+    },
+  };
 }
 
 /**
@@ -388,39 +480,7 @@ function createFindingFromExposedPath(
   exposed: ExposedPath,
   parsed: ParsedPythonFile
 ): AFBFinding {
-  const op = exposed.operation;
-
-  // Apply CEE severity model
-  const severity = calculateSeverity(op.severity, op, exposed);
-
-  // Find the call that contains this operation
-  const call = parsed.calls.find((c) => c.startLine === op.line && c.callee === op.callee);
-  const callPath = exposed.path.map((nodeId) => nodeId.includes(':') ? nodeId : `${filePath}:${nodeId}`);
-
-  return {
-    type: AFBType.UNAUTHORIZED_ACTION,
-    severity,
-    category: op.category,
-    file: filePath,
-    line: op.line,
-    column: op.column,
-    codeSnippet: op.codeSnippet,
-    operation: `${getCategoryDescription(op.category)}: ${op.callee}`,
-    explanation: buildExplanation(exposed, op),
-    confidence: 0.95,
-    context: {
-      enclosingFunction: call?.enclosingFunction,
-      enclosingClass: call?.enclosingClass,
-      isToolDefinition: true,
-      framework: exposed.tool.framework,
-      toolFile: exposed.tool.sourceFile,
-      toolLine: exposed.tool.startLine,
-      callPath,
-      involvesCrossFile: exposed.involvesCrossFile,
-      unresolvedCalls: exposed.unresolvedCrossFileCalls,
-      depthLimitHit: exposed.depthLimitHit,
-    },
-  };
+  return createFindingFromCEE(createCEEFromPath(filePath, exposed, parsed), parsed);
 }
 
 /**
@@ -460,6 +520,30 @@ function buildExplanation(exposed: ExposedPath, op: DangerousOperation): string 
   }
 
   return explanation.trim();
+}
+
+function buildCEEClassificationNote(exposed: ExposedPath): string {
+  const op = exposed.operation;
+
+  if (exposed.hasGateInPath) {
+    let note = `Detected reachable call from tool "${exposed.tool.name}" (${exposed.tool.framework || 'agent framework'}) to ${op.callee}. Policy gate detected in the analyzed call path, so this event was not classified as AFB04.`;
+
+    if (exposed.involvesCrossFile) {
+      note += ' The analyzed path crosses file boundaries.';
+    }
+
+    if (exposed.unresolvedCrossFileCalls && exposed.unresolvedCrossFileCalls.length > 0) {
+      note += ` Unresolved call targets while tracing: ${exposed.unresolvedCrossFileCalls.slice(0, 5).join(', ')}.`;
+    }
+
+    if (exposed.depthLimitHit) {
+      note += ' Cross-file depth limit was reached while tracing this path. Manual review recommended.';
+    }
+
+    return note;
+  }
+
+  return buildExplanation(exposed, op);
 }
 
 /**

@@ -147,6 +147,7 @@ export class AFBAnalyzer {
 
   private buildReport(repository: string, results: FileAnalysisResult[], startTime: number, totalFilesDiscovered: number): AnalysisReport {
     const failedFiles = results.filter((result) => !result.success).map((result) => result.file);
+    const allCEEs = results.flatMap((result) => result.cees || []);
     const allFindings = results.flatMap(r => r.findings).filter(f => f.confidence >= this.config.minConfidence);
     const skippedFiles = results
       .filter((result) => result.skipped)
@@ -168,6 +169,7 @@ export class AFBAnalyzer {
       repository: path.basename(repository),
       filesAnalyzed: results.filter(r => r.success).map(r => r.file),
       totalFindings: allFindings.length,
+      totalCEEs: allCEEs.length,
       findingsBySeverity: {
         critical: allFindings.filter(f => f.severity === Severity.CRITICAL).length,
         warning: allFindings.filter(f => f.severity === Severity.WARNING).length,
@@ -175,6 +177,7 @@ export class AFBAnalyzer {
         suppressed: allFindings.filter(f => f.severity === Severity.SUPPRESSED).length,
       },
       findings: allFindings,
+      cees: allCEEs,
       metadata: {
         scannerVersion: VERSION,
         timestamp: new Date().toISOString(),
