@@ -492,6 +492,8 @@ export function printSummaryCounts(report: AnalysisReport): void {
     console.log(`  ${parts.join(styled('  ·  ', chalk.dim))}`);
   }
 
+  console.log(`  ${styled(`${report.totalCEEs} cees detected`, chalk.dim)}`);
+
   console.log(`  ${styled(DIVIDER, chalk.dim)}`);
 }
 
@@ -628,8 +630,12 @@ export function printOneLiner(report: AnalysisReport): void {
     parts.push(`${metadata.skippedFiles.length} skipped`);
   }
 
-  if (parts.length === 0) {
-    console.log(`0 findings  ·  ${fileCount} ${fileLabel}  ·  ${runtimeSec}s`);
+  parts.push(`${report.totalCEEs} cees`);
+
+  const hasReportedFindings = findingsBySeverity.critical > 0 || findingsBySeverity.warning > 0 || findingsBySeverity.info > 0;
+
+  if (!hasReportedFindings) {
+    console.log(`0 findings  ·  ${parts.join('  ·  ')}  ·  ${fileCount} ${fileLabel}  ·  ${runtimeSec}s`);
   } else {
     console.log(`${parts.join('  ·  ')}  ·  ${fileCount} ${fileLabel}  ·  ${runtimeSec}s`);
   }
@@ -666,5 +672,8 @@ export function printZeroFindings(report: AnalysisReport, targetPath: string, me
   console.log();
   console.log(`  ${styled(DIVIDER, chalk.dim)}`);
   console.log(`  ${styled(message, chalk.green)}`);
+  if (report.totalCEEs > 0) {
+    console.log(`  ${styled(`${report.totalCEEs} cees detected in the analyzed path set.`, chalk.dim)}`);
+  }
   printFooter(report);
 }

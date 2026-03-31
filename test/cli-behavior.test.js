@@ -91,6 +91,8 @@ describe('CLI behavior honesty', () => {
     expect(report.coverage.languages_skipped).toContain('typescript');
     expect(report.coverage.files_skipped).toBe(1);
     expect(report.coverage.skipped_files[0].reason).toContain('not implemented');
+    expect(report.total_cees).toBe(0);
+    expect(report.cees).toEqual([]);
   });
 
   test('directory scan traces Python calls across files', () => {
@@ -117,11 +119,46 @@ describe('CLI behavior honesty', () => {
     const report = JSON.parse(result.stdout);
 
     expect(result.status).toBe(2);
+    expect(report.total_cees).toBe(1);
+    expect(report.cees).toHaveLength(1);
     expect(report.findings).toHaveLength(1);
+    expect(report.cees[0].gate_status).toBe('absent');
+    expect(report.cees[0].afb_type).toBe('AFB04');
     expect(report.findings[0].operation).toContain('shutil.rmtree');
     expect(report.findings[0].involves_cross_file).toBe(true);
     expect(report.findings[0].tool_file).toContain('tools.py');
     expect(report.findings[0].call_path).toHaveLength(2);
+  });
+
+  test('gated execution events stay in CEE inventory but not findings', () => {
+    const projectDir = makeTempProject({
+      'auth.py': [
+        'def login_required(fn):',
+        '    return fn',
+        '',
+      ].join('\n'),
+      'tools.py': [
+        'import shutil',
+        'from auth import login_required',
+        'from langchain.tools import tool',
+        '',
+        '@login_required',
+        '@tool',
+        'def cleanup_agent(target: str):',
+        '    shutil.rmtree(target)',
+        '',
+      ].join('\n'),
+    });
+
+    const result = runCli(['scan', projectDir, '--json']);
+    const report = JSON.parse(result.stdout);
+
+    expect(result.status).toBe(0);
+    expect(report.total_cees).toBe(1);
+    expect(report.cees).toHaveLength(1);
+    expect(report.findings).toEqual([]);
+    expect(report.cees[0].gate_status).toBe('present');
+    expect(report.cees[0].afb_type).toBeNull();
   });
 
   test('syntax-error Python files fail explicitly', () => {

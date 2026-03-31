@@ -60,6 +60,7 @@ export function summarizeReportForCheck(report: AnalysisReport): CheckOutput {
 
   const summaryLines = [
     `Files analyzed: ${report.filesAnalyzed.length}`,
+    `CEEs detected: ${report.totalCEEs}`,
     `Findings reported: ${report.totalFindings} (critical: ${report.findingsBySeverity.critical}, warning: ${report.findingsBySeverity.warning}, info: ${report.findingsBySeverity.info})`,
     `Coverage: ${partialCoverage ? 'partial' : 'full'}`,
   ];

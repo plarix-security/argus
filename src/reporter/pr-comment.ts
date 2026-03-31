@@ -94,10 +94,11 @@ export function generatePRComment(report: AnalysisReport): string {
 
 **Scan scope:** Python AFB04 scan
 **Files analyzed:** ${report.filesAnalyzed.length}
+**CEEs detected:** ${report.totalCEEs}
 **Findings reported:** 0
 ${coverageLines.join('\n')}
 
-No findings were reported in the analyzed files.
+No AFB04 findings were reported in the analyzed files.
 
 ---
 
@@ -114,6 +115,7 @@ ${coverageNotes.join('\n')}`;
 
 **Scan scope:** Python AFB04 scan
 **Files analyzed:** ${report.filesAnalyzed.length}
+**CEEs detected:** ${report.totalCEEs}
 **Findings reported:** ${totalFindings}
 ${getCoverageLines(report).join('\n')}`);
 
@@ -197,12 +199,13 @@ ${'='.repeat(50)}
 
 ${BOLD}Scan scope:${RESET} Python AFB04 scan
 ${BOLD}Files analyzed:${RESET} ${report.filesAnalyzed.length}
+${BOLD}CEEs detected:${RESET} ${report.totalCEEs}
 ${BOLD}Findings reported:${RESET} ${totalFindings}
 `;
 
   if (totalFindings === 0) {
     output += `
-${GREEN}No findings were reported in the analyzed files.${RESET}
+${GREEN}No AFB04 findings were reported in the analyzed files.${RESET}
 `;
     return output;
   }

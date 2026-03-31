@@ -66,12 +66,34 @@ describe('docs and failure reporting', () => {
       code_snippet: '',
       category: '',
     }).sort();
+    const expectedCEEKeys = Object.keys(actual.cees[0] || {
+      severity: '',
+      file: '',
+      line: 0,
+      column: 0,
+      operation: '',
+      tool: '',
+      framework: '',
+      tool_file: '',
+      tool_line: 0,
+      call_path: [],
+      gate_status: '',
+      afb_type: null,
+      classification_note: '',
+      involves_cross_file: false,
+      unresolved_calls: [],
+      depth_limit_hit: false,
+      code_snippet: '',
+      category: '',
+    }).sort();
     const expectedCoverageKeys = Object.keys(actual.coverage).sort();
 
     expect(Object.keys(readmeExample).sort()).toEqual(expectedTopLevelKeys);
     expect(Object.keys(usageExample).sort()).toEqual(expectedTopLevelKeys);
     expect(Object.keys(readmeExample.findings[0]).sort()).toEqual(expectedFindingKeys);
     expect(Object.keys(usageExample.findings[0]).sort()).toEqual(expectedFindingKeys);
+    expect(Object.keys(readmeExample.cees[0]).sort()).toEqual(expectedCEEKeys);
+    expect(Object.keys(usageExample.cees[0]).sort()).toEqual(expectedCEEKeys);
     expect(Object.keys(readmeExample.coverage).sort()).toEqual(expectedCoverageKeys);
     expect(Object.keys(usageExample.coverage).sort()).toEqual(expectedCoverageKeys);
   });

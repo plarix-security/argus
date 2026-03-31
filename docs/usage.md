@@ -41,6 +41,7 @@ Current CLI JSON shape:
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,
+  "total_cees": 10,
   "findings": [
     {
       "severity": "CRITICAL",
@@ -64,7 +65,33 @@ Current CLI JSON shape:
       "category": "file_operation"
     }
   ],
+  "cees": [
+    {
+      "severity": "CRITICAL",
+      "file": "/absolute/path/tools/setup.py",
+      "line": 60,
+      "column": 5,
+      "operation": "File system operation: shutil.rmtree",
+      "tool": "setup_agent",
+      "framework": "langchain",
+      "tool_file": "/absolute/path/tools/setup.py",
+      "tool_line": 12,
+      "call_path": [
+        "/absolute/path/tools/setup.py:setup_agent",
+        "/absolute/path/helpers/files.py:delete_workspace"
+      ],
+      "gate_status": "absent",
+      "afb_type": "AFB04",
+      "classification_note": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path.",
+      "involves_cross_file": true,
+      "unresolved_calls": [],
+      "depth_limit_hit": false,
+      "code_snippet": "shutil.rmtree(agent_dir)",
+      "category": "file_operation"
+    }
+  ],
   "summary": {
+    "cees": 10,
     "critical": 2,
     "warning": 3,
     "info": 5,

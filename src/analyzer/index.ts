@@ -165,6 +165,13 @@ export class AFBAnalyzer {
       if (fileDiff !== 0) return fileDiff;
       return a.line - b.line;
     });
+    allCEEs.sort((a, b) => {
+      const fileDiff = a.file.localeCompare(b.file);
+      if (fileDiff !== 0) return fileDiff;
+      const lineDiff = a.line - b.line;
+      if (lineDiff !== 0) return lineDiff;
+      return a.tool.localeCompare(b.tool);
+    });
     return {
       repository: path.basename(repository),
       filesAnalyzed: results.filter(r => r.success).map(r => r.file),

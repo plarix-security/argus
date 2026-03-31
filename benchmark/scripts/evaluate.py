@@ -72,8 +72,10 @@ def run_scan(system_dir: Path) -> tuple[int, dict]:
 def actual_result_text(exit_code: int, report: dict) -> str:
     summary = report["summary"]
     coverage = report["coverage"]
+    cees = report.get("cees", [])
+    afb04_cees = [cee for cee in cees if cee.get("afb_type") == "AFB04"]
     return (
-        f"{len(report['findings'])} findings "
+        f"{len(cees)} cees, {len(afb04_cees)} afb04 findings "
         f"({summary['critical']}C/{summary['warning']}W/{summary['info']}I), "
         f"exit {exit_code}, analyzed {coverage['files_analyzed']}, "
         f"skipped {coverage['files_skipped']}, failed {len(coverage['failed_files'])}"
@@ -84,12 +86,13 @@ def classify_result(system_dir: Path, exit_code: int, report: dict, expected_cou
     language_label = ", ".join(languages) if languages else "unknown"
     coverage = report["coverage"]
     findings = len(report["findings"])
+    cees = report.get("cees", [])
     failed_files = len(coverage["failed_files"])
     partial = bool(coverage["partial"])
 
     if expected_count is not None and languages == ["python"] and code_files > 0:
         status = "PASS" if findings == expected_count and failed_files == 0 and not partial else "FAIL"
-        notes = "Python manifest count matched exactly." if status == "PASS" else "Python manifest count or coverage did not match."
+        notes = f"Python manifest count matched exactly. {len(cees)} CEEs were inventoried." if status == "PASS" else "Python manifest count or coverage did not match."
         return BenchmarkResult(
             name=system_dir.name,
             languages=language_label,
@@ -101,7 +104,7 @@ def classify_result(system_dir: Path, exit_code: int, report: dict, expected_cou
 
     if expected_count is None and code_files > 0:
         status = "PASS" if failed_files == 0 and findings > 0 else "FAIL"
-        notes = "Operational smoke run only; no manifest is available in this snapshot." if status == "PASS" else "Smoke run did not produce a usable Python result."
+        notes = f"Operational smoke run only; no manifest is available in this snapshot. {len(cees)} CEEs were inventoried." if status == "PASS" else "Smoke run did not produce a usable Python result."
         return BenchmarkResult(
             name=system_dir.name,
             languages=language_label,
