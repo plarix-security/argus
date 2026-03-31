@@ -436,7 +436,7 @@ export class PythonSemanticIndex {
   }
 
   private resolveOpenAIToolNames(
-    expression: { references: string[] },
+    expression: { references: string[]; callCallee?: string },
     context: ResolutionContext,
     visited: Set<string>
   ): Set<string> {
@@ -476,10 +476,31 @@ export class PythonSemanticIndex {
       }
     }
 
+    if (expression.callCallee) {
+      for (const returnInfo of this.resolveFunctionReturns(expression.callCallee, context)) {
+        for (const toolName of this.resolveOpenAIToolNames(returnInfo.value, {
+          filePath: returnInfo.filePath,
+          className: returnInfo.enclosingClass,
+          functionName: returnInfo.enclosingFunction,
+        }, visited)) {
+          result.add(toolName);
+        }
+      }
+    }
+
     return result;
   }
 
-  private expandMappingToFunctionNodes(expression: { references: string[]; mappingReferences: Array<{ key: string; reference: string }> }, context: ResolutionContext, visited: Set<string>): Set<string> {
+  private expandMappingToFunctionNodes(
+    expression: {
+      references: string[];
+      mappingReferences: Array<{ key: string; reference: string }>;
+      subscriptReferences?: Array<{ base: string; keyReference?: string; keyString?: string }>;
+      callCallee?: string;
+    },
+    context: ResolutionContext,
+    visited: Set<string>
+  ): Set<string> {
     const result = new Set<string>();
 
     for (const mapping of expression.mappingReferences) {
@@ -498,15 +519,59 @@ export class PythonSemanticIndex {
       }
     }
 
+    for (const subscriptReference of expression.subscriptReferences || []) {
+      for (const nodeId of this.resolveDispatchReferenceToFunctionNodes(subscriptReference.base, subscriptReference.keyString, subscriptReference.keyReference, context, visited)) {
+        result.add(nodeId);
+      }
+    }
+
+    if (expression.callCallee) {
+      for (const returnInfo of this.resolveFunctionReturns(expression.callCallee, context)) {
+        for (const nodeId of this.expandMappingToFunctionNodes(returnInfo.value, {
+          filePath: returnInfo.filePath,
+          className: returnInfo.enclosingClass,
+          functionName: returnInfo.enclosingFunction,
+        }, visited)) {
+          result.add(nodeId);
+        }
+      }
+    }
+
     return result;
   }
 
-  private expandExpressionToFunctionNodes(expression: { references: string[] }, context: ResolutionContext, visited: Set<string>): Set<string> {
+  private expandExpressionToFunctionNodes(
+    expression: {
+      references: string[];
+      subscriptReferences?: Array<{ base: string; keyReference?: string; keyString?: string }>;
+      callCallee?: string;
+    },
+    context: ResolutionContext,
+    visited: Set<string>
+  ): Set<string> {
     const result = new Set<string>();
 
     for (const reference of expression.references) {
       for (const nodeId of this.resolveReferenceToFunctionNodes(reference, context, visited)) {
         result.add(nodeId);
+      }
+    }
+
+    for (const subscriptReference of expression.subscriptReferences || []) {
+      for (const nodeId of this.resolveDispatchReferenceToFunctionNodes(subscriptReference.base, subscriptReference.keyString, subscriptReference.keyReference, context, visited)) {
+        result.add(nodeId);
+      }
+    }
+
+    if (expression.callCallee) {
+      for (const returnInfo of this.resolveFunctionReturns(expression.callCallee, context)) {
+        for (const nodeId of this.expandExpressionToFunctionNodes(returnInfo.value, {
+          filePath: returnInfo.filePath,
+          className: returnInfo.enclosingClass,
+          functionName: returnInfo.enclosingFunction,
+        }, visited)) {
+          result.add(nodeId);
+        }
       }
     }
 
@@ -522,6 +587,17 @@ export class PythonSemanticIndex {
     visited.add(visitKey);
     const result = new Set<string>();
     const localFunctions = this.functionsByFile.get(context.filePath) || new Map<string, string>();
+
+    const subscriptReference = parseSubscriptReference(reference);
+    if (subscriptReference) {
+      for (const nodeId of this.resolveDispatchReferenceToFunctionNodes(subscriptReference.base, subscriptReference.keyString, subscriptReference.keyReference, context, visited)) {
+        result.add(nodeId);
+      }
+
+      if (result.size > 0) {
+        return result;
+      }
+    }
 
     if (reference.includes('.')) {
       const parts = reference.split('.');
@@ -592,6 +668,106 @@ export class PythonSemanticIndex {
             result.add(nodeId);
           }
         }
+      }
+    }
+
+    return result;
+  }
+
+  private resolveDispatchReferenceToFunctionNodes(
+    baseReference: string,
+    keyString: string | undefined,
+    keyReference: string | undefined,
+    context: ResolutionContext,
+    visited: Set<string>
+  ): Set<string> {
+    const mappings = this.collectDispatchMappings(baseReference, context);
+    const keys = keyString ? [keyString] : Array.from(this.resolvePossibleStringKeys(keyReference, context, visited));
+    const result = new Set<string>();
+
+    if (mappings.size === 0) {
+      return result;
+    }
+
+    if (keys.length === 0) {
+      for (const reference of mappings.values()) {
+        for (const nodeId of this.resolveReferenceToFunctionNodes(reference, context, visited)) {
+          result.add(nodeId);
+        }
+      }
+
+      return result;
+    }
+
+    for (const key of keys) {
+      const reference = mappings.get(key);
+      if (!reference) {
+        continue;
+      }
+
+      for (const nodeId of this.resolveReferenceToFunctionNodes(reference, context, visited)) {
+        result.add(nodeId);
+      }
+    }
+
+    return result;
+  }
+
+  private collectDispatchMappings(baseReference: string, context: ResolutionContext): Map<string, string> {
+    const mappings = new Map<string, string>();
+
+    for (const dispatchMapping of this.dispatchMappingsByFile.get(context.filePath) || []) {
+      if (dispatchMapping.variableName !== baseReference) {
+        continue;
+      }
+
+      for (const [key, reference] of dispatchMapping.mappings) {
+        mappings.set(key, reference);
+      }
+    }
+
+    for (const assignment of this.findAssignments(baseReference, context)) {
+      for (const mappingReference of assignment.value.mappingReferences) {
+        mappings.set(mappingReference.key, mappingReference.reference);
+      }
+    }
+
+    const imported = this.resolveImportedSymbol(baseReference, context.filePath);
+    if (imported?.resolvedFile) {
+      for (const dispatchMapping of this.dispatchMappingsByFile.get(imported.resolvedFile) || []) {
+        if (dispatchMapping.variableName !== (imported.importedName || baseReference)) {
+          continue;
+        }
+
+        for (const [key, reference] of dispatchMapping.mappings) {
+          mappings.set(key, reference);
+        }
+      }
+    }
+
+    return mappings;
+  }
+
+  private resolvePossibleStringKeys(reference: string | undefined, context: ResolutionContext, visited: Set<string>): Set<string> {
+    const result = new Set<string>();
+    if (!reference) {
+      return result;
+    }
+
+    if ((reference.startsWith('"') && reference.endsWith('"')) || (reference.startsWith("'") && reference.endsWith("'"))) {
+      result.add(reference.slice(1, -1));
+      return result;
+    }
+
+    const visitKey = `${context.filePath}:${context.className || ''}:${context.functionName || ''}:str:${reference}`;
+    if (visited.has(visitKey)) {
+      return result;
+    }
+
+    visited.add(visitKey);
+    for (const assignment of this.findAssignments(reference, context)) {
+      for (const literal of assignment.value.stringLiterals) {
+        result.add(literal);
       }
     }
 
@@ -779,6 +955,25 @@ export class PythonSemanticIndex {
     return {};
   }
 
+  private resolveFunctionReturns(
+    reference: string,
+    context: ResolutionContext
+  ): Array<ReturnInfo & { filePath: string }> {
+    const target = this.resolveFunctionReference(reference, context);
+    if (!target) {
+      return [];
+    }
+
+    return this.findReturns(target.functionName, {
+      filePath: target.filePath,
+      className: target.className,
+      functionName: target.functionName,
+    }).map((returnInfo) => ({
+      ...returnInfo,
+      filePath: target.filePath,
+    }));
+  }
+
   private resolveFunctionReference(
     reference: string,
     context: ResolutionContext
@@ -867,6 +1062,31 @@ export class PythonSemanticIndex {
 
 function splitReferenceSegments(reference: string | undefined): string[] {
   return (reference || '').split('.').filter(Boolean);
+}
+
+function parseSubscriptReference(reference: string): { base: string; keyReference?: string; keyString?: string } | undefined {
+  const match = reference.match(/^(.+)\[([^\]]+)\]$/);
+  if (!match) {
+    return undefined;
+  }
+
+  const base = match[1].trim();
+  const rawKey = match[2].trim();
+  if (!base || !rawKey) {
+    return undefined;
+  }
+
+  if ((rawKey.startsWith('"') && rawKey.endsWith('"')) || (rawKey.startsWith("'") && rawKey.endsWith("'"))) {
+    return {
+      base,
+      keyString: rawKey.slice(1, -1),
+    };
+  }
+
+  return {
+    base,
+    keyReference: rawKey,
+  };
 }
 
 function* iterateReferenceCandidates(reference: string): Generator<string> {

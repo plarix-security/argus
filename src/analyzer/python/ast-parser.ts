@@ -1096,6 +1096,76 @@ function extractToolNameFromOpenAISchema(dictNode: Parser.SyntaxNode): string | 
   return hasTypeFunctionPair && toolName ? toolName : null;
 }
 
+function extractToolNamesFromSchemaNode(node: Parser.SyntaxNode): string[] {
+  if (node.type === 'dictionary') {
+    const toolName = extractToolNameFromOpenAISchema(node);
+    return toolName ? [toolName] : [];
+  }
+
+  if (node.type === 'list' || node.type === 'tuple' || node.type === 'set') {
+    return uniqueStrings(
+      node.children
+        .filter((child) => !['[', ']', '(', ')', '{', '}', ',', 'comment'].includes(child.type))
+        .flatMap((child) => extractToolNamesFromSchemaNode(child))
+    );
+  }
+
+  return [];
+}
+
+function extractReferenceTarget(node: Parser.SyntaxNode | null): string | null {
+  if (!node) {
+    return null;
+  }
+
+  if (node.type === 'identifier' || node.type === 'attribute') {
+    return node.text;
+  }
+
+  if (node.type === 'subscript') {
+    const baseNode = node.childForFieldName('value') || node.children.find((child) => child.type !== '[' && child.type !== ']');
+    return extractReferenceTarget(baseNode || null);
+  }
+
+  return null;
+}
+
+function extractSubscriptStringKey(node: Parser.SyntaxNode | null): string | null {
+  if (!node || node.type !== 'subscript') {
+    return null;
+  }
+
+  const significantChildren = node.children.filter((child) => child.type !== '[' && child.type !== ']' && child.type !== 'comment');
+  const keyNode = node.childForFieldName('subscript') || significantChildren[1];
+  return keyNode ? extractStringValue(keyNode) : null;
+}
+
+function extractDispatchEntriesFromNode(node: Parser.SyntaxNode): Array<{ key: string; reference: string }> {
+  if (node.type !== 'dictionary') {
+    return [];
+  }
+
+  const mappings: Array<{ key: string; reference: string }> = [];
+  for (const child of node.children) {
+    if (child.type !== 'pair') {
+      continue;
+    }
+
+    const children = child.children.filter((c) => c.type !== ':');
+    if (children.length < 2) {
+      continue;
+    }
+
+    const keyStr = extractStringValue(children[0]);
+    const reference = extractReferenceTarget(children[1]);
+    if (keyStr && reference) {
+      mappings.push({ key: keyStr, reference });
+    }
+  }
+
+  return mappings;
+}
+
 /**
  * Extract OpenAI tool schemas from an assignment node.
  * Detects: TOOLS = [{"type": "function", "function": {"name": "calculate"}}]
@@ -1114,6 +1184,20 @@ function extractOpenAIToolSchema(assignmentNode: Parser.SyntaxNode): OpenAIToolS
     if (assignment) {
       leftNode = assignment.childForFieldName('left');
       rightNode = assignment.childForFieldName('right');
+    } else {
+      const callNode = assignmentNode.children.find(c => c.type === 'call');
+      if (callNode) {
+        const calleeInfo = extractCalleeInfo(callNode);
+        const operation = calleeInfo.memberChain[calleeInfo.memberChain.length - 1];
+        if (calleeInfo.baseExpression && ['append', 'extend'].includes(operation || '')) {
+          leftNode = {
+            type: 'identifier',
+            text: calleeInfo.baseExpression,
+          } as Parser.SyntaxNode;
+          const callArgs = callNode.childForFieldName('arguments');
+          rightNode = callArgs?.children.find((child) => !['(', ')', ',', 'comment'].includes(child.type)) || null;
+        }
+      }
     }
   }
 
@@ -1129,20 +1213,7 @@ function extractOpenAIToolSchema(assignmentNode: Parser.SyntaxNode): OpenAIToolS
     return null;
   }
 
-  // Check if right side is a list
-  if (rightNode.type !== 'list') return null;
-
-  const toolNames: string[] = [];
-
-  // Iterate through list items looking for OpenAI schema dicts
-  for (const item of rightNode.children) {
-    if (item.type === 'dictionary') {
-      const toolName = extractToolNameFromOpenAISchema(item);
-      if (toolName) {
-        toolNames.push(toolName);
-      }
-    }
-  }
+  const toolNames = extractToolNamesFromSchemaNode(rightNode);
 
   if (toolNames.length === 0) return null;
 
@@ -1160,6 +1231,7 @@ function extractOpenAIToolSchema(assignmentNode: Parser.SyntaxNode): OpenAIToolS
 function extractDispatchMapping(assignmentNode: Parser.SyntaxNode): FunctionDispatchMapping | null {
   let leftNode: Parser.SyntaxNode | null = null;
   let rightNode: Parser.SyntaxNode | null = null;
+  let directMappings: Array<{ key: string; reference: string }> | null = null;
 
   if (assignmentNode.type === 'assignment') {
     leftNode = assignmentNode.childForFieldName('left');
@@ -1169,6 +1241,20 @@ function extractDispatchMapping(assignmentNode: Parser.SyntaxNode): FunctionDisp
     if (assignment) {
       leftNode = assignment.childForFieldName('left');
       rightNode = assignment.childForFieldName('right');
+    } else {
+      const callNode = assignmentNode.children.find((c) => c.type === 'call');
+      if (callNode) {
+        const calleeInfo = extractCalleeInfo(callNode);
+        const operation = calleeInfo.memberChain[calleeInfo.memberChain.length - 1];
+        if (calleeInfo.baseExpression && operation === 'update') {
+          leftNode = {
+            type: 'identifier',
+            text: calleeInfo.baseExpression,
+          } as Parser.SyntaxNode;
+          const callArgs = callNode.childForFieldName('arguments');
+          rightNode = callArgs?.children.find((child) => !['(', ')', ',', 'comment'].includes(child.type)) || null;
+        }
+      }
     }
   }
 
@@ -1180,33 +1266,25 @@ function extractDispatchMapping(assignmentNode: Parser.SyntaxNode): FunctionDisp
     variableName = leftNode.text;
   } else if (leftNode.type === 'attribute') {
     variableName = leftNode.text;
+  } else if (leftNode.type === 'subscript') {
+    variableName = extractReferenceTarget(leftNode) || '';
+    const keyStr = extractSubscriptStringKey(leftNode);
+    const reference = extractReferenceTarget(rightNode);
+    if (variableName && keyStr && reference) {
+      directMappings = [{ key: keyStr, reference }];
+    }
   } else {
     return null;
   }
 
-  // Check if right side is a dictionary
-  if (rightNode.type !== 'dictionary') return null;
-
   const mappings = new Map<string, string>();
 
-  for (const child of rightNode.children) {
-    if (child.type === 'pair') {
-      // Get key and value
-      const children = child.children.filter(c => c.type !== ':');
-      if (children.length < 2) continue;
-
-      const keyNode = children[0];
-      const valueNode = children[1];
-
-      // Key must be a string literal
-      const keyStr = extractStringValue(keyNode);
-      if (!keyStr) continue;
-
-      // Value must be an identifier (function reference)
-      if (valueNode.type === 'identifier') {
-        mappings.set(keyStr, valueNode.text);
-      }
+  for (const mapping of directMappings || extractDispatchEntriesFromNode(rightNode)) {
+    if (!mapping.key || !mapping.reference) {
+      continue;
     }
+
+    mappings.set(mapping.key, mapping.reference);
   }
 
   if (mappings.size === 0) return null;

@@ -53,6 +53,47 @@ describe('semantic-first python analysis', () => {
     expect(report.cees[0].evidenceKind).not.toBe('heuristic');
   });
 
+  test('manual OpenAI wiring resolves helper-returned schemas and mutated dispatch maps', async () => {
+    const projectDir = makeTempProject({
+      'agent.py': [
+        'from openai import OpenAI',
+        'from tools import calculate, build_tools',
+        '',
+        'tool_functions = {}',
+        'tool_functions["calculate"] = calculate',
+        '',
+        'class ReactAgent:',
+        '    def __init__(self):',
+        '        self.client = OpenAI()',
+        '        self.tools = build_tools()',
+        '        self.tool_functions = tool_functions',
+        '',
+        '    def run(self, task: str):',
+        '        return self.client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": task}], tools=self.tools)',
+        '',
+      ].join('\n'),
+      'tools.py': [
+        'def calculate(expression: str):',
+        '    return eval(expression)',
+        '',
+        'CALCULATOR_TOOLS = [{"type": "function", "function": {"name": "calculate", "parameters": {"type": "object", "properties": {"expression": {"type": "string"}}}}}]',
+        '',
+        'def build_tools():',
+        '    return CALCULATOR_TOOLS',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(1);
+    expect(report.cees[0].tool).toBe('calculate');
+    expect(report.cees[0].framework).toBe('openai');
+    expect(report.cees[0].evidenceKind).not.toBe('heuristic');
+  });
+
   test('langgraph create_react_agent roots tools semantically', async () => {
     const projectDir = makeTempProject({
       'graph.py': [
@@ -68,6 +109,38 @@ describe('semantic-first python analysis', () => {
         '',
         'def cleanup_workspace(target: str):',
         '    shutil.rmtree(target)',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(1);
+    expect(report.cees[0].tool).toBe('cleanup_workspace');
+    expect(report.cees[0].framework).toBe('langgraph');
+    expect(report.cees[0].evidenceKind).not.toBe('heuristic');
+  });
+
+  test('helper-returned tool bundles keep semantic framework roots', async () => {
+    const projectDir = makeTempProject({
+      'graph.py': [
+        'from langgraph.prebuilt import create_react_agent',
+        'from tools import build_tools',
+        '',
+        'def build_agent(model):',
+        '    return create_react_agent(model, build_tools())',
+        '',
+      ].join('\n'),
+      'tools.py': [
+        'import shutil',
+        '',
+        'def cleanup_workspace(target: str):',
+        '    shutil.rmtree(target)',
+        '',
+        'def build_tools():',
+        '    return [cleanup_workspace]',
         '',
       ].join('\n'),
     });
@@ -311,6 +384,34 @@ describe('semantic-first python analysis', () => {
     expect(report.cees.every((cee) => cee.evidenceKind !== 'heuristic')).toBe(true);
     expect(report.cees.some((cee) => cee.operation.includes('sqlite3.connect.cursor.execute'))).toBe(true);
     expect(report.cees.some((cee) => cee.operation.includes('redis.Redis.set'))).toBe(true);
+  });
+
+  test('dict dispatch keeps tool-to-sink paths through wrappers', async () => {
+    const projectDir = makeTempProject({
+      'tools.py': [
+        'import shutil',
+        'from langchain.tools import tool',
+        '',
+        'def cleanup_workspace(target: str):',
+        '    shutil.rmtree(target)',
+        '',
+        'HANDLERS = {"cleanup": cleanup_workspace}',
+        '',
+        '@tool',
+        'def route_command(command_name: str, target: str):',
+        '    return HANDLERS[command_name](target)',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(1);
+    expect(report.cees[0].tool).toBe('route_command');
+    expect(report.cees[0].callPath).toHaveLength(2);
+    expect(report.cees[0].operation).toContain('shutil.rmtree');
   });
 
   test('semantic open classification respects write mode', async () => {
