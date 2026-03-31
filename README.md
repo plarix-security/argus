@@ -188,12 +188,19 @@ Current CLI JSON shape:
         "/absolute/path/tools/setup.py:setup_agent",
         "/absolute/path/helpers/files.py:delete_workspace"
       ],
-      "involves_cross_file": true,
-      "unresolved_calls": [],
-      "depth_limit_hit": false,
-      "description": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). No policy gate detected in the analyzed call path.",
-      "code_snippet": "shutil.rmtree(agent_dir)",
-      "category": "file_operation"
+       "involves_cross_file": true,
+       "unresolved_calls": [],
+       "depth_limit_hit": false,
+       "evidence_kind": "semantic",
+       "supporting_evidence": [
+         "Tool registration evidence: decorator tool imported from langchain.tools",
+         "Operation evidence: resolved module alias shutil"
+       ],
+       "resource": "agent_dir",
+       "changes_state": true,
+       "description": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). No policy gate detected in the analyzed call path.",
+       "code_snippet": "shutil.rmtree(agent_dir)",
+       "category": "file_operation"
     }
   ],
   "cees": [
@@ -213,12 +220,19 @@ Current CLI JSON shape:
       ],
       "gate_status": "absent",
       "afb_type": "AFB04",
-      "classification_note": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path.",
-      "involves_cross_file": true,
-      "unresolved_calls": [],
-      "depth_limit_hit": false,
-      "code_snippet": "shutil.rmtree(agent_dir)",
-      "category": "file_operation"
+       "classification_note": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path.",
+       "involves_cross_file": true,
+       "unresolved_calls": [],
+       "depth_limit_hit": false,
+       "evidence_kind": "semantic",
+       "supporting_evidence": [
+         "Tool registration evidence: decorator tool imported from langchain.tools",
+         "Operation evidence: resolved module alias shutil"
+       ],
+       "resource": "agent_dir",
+       "changes_state": true,
+       "code_snippet": "shutil.rmtree(agent_dir)",
+       "category": "file_operation"
     }
   ],
   "summary": {
@@ -261,6 +275,7 @@ Notes:
 - `cees` is the full detected execution-event inventory for the analyzed path set.
 - `findings` is the AFB04 subset of `cees`.
 - `call_path` lists the traced function path in the analyzed file set.
+- `evidence_kind`, `supporting_evidence`, `resource`, and `changes_state` expose the current proof and action summary for each finding or CEE.
 - The repository does not currently promise a separately versioned stable JSON schema.
 
 ## GitHub App

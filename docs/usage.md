@@ -60,6 +60,13 @@ Current CLI JSON shape:
       "involves_cross_file": true,
       "unresolved_calls": [],
       "depth_limit_hit": false,
+      "evidence_kind": "semantic",
+      "supporting_evidence": [
+        "Tool registration evidence: decorator tool imported from langchain.tools",
+        "Operation evidence: resolved module alias shutil"
+      ],
+      "resource": "agent_dir",
+      "changes_state": true,
       "description": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). No policy gate detected in the analyzed call path.",
       "code_snippet": "shutil.rmtree(agent_dir)",
       "category": "file_operation"
@@ -86,6 +93,13 @@ Current CLI JSON shape:
       "involves_cross_file": true,
       "unresolved_calls": [],
       "depth_limit_hit": false,
+      "evidence_kind": "semantic",
+      "supporting_evidence": [
+        "Tool registration evidence: decorator tool imported from langchain.tools",
+        "Operation evidence: resolved module alias shutil"
+      ],
+      "resource": "agent_dir",
+      "changes_state": true,
       "code_snippet": "shutil.rmtree(agent_dir)",
       "category": "file_operation"
     }
