@@ -117,20 +117,21 @@ function calculateSeverity(
   exposed: ExposedPath
 ): Severity {
   let severity = baseSeverity;
+  const heuristicFallbackInPath = exposed.tool.toolDetectionKind === 'heuristic' || operation.detectionKind === 'heuristic';
 
   // 1. Irreversibility: always CRITICAL
   if (isIrreversibleOperation(operation.callee)) {
     return Severity.CRITICAL;
   }
 
-  // 2. Data sensitivity: elevate one level
+  // 2. Data sensitivity heuristics only affect fallback-classified paths.
   const enclosingFunc = exposed.tool.name;
-  if (touchesSensitiveData(operation.codeSnippet, enclosingFunc)) {
+  if (heuristicFallbackInPath && touchesSensitiveData(operation.codeSnippet, enclosingFunc)) {
     severity = elevateSeverity(severity);
   }
 
-  // 3. Validation helper in path: downgrade one level
-  if (exposed.hasValidationHelperInPath) {
+  // 3. Validation-helper names only affect fallback-classified paths.
+  if (heuristicFallbackInPath && exposed.hasValidationHelperInPath) {
     severity = downgradeSeverity(severity);
   }
 
@@ -550,7 +551,7 @@ function buildExplanation(exposed: ExposedPath, op: DangerousOperation): string 
     }
 
     if (exposed.hasValidationHelperInPath) {
-      explanation += 'The analyzed path includes a probable validation-helper name. This is heuristic and only affected severity. ';
+      explanation += 'The analyzed path includes a probable validation-helper name. This is heuristic evidence, not structural gate proof. ';
     }
   }
 

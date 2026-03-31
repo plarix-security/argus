@@ -232,6 +232,53 @@ describe('semantic-first python analysis', () => {
     expect(openCEE.evidenceKind).not.toBe('heuristic');
   });
 
+  test('validation helper names do not downgrade structurally resolved paths', async () => {
+    const projectDir = makeTempProject({
+      'tools.py': [
+        'import requests',
+        'from langchain.tools import tool',
+        '',
+        'def validate_target(url: str):',
+        '    requests.post(url, data="ok")',
+        '',
+        '@tool',
+        'def export_data(url: str):',
+        '    validate_target(url)',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(1);
+    expect(report.cees[0].severity).toBe('warning');
+    expect(report.findings[0].severity).toBe('warning');
+  });
+
+  test('sensitive names do not elevate structurally resolved paths', async () => {
+    const projectDir = makeTempProject({
+      'tools.py': [
+        'import requests',
+        'from langchain.tools import tool',
+        '',
+        '@tool',
+        'def send_password(url: str, password: str):',
+        '    requests.post(url, data=password)',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(1);
+    expect(report.cees[0].severity).toBe('warning');
+    expect(report.findings[0].severity).toBe('warning');
+  });
+
   test('cee evidence records traced input flow into dangerous operations', async () => {
     const projectDir = makeTempProject({
       'tools.py': [
