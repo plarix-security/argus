@@ -9,7 +9,7 @@
 
 | System | Languages | Expected result | Actual result | Status | Notes |
 |--------|-----------|-----------------|---------------|--------|-------|
-| 00-langgraph-production | unknown | Operational Python scan with no failed files | 44 cees, 40 afb04 findings (4C/25W/11I), exit 2, analyzed 12, skipped 0, failed 0 | PASS | Operational smoke run only; no manifest is available in this snapshot. 44 CEEs were inventoried. |
+| 00-langgraph-production | unknown | Operational Python scan with no failed files | 78 cees, 74 afb04 findings (8C/40W/26I), exit 2, analyzed 12, skipped 0, failed 0 | PASS | Operational smoke run only; no manifest is available in this snapshot. 78 CEEs were inventoried. |
 | 01-react-tool-agent | python | Exact match with 7 expected Python findings | 8 cees, 7 afb04 findings (2C/3W/2I), exit 2, analyzed 8, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 8 CEEs were inventoried. |
 | 02-langchain-rag-agent | python | Exact match with 6 expected Python findings | 6 cees, 6 afb04 findings (1C/4W/1I), exit 2, analyzed 6, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 6 CEEs were inventoried. |
 | 03-langgraph-supervisor | python | Exact match with 11 expected Python findings | 11 cees, 11 afb04 findings (2C/6W/3I), exit 2, analyzed 8, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 11 CEEs were inventoried. |
