@@ -37,7 +37,7 @@ function getCoverageLines(report: AnalysisReport): string[] {
 
 function getCoverageNotes(report: AnalysisReport): string[] {
   const notes = [
-    'Python files are analyzed independently in the shipped scan flow. Repository-wide cross-file tracing is not guaranteed.',
+    'The analyzed Python file set is graphed together. Changed-file scans do not guarantee full repository coverage.',
   ];
 
   if (report.metadata.failedFiles.length > 0) {
@@ -56,9 +56,28 @@ function getCoverageNotes(report: AnalysisReport): string[] {
  * Format a single finding as a markdown block per spec
  */
 function formatFinding(finding: AFBFinding): string {
+  const detailLines: string[] = [];
+
+  if (finding.context?.toolFile && finding.context?.toolLine) {
+    detailLines.push(`Tool registration: \`${finding.context.toolFile}:${finding.context.toolLine}\``);
+  }
+
+  if (finding.context?.involvesCrossFile) {
+    detailLines.push('Path crosses file boundaries.');
+  }
+
+  if (finding.context?.depthLimitHit) {
+    detailLines.push('Tracing hit the configured depth limit.');
+  }
+
+  if (finding.context?.unresolvedCalls && finding.context.unresolvedCalls.length > 0) {
+    detailLines.push(`Unresolved calls: \`${finding.context.unresolvedCalls.slice(0, 5).join('`, `')}\``);
+  }
+
   return `**\`${finding.file}\` line ${finding.line}**
 \`${finding.codeSnippet}\`
-${finding.explanation}`;
+${finding.explanation}
+${detailLines.join('\n')}`;
 }
 
 /**

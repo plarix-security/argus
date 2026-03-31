@@ -50,6 +50,15 @@ Current CLI JSON shape:
       "operation": "File system operation: shutil.rmtree",
       "tool": "setup_agent",
       "framework": "langchain",
+      "tool_file": "/absolute/path/tools/setup.py",
+      "tool_line": 12,
+      "call_path": [
+        "/absolute/path/tools/setup.py:setup_agent",
+        "/absolute/path/helpers/files.py:delete_workspace"
+      ],
+      "involves_cross_file": true,
+      "unresolved_calls": [],
+      "depth_limit_hit": false,
       "description": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). No policy gate detected in the analyzed call path.",
       "code_snippet": "shutil.rmtree(agent_dir)",
       "category": "file_operation"
@@ -76,8 +85,11 @@ Current CLI JSON shape:
       }
     ],
     "partial": true,
+    "total_files_discovered": 36,
+    "file_limit": 9007199254740991,
+    "file_limit_hit": false,
     "limitations": [
-      "Python files are analyzed independently in the shipped scan flow. Repository-wide cross-file tracing is not guaranteed."
+      "The analyzed Python file set is graphed together. Changed-file scans do not guarantee full repository coverage."
     ]
   }
 }

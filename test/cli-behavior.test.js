@@ -92,4 +92,52 @@ describe('CLI behavior honesty', () => {
     expect(report.coverage.files_skipped).toBe(1);
     expect(report.coverage.skipped_files[0].reason).toContain('not implemented');
   });
+
+  test('directory scan traces Python calls across files', () => {
+    const projectDir = makeTempProject({
+      'tools.py': [
+        'from langchain.tools import tool',
+        'from helpers import delete_workspace',
+        '',
+        '@tool',
+        'def cleanup_agent(target: str):',
+        '    delete_workspace(target)',
+        '',
+      ].join('\n'),
+      'helpers.py': [
+        'import shutil',
+        '',
+        'def delete_workspace(target: str):',
+        '    shutil.rmtree(target)',
+        '',
+      ].join('\n'),
+    });
+
+    const result = runCli(['scan', projectDir, '--json']);
+    const report = JSON.parse(result.stdout);
+
+    expect(result.status).toBe(2);
+    expect(report.findings).toHaveLength(1);
+    expect(report.findings[0].operation).toContain('shutil.rmtree');
+    expect(report.findings[0].involves_cross_file).toBe(true);
+    expect(report.findings[0].tool_file).toContain('tools.py');
+    expect(report.findings[0].call_path).toHaveLength(2);
+  });
+
+  test('syntax-error Python files fail explicitly', () => {
+    const projectDir = makeTempProject({
+      'broken.py': [
+        'from langchain.tools import tool',
+        '',
+        '@tool',
+        'def broken_tool(:',
+        '    return 1',
+      ].join('\n'),
+    });
+
+    const result = runCli(['scan', projectDir]);
+
+    expect(result.status).toBe(3);
+    expect(result.stdout).toContain('Failed to analyze 1 file.');
+  });
 });

@@ -504,12 +504,33 @@ export function formatFinding(finding: AFBFinding): string {
   const location = `${styled(filename, chalk.white.bold)}${styled(`:${finding.line}:${col}`, chalk.dim)}`;
   const snippet = formatSnippet(finding.codeSnippet);
   const description = getDescription(finding);
+  const detailLines: string[] = [];
+
+  if (finding.context?.toolFile && finding.context?.toolLine) {
+    detailLines.push(`tool: ${finding.context.toolFile}:${finding.context.toolLine}`);
+  }
+
+  if (finding.context?.involvesCrossFile) {
+    detailLines.push('path: cross-file');
+  }
+
+  if (finding.context?.depthLimitHit) {
+    detailLines.push('trace: depth limit hit');
+  }
+
+  if (finding.context?.unresolvedCalls && finding.context.unresolvedCalls.length > 0) {
+    detailLines.push(`unresolved: ${finding.context.unresolvedCalls.slice(0, 3).join(', ')}`);
+  }
 
   const lines = [
     `  ${formatSeverityLabel(finding.severity)} ${location}`,
     `    ${styled(snippet, chalk.white)}`,
     `    ${styled(description, chalk.gray)}`,
   ];
+
+  for (const detailLine of detailLines) {
+    lines.push(`    ${styled(detailLine, chalk.dim)}`);
+  }
 
   return lines.join('\n');
 }

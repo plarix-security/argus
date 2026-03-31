@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { FileLanguageRouter, fileLanguageRouter } from './file-language-router';
-import { analyzePythonFile, ensureParserInitialized } from './python/detector';
+import { analyzePythonFile, analyzePythonFiles, ensureParserInitialized } from './python/detector';
 import { analyzeTypeScriptFile } from './typescript/detector';
 import { AFBFinding, AnalysisReport, AnalyzerConfig, FileAnalysisResult, SupportedLanguage, Severity } from '../types';
 import { VERSION } from '../cli/version';
@@ -10,7 +10,7 @@ const DEFAULT_CONFIG: Required<AnalyzerConfig> = {
   include: ['**/*.py', '**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
   exclude: ['**/node_modules/**', '**/.venv/**', '**/venv/**', '**/__pycache__/**', '**/dist/**', '**/build/**', '**/.git/**', '**/test/**', '**/tests/**', '**/*.test.*', '**/*.spec.*'],
   minConfidence: 0.7,
-  maxFiles: 1000,
+  maxFiles: Number.MAX_SAFE_INTEGER,
   changedFilesOnly: false,
 };
 
@@ -46,29 +46,81 @@ export class AFBAnalyzer {
   analyzeDirectory(dirPath: string): AnalysisReport {
     const startTime = Date.now();
     const files = this.discoverFiles(dirPath);
-    const results: FileAnalysisResult[] = [];
-    const failedFiles: string[] = [];
-    for (const file of files.slice(0, this.config.maxFiles)) {
-      const result = this.analyzeFile(file);
-      results.push(result);
-      if (!result.success) failedFiles.push(file);
+    if (files.length > this.config.maxFiles) {
+      throw new Error(`Configured file limit exceeded: discovered ${files.length} analyzable files with limit ${this.config.maxFiles}.`);
     }
-    return this.buildReport(dirPath, results, failedFiles, startTime);
+    const results = this.analyzeResolvedFiles(files);
+    return this.buildReport(dirPath, results, startTime, files.length);
   }
 
   analyzeFiles(filePaths: string[], repoPath: string): AnalysisReport {
     const startTime = Date.now();
-    const results: FileAnalysisResult[] = [];
-    const failedFiles: string[] = [];
+    const analyzableFiles: string[] = [];
     for (const file of filePaths.filter(f => this.walker.isAnalyzable(f))) {
       const fullPath = path.isAbsolute(file) ? file : path.join(repoPath, file);
       if (!fs.existsSync(fullPath)) continue;
-      const result = this.analyzeFile(fullPath);
-      result.file = file;
-      results.push(result);
-      if (!result.success) failedFiles.push(file);
+      analyzableFiles.push(fullPath);
     }
-    return this.buildReport(repoPath, results, failedFiles, startTime);
+    if (analyzableFiles.length > this.config.maxFiles) {
+      throw new Error(`Configured file limit exceeded: discovered ${analyzableFiles.length} analyzable files with limit ${this.config.maxFiles}.`);
+    }
+    const results = this.analyzeResolvedFiles(analyzableFiles).map((result) => ({
+      ...result,
+      file: path.isAbsolute(result.file) ? path.relative(repoPath, result.file) : result.file,
+      findings: result.findings.map((finding) => ({
+        ...finding,
+        file: path.isAbsolute(finding.file) ? path.relative(repoPath, finding.file) : finding.file,
+        context: finding.context ? {
+          ...finding.context,
+          toolFile: finding.context.toolFile && path.isAbsolute(finding.context.toolFile)
+            ? path.relative(repoPath, finding.context.toolFile)
+            : finding.context.toolFile,
+          callPath: finding.context.callPath?.map((nodeId) => {
+            const separatorIndex = nodeId.lastIndexOf(':');
+            if (separatorIndex === -1) {
+              return nodeId;
+            }
+
+            const filePart = nodeId.slice(0, separatorIndex);
+            const symbolPart = nodeId.slice(separatorIndex + 1);
+            const relativeFile = path.isAbsolute(filePart) ? path.relative(repoPath, filePart) : filePart;
+            return `${relativeFile}:${symbolPart}`;
+          }),
+        } : finding.context,
+      })),
+    }));
+    return this.buildReport(repoPath, results, startTime, analyzableFiles.length);
+  }
+
+  private analyzeResolvedFiles(files: string[]): FileAnalysisResult[] {
+    const nonPythonResults: FileAnalysisResult[] = [];
+    const pythonInputs: Array<{ filePath: string; sourceCode: string }> = [];
+
+    for (const file of files) {
+      const language = this.walker.getLanguage(file);
+      if (!language) {
+        nonPythonResults.push({
+          file,
+          language: 'python',
+          findings: [],
+          success: false,
+          error: 'Unsupported file type',
+          analysisTimeMs: 0,
+        });
+        continue;
+      }
+
+      const sourceCode = fs.readFileSync(file, 'utf-8');
+      if (language === 'python') {
+        pythonInputs.push({ filePath: file, sourceCode });
+        continue;
+      }
+
+      nonPythonResults.push(analyzeTypeScriptFile(file, sourceCode));
+    }
+
+    const pythonResults = pythonInputs.length > 0 ? analyzePythonFiles(pythonInputs) : [];
+    return [...pythonResults, ...nonPythonResults];
   }
 
   private discoverFiles(dirPath: string): string[] {
@@ -93,7 +145,8 @@ export class AFBAnalyzer {
     });
   }
 
-  private buildReport(repository: string, results: FileAnalysisResult[], failedFiles: string[], startTime: number): AnalysisReport {
+  private buildReport(repository: string, results: FileAnalysisResult[], startTime: number, totalFilesDiscovered: number): AnalysisReport {
+    const failedFiles = results.filter((result) => !result.success).map((result) => result.file);
     const allFindings = results.flatMap(r => r.findings).filter(f => f.confidence >= this.config.minConfidence);
     const skippedFiles = results
       .filter((result) => result.skipped)
@@ -128,6 +181,9 @@ export class AFBAnalyzer {
         totalTimeMs: Date.now() - startTime,
         failedFiles,
         skippedFiles,
+        fileLimitHit: false,
+        fileLimit: this.config.maxFiles,
+        totalFilesDiscovered,
       },
     };
   }

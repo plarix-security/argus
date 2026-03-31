@@ -44,7 +44,7 @@ WyScan currently does not do any of the following:
 
 - Execute your code.
 - Scan TypeScript or JavaScript for findings.
-- Guarantee repository-wide multi-file call-path tracing in the shipped CLI or GitHub App scan flow.
+- Guarantee full-repository coverage in changed-file GitHub App scans.
 - Trace into third-party package internals.
 - Detect AFB01, AFB02, or AFB03.
 
@@ -180,6 +180,15 @@ Current CLI JSON shape:
       "operation": "File system operation: shutil.rmtree",
       "tool": "setup_agent",
       "framework": "langchain",
+      "tool_file": "/absolute/path/tools/setup.py",
+      "tool_line": 12,
+      "call_path": [
+        "/absolute/path/tools/setup.py:setup_agent",
+        "/absolute/path/helpers/files.py:delete_workspace"
+      ],
+      "involves_cross_file": true,
+      "unresolved_calls": [],
+      "depth_limit_hit": false,
       "description": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). No policy gate detected in the analyzed call path.",
       "code_snippet": "shutil.rmtree(agent_dir)",
       "category": "file_operation"
@@ -206,8 +215,11 @@ Current CLI JSON shape:
       }
     ],
     "partial": true,
+    "total_files_discovered": 36,
+    "file_limit": 9007199254740991,
+    "file_limit_hit": false,
     "limitations": [
-      "Python files are analyzed independently in the shipped scan flow. Repository-wide cross-file tracing is not guaranteed."
+      "The analyzed Python file set is graphed together. Changed-file scans do not guarantee full repository coverage."
     ]
   }
 }
@@ -216,8 +228,9 @@ Current CLI JSON shape:
 Notes:
 
 - `files_analyzed` at the top level is the report file count used by the current CLI output.
-- `coverage.files_analyzed` currently counts Python files only.
+- `coverage.files_analyzed` counts Python files only.
 - TypeScript and JavaScript files are reflected as skipped coverage, not findings.
+- `call_path` lists the traced function path in the analyzed file set.
 - The repository does not currently promise a separately versioned stable JSON schema.
 
 ## GitHub App
@@ -239,7 +252,7 @@ Failure and partial-coverage reporting are being tightened further in the implem
 
 - Python is the only supported finding language.
 - TypeScript and JavaScript files are skipped explicitly and produce no findings.
-- The shipped CLI and GitHub App scan flow analyzes Python files independently rather than guaranteeing repository-wide cross-file call-path tracing.
+- Directory scans graph the analyzed Python file set together. Changed-file scans still do not guarantee full repository coverage.
 - External packages are not traced.
 - Dynamic runtime tool registration is not guaranteed to be detected.
 - Framework labels are pattern matches, not complete framework models.

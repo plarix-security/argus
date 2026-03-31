@@ -76,7 +76,7 @@ export function summarizeReportForCheck(report: AnalysisReport): CheckOutput {
     summaryLines.push(`Skipped languages: ${skippedLanguages.join(', ')}`);
   }
 
-  summaryLines.push('Current shipped scan flow analyzes Python files independently; repository-wide cross-file tracing is not guaranteed.');
+  summaryLines.push('The analyzed Python file set is graphed together. Changed-file scans do not guarantee full repository coverage.');
 
   return {
     title,

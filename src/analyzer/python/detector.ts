@@ -38,6 +38,11 @@ import {
   Severity,
 } from '../../types';
 
+interface PythonSourceInput {
+  filePath: string;
+  sourceCode: string;
+}
+
 /**
  * SEVERITY MODEL (CEE - Comprehensive Exposure Evaluation)
  *
@@ -273,6 +278,105 @@ export function analyzePythonFile(
 }
 
 /**
+ * Analyze multiple Python files as a single repository graph.
+ *
+ * This is the shipped path for directory-style scans. It parses all files first,
+ * builds one call graph, then attributes findings back to the file where the
+ * matched operation occurs.
+ */
+export function analyzePythonFiles(inputs: PythonSourceInput[]): FileAnalysisResult[] {
+  const parsedByFile = new Map<string, ParsedPythonFile>();
+  const parseResults = new Map<string, FileAnalysisResult>();
+
+  for (const input of inputs) {
+    const startTime = Date.now();
+    const parsed = parsePythonSource(input.sourceCode);
+
+    if (!parsed.success) {
+      parseResults.set(input.filePath, {
+        file: input.filePath,
+        language: 'python',
+        findings: [],
+        success: false,
+        error: `Tree-sitter parse failed: ${parsed.error || 'Unknown parse failure.'}`,
+        analysisTimeMs: Date.now() - startTime,
+      });
+      continue;
+    }
+
+    parsedByFile.set(input.filePath, parsed);
+    parseResults.set(input.filePath, {
+      file: input.filePath,
+      language: 'python',
+      findings: [],
+      success: true,
+      analysisTimeMs: Date.now() - startTime,
+    });
+  }
+
+  if (parsedByFile.size === 0) {
+    return inputs.map((input) => parseResults.get(input.filePath) || {
+      file: input.filePath,
+      language: 'python',
+      findings: [],
+      success: false,
+      error: 'Python file was not analyzed.',
+      analysisTimeMs: 0,
+    });
+  }
+
+  const findingsByFile = new Map<string, AFBFinding[]>();
+  const seenOperations = new Set<string>();
+  const callGraph = buildCallGraph(parsedByFile);
+
+  for (const exposed of callGraph.exposedPaths) {
+    if (exposed.hasGateInPath) {
+      continue;
+    }
+
+    const operationFile = exposed.file;
+    const parsed = parsedByFile.get(operationFile);
+    if (!parsed) {
+      continue;
+    }
+
+    const opKey = `${operationFile}:${exposed.operation.line}:${exposed.operation.callee}`;
+    if (seenOperations.has(opKey)) {
+      continue;
+    }
+    seenOperations.add(opKey);
+
+    const finding = createFindingFromExposedPath(operationFile, exposed, parsed);
+    const fileFindings = findingsByFile.get(operationFile) || [];
+    fileFindings.push(finding);
+    findingsByFile.set(operationFile, fileFindings);
+  }
+
+  for (const [filePath, fileFindings] of findingsByFile) {
+    fileFindings.sort((a, b) => {
+      const severityOrder = { critical: 0, warning: 1, info: 2, suppressed: 3 };
+      const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
+      if (sevDiff !== 0) return sevDiff;
+      return a.line - b.line;
+    });
+
+    const result = parseResults.get(filePath);
+    if (result) {
+      result.findings = fileFindings;
+    }
+  }
+
+  return inputs.map((input) => parseResults.get(input.filePath) || {
+    file: input.filePath,
+    language: 'python',
+    findings: [],
+    success: false,
+    error: 'Python file was not analyzed.',
+    analysisTimeMs: 0,
+  });
+}
+
+/**
  * Create a finding from an exposed path
  *
  * Applies the CEE (Comprehensive Exposure Evaluation) severity model:
@@ -291,6 +395,7 @@ function createFindingFromExposedPath(
 
   // Find the call that contains this operation
   const call = parsed.calls.find((c) => c.startLine === op.line && c.callee === op.callee);
+  const callPath = exposed.path.map((nodeId) => nodeId.includes(':') ? nodeId : `${filePath}:${nodeId}`);
 
   return {
     type: AFBType.UNAUTHORIZED_ACTION,
@@ -308,6 +413,12 @@ function createFindingFromExposedPath(
       enclosingClass: call?.enclosingClass,
       isToolDefinition: true,
       framework: exposed.tool.framework,
+      toolFile: exposed.tool.sourceFile,
+      toolLine: exposed.tool.startLine,
+      callPath,
+      involvesCrossFile: exposed.involvesCrossFile,
+      unresolvedCalls: exposed.unresolvedCrossFileCalls,
+      depthLimitHit: exposed.depthLimitHit,
     },
   };
 }
@@ -328,6 +439,10 @@ function buildExplanation(exposed: ExposedPath, op: DangerousOperation): string 
 
   explanation += '. ';
 
+  if (exposed.involvesCrossFile) {
+    explanation += 'The analyzed path crosses file boundaries. ';
+  }
+
   if (!exposed.hasGateInPath) {
     explanation += 'No policy gate detected in the analyzed call path. ';
 
@@ -336,7 +451,15 @@ function buildExplanation(exposed: ExposedPath, op: DangerousOperation): string 
     }
   }
 
-  return explanation;
+  if (exposed.unresolvedCrossFileCalls && exposed.unresolvedCrossFileCalls.length > 0) {
+    explanation += `Unresolved call targets while tracing: ${exposed.unresolvedCrossFileCalls.slice(0, 5).join(', ')}. `;
+  }
+
+  if (exposed.depthLimitHit) {
+    explanation += 'Cross-file depth limit was reached while tracing this path. Manual review recommended. ';
+  }
+
+  return explanation.trim();
 }
 
 /**

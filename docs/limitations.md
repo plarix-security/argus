@@ -7,8 +7,8 @@
 
 ## Call-Path Scope
 
-- The shipped CLI and GitHub App scan flow analyzes Python files independently.
-- Repository-wide cross-file call-path tracing is not part of the current shipped guarantee.
+- Directory scans graph the analyzed Python file set together.
+- Changed-file GitHub App scans do not guarantee full repository coverage.
 - Third-party package internals are not traced.
 
 ## Registration Scope

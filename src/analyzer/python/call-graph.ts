@@ -158,6 +158,15 @@ export const DEFAULT_IMPORT_CONFIG: ImportResolutionConfig = {
   emitSuppressedOnLimit: true,
 };
 
+function extractFileFromNodeId(nodeId: string): string | null {
+  const separatorIndex = nodeId.lastIndexOf(':');
+  if (separatorIndex === -1) {
+    return null;
+  }
+
+  return nodeId.slice(0, separatorIndex);
+}
+
 /**
  * Framework detection patterns for tool registration
  *
@@ -996,8 +1005,8 @@ export function buildCallGraph(
       // With cross-file IDs, we can extract the file from the path nodes
       let file = tool.sourceFile || '<unknown>';
       for (const nodeId of path) {
-        if (nodeId.includes(':')) {
-          const operationFile = nodeId.split(':')[0];
+        const operationFile = extractFileFromNodeId(nodeId);
+        if (operationFile) {
           // The operation is in the last file in the path that contains the operation
           for (const [filePath, parsed] of files) {
             const matchingCall = parsed.calls.find(
@@ -1253,8 +1262,9 @@ function findDangerousPathsFromNode(
   // Track cross-file involvement: check if path spans multiple files
   const filesInPath = new Set<string>();
   for (const nodeId of currentPath) {
-    if (nodeId.includes(':')) {
-      filesInPath.add(nodeId.split(':')[0]);
+    const file = extractFileFromNodeId(nodeId);
+    if (file) {
+      filesInPath.add(file);
     }
   }
   const involvesCrossFile = filesInPath.size > 1;
@@ -1279,8 +1289,8 @@ function findDangerousPathsFromNode(
       const calleeNode = allNodes.get(calleeId);
 
       // Determine if this call crosses a file boundary
-      const currentFile = node.id.includes(':') ? node.id.split(':')[0] : '';
-      const calleeFile = calleeId.includes(':') ? calleeId.split(':')[0] : '';
+      const currentFile = extractFileFromNodeId(node.id) || '';
+      const calleeFile = extractFileFromNodeId(calleeId) || '';
       const crossesFileBoundary = currentFile !== calleeFile && calleeFile !== '';
       const newCrossFileDepth = crossesFileBoundary ? currentCrossFileDepth + 1 : currentCrossFileDepth;
 

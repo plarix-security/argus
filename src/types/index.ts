@@ -111,6 +111,18 @@ export interface AFBFinding {
     isToolDefinition?: boolean;
     /** The framework detected (langchain, crewai, custom) */
     framework?: string;
+    /** File where the tool registration was detected */
+    toolFile?: string;
+    /** Line where the tool registration starts */
+    toolLine?: number;
+    /** Call path from tool registration to matched operation */
+    callPath?: string[];
+    /** Whether the matched path crossed file boundaries */
+    involvesCrossFile?: boolean;
+    /** Unresolved calls encountered while tracing */
+    unresolvedCalls?: string[];
+    /** Whether call tracing hit the configured depth limit */
+    depthLimitHit?: boolean;
   };
 }
 
@@ -175,6 +187,12 @@ export interface AnalysisReport {
       language: SupportedLanguage;
       reason: string;
     }>;
+    /** Whether analysis was truncated by a configured file limit */
+    fileLimitHit?: boolean;
+    /** Configured file limit if applied */
+    fileLimit?: number;
+    /** Total analyzable files discovered before applying any configured limit */
+    totalFilesDiscovered?: number;
   };
 }
 

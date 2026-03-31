@@ -891,6 +891,21 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
   try {
     const tree = parser.parse(sourceCode);
     const root = tree.rootNode;
+
+    if (root.hasError) {
+      return {
+        functions: [],
+        classes: [],
+        calls: [],
+        imports: [],
+        decoratorDefs: [],
+        openaiToolSchemas: [],
+        dispatchMappings: [],
+        success: false,
+        error: 'Tree-sitter produced a syntax-error parse tree.',
+      };
+    }
+
     const lines = sourceCode.split('\n');
 
     const functions: FunctionDef[] = [];
