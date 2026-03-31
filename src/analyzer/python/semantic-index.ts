@@ -138,6 +138,10 @@ export class PythonSemanticIndex {
     return roots;
   }
 
+  resolveCallableNodeIds(reference: string, filePath: string, className?: string): string[] {
+    return Array.from(this.resolveReferenceToFunctionNodes(reference, { filePath, className }, new Set<string>()));
+  }
+
   private buildIndex(): void {
     for (const [filePath, parsed] of this.files) {
       const localFunctions = new Map<string, string>();
@@ -336,6 +340,15 @@ export class PythonSemanticIndex {
     visited.add(visitKey);
     const result = new Set<string>();
     const localFunctions = this.functionsByFile.get(context.filePath) || new Map<string, string>();
+
+    if (reference.startsWith('self.') && context.className) {
+      const methodName = reference.slice('self.'.length);
+      const selfNodeId = makeNodeId(context.filePath, `${context.className}.${methodName}`);
+      if (this.files.has(context.filePath) && Array.from(localFunctions.values()).includes(selfNodeId)) {
+        result.add(selfNodeId);
+        return result;
+      }
+    }
 
     if (localFunctions.has(reference)) {
       result.add(localFunctions.get(reference)!);

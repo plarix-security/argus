@@ -26,6 +26,7 @@ import {
   FunctionDispatchMapping,
 } from './ast-parser';
 import {
+  PythonSemanticIndex,
   extractSemanticInvocationRoots,
   SemanticInvocationRoot,
 } from './semantic-index';
@@ -100,6 +101,8 @@ export interface DangerousOperation {
   line: number;
   column: number;
   codeSnippet: string;
+  sourceFile?: string;
+  enclosingNodeId?: string;
 }
 
 /**
@@ -843,7 +846,8 @@ export function buildCallGraph(
 
   // Get all file paths for cross-file resolution
   const allFilePaths = Array.from(files.keys());
-  const semanticRoots = extractSemanticInvocationRoots(files);
+  const semanticIndex = new PythonSemanticIndex(files);
+  const semanticRoots = semanticIndex.extractInvocationRoots();
 
   // Build cross-file import map
   const importMap = buildCrossFileImportMap(files, allFilePaths);
@@ -979,36 +983,47 @@ export function buildCallGraph(
 
         // Try to resolve the callee
         // First, check if it's a local function (same file)
-        let resolvedCalleeId: string | undefined;
+        let resolvedCalleeIds: string[] = [];
         const localCalleeId = `${filePath}:${call.callee}`;
 
         if (nodes.has(localCalleeId)) {
-          resolvedCalleeId = localCalleeId;
+          resolvedCalleeIds = [localCalleeId];
         } else {
-          // Try cross-file resolution
-          const crossFileResult = resolveCrossFileCall(
+          resolvedCalleeIds = semanticIndex.resolveCallableNodeIds(
             call.callee,
             filePath,
-            importMap,
-            files
+            call.enclosingClass
           );
-          if (crossFileResult) {
-            resolvedCalleeId = crossFileResult.nodeId;
+
+          if (resolvedCalleeIds.length === 0) {
+            // Try cross-file resolution fallback
+            const crossFileResult = resolveCrossFileCall(
+              call.callee,
+              filePath,
+              importMap,
+              files
+            );
+            if (crossFileResult) {
+              resolvedCalleeIds = [crossFileResult.nodeId];
+            }
           }
         }
 
-        // Add callee to caller's outgoing edges (use resolved ID if found)
-        const calleeRef = resolvedCalleeId || call.callee;
-        callerNode.callees.add(calleeRef);
+        if (resolvedCalleeIds.length > 0) {
+          for (const resolvedCalleeId of resolvedCalleeIds) {
+            callerNode.callees.add(resolvedCalleeId);
 
-        // If resolved, establish bidirectional edge
-        if (resolvedCalleeId && nodes.has(resolvedCalleeId)) {
-          const calleeNode = nodes.get(resolvedCalleeId)!;
-          calleeNode.callers.add(callerId);
+            if (nodes.has(resolvedCalleeId)) {
+              const calleeNode = nodes.get(resolvedCalleeId)!;
+              calleeNode.callers.add(callerId);
+            }
+          }
+        } else {
+          callerNode.callees.add(call.callee);
         }
 
         // Check if this call is a dangerous operation
-        const dangerousOp = detectDangerousOperation(call);
+        const dangerousOp = detectDangerousOperation(call, callerId, filePath);
         if (dangerousOp) {
           callerNode.dangerousOps.push(dangerousOp);
         }
@@ -1030,24 +1045,7 @@ export function buildCallGraph(
     );
 
     for (const { operation, path, hasGate, involvesCrossFile, unresolvedCalls, depthLimitHit } of paths) {
-      // Find the file containing this operation
-      // With cross-file IDs, we can extract the file from the path nodes
-      let file = tool.sourceFile || '<unknown>';
-      for (const nodeId of path) {
-        const operationFile = extractFileFromNodeId(nodeId);
-        if (operationFile) {
-          // The operation is in the last file in the path that contains the operation
-          for (const [filePath, parsed] of files) {
-            const matchingCall = parsed.calls.find(
-              (c) => c.startLine === operation.line && c.callee === operation.callee
-            );
-            if (matchingCall) {
-              file = filePath;
-              break;
-            }
-          }
-        }
-      }
+      const file = operation.sourceFile || tool.sourceFile || '<unknown>';
 
       // Check if any node in the path is a validation helper
       const hasValidationHelperInPath = path.some(nodeId => {
@@ -1255,7 +1253,7 @@ function detectToolClass(
  * For open() calls, checks the mode argument to determine if write (WARNING)
  * or read (INFO). Default mode 'r' is read.
  */
-function detectDangerousOperation(call: CallSite): DangerousOperation | null {
+function detectDangerousOperation(call: CallSite, callerId: string, filePath: string): DangerousOperation | null {
   for (const pattern of DANGEROUS_OPERATION_PATTERNS) {
     if (pattern.pattern.test(call.callee)) {
       let severity = pattern.severity;
@@ -1291,6 +1289,8 @@ function detectDangerousOperation(call: CallSite): DangerousOperation | null {
         line: call.startLine,
         column: call.startColumn,
         codeSnippet: call.codeSnippet,
+        sourceFile: filePath,
+        enclosingNodeId: callerId,
       };
     }
   }
