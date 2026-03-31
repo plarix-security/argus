@@ -225,7 +225,7 @@ export class PythonSemanticIndex {
     }
 
     if (call.memberChain?.[call.memberChain.length - 1] === 'register_function') {
-      const receiver = this.resolveAssignedConstructor(call.baseExpression, context);
+      const receiver = this.resolveAssignedConstructor(this.buildReceiverReference(call, 1), context);
       if (receiver.modulePath === 'autogen' && receiver.importedName === 'UserProxyAgent') {
         const toolArg = getCallArgument(call, 'function_map');
         this.addRootsFromMappingArgument(toolArg, context, 'autogen', `register_function at line ${call.startLine}`, roots);
@@ -234,7 +234,7 @@ export class PythonSemanticIndex {
     }
 
     if (call.memberChain?.[call.memberChain.length - 1] === 'bind_tools') {
-      const receiver = this.resolveAssignedConstructor(call.baseExpression, context);
+      const receiver = this.resolveAssignedConstructor(this.buildReceiverReference(call, 1), context);
       if (receiver.modulePath === 'langchain_openai') {
         const toolArg = getCallArgument(call, 'tools', 0);
         this.addRootsFromArgument(toolArg, context, 'langgraph', `bind_tools at line ${call.startLine}`, roots);
@@ -377,8 +377,7 @@ export class PythonSemanticIndex {
         }
       }
 
-      const assignment = this.findAssignment(reference, context);
-      if (assignment) {
+      for (const assignment of this.findAssignments(reference, context)) {
         for (const toolName of this.resolveOpenAIToolNames(assignment.value, { filePath: context.filePath, className: assignment.enclosingClass }, visited)) {
           result.add(toolName);
         }
@@ -409,14 +408,11 @@ export class PythonSemanticIndex {
     }
 
     for (const reference of expression.references) {
-      const assignment = this.findAssignment(reference, context);
-      if (!assignment) {
-        continue;
-      }
-
-      for (const mapping of assignment.value.mappingReferences) {
-        for (const nodeId of this.resolveReferenceToFunctionNodes(mapping.reference, { filePath: context.filePath, className: assignment.enclosingClass }, visited)) {
-          result.add(nodeId);
+      for (const assignment of this.findAssignments(reference, context)) {
+        for (const mapping of assignment.value.mappingReferences) {
+          for (const nodeId of this.resolveReferenceToFunctionNodes(mapping.reference, { filePath: context.filePath, className: assignment.enclosingClass }, visited)) {
+            result.add(nodeId);
+          }
         }
       }
     }
@@ -474,12 +470,16 @@ export class PythonSemanticIndex {
       return result;
     }
 
-    const assignment = this.findAssignment(reference, context);
-    if (assignment) {
-      for (const nodeId of this.expandExpressionToFunctionNodes(assignment.value, { filePath: context.filePath, className: assignment.enclosingClass }, visited)) {
-        result.add(nodeId);
+    const assignments = this.findAssignments(reference, context);
+    if (assignments.length > 0) {
+      for (const assignment of assignments) {
+        for (const nodeId of this.expandExpressionToFunctionNodes(assignment.value, { filePath: context.filePath, className: assignment.enclosingClass }, visited)) {
+          result.add(nodeId);
+        }
       }
-      return result;
+      if (result.size > 0) {
+        return result;
+      }
     }
 
     const imported = this.resolveImportedSymbol(reference, context.filePath);
@@ -490,8 +490,7 @@ export class PythonSemanticIndex {
         return result;
       }
 
-      const importedAssignment = this.findAssignment(imported.importedName, { filePath: imported.resolvedFile });
-      if (importedAssignment) {
+      for (const importedAssignment of this.findAssignments(imported.importedName, { filePath: imported.resolvedFile })) {
         for (const nodeId of this.expandExpressionToFunctionNodes(importedAssignment.value, { filePath: imported.resolvedFile, className: importedAssignment.enclosingClass }, visited)) {
           result.add(nodeId);
         }
@@ -507,8 +506,7 @@ export class PythonSemanticIndex {
           result.add(targetFunctions.get(member)!);
         }
 
-        const importedAssignment = this.findAssignment(member, { filePath: importedBase.resolvedFile });
-        if (importedAssignment) {
+        for (const importedAssignment of this.findAssignments(member, { filePath: importedBase.resolvedFile })) {
           for (const nodeId of this.expandExpressionToFunctionNodes(importedAssignment.value, { filePath: importedBase.resolvedFile, className: importedAssignment.enclosingClass }, visited)) {
             result.add(nodeId);
           }
@@ -524,7 +522,10 @@ export class PythonSemanticIndex {
       return {};
     }
 
-    const assignment = this.findAssignment(baseExpression, context);
+    const assignment = this.findAssignments(baseExpression, context)
+      .slice()
+      .reverse()
+      .find((candidate) => candidate.value.callCallee);
     if (!assignment?.value.callCallee) {
       return {};
     }
@@ -540,14 +541,25 @@ export class PythonSemanticIndex {
     };
   }
 
-  private findAssignment(reference: string, context: ResolutionContext): AssignmentInfo | undefined {
+  private buildReceiverReference(call: CallSite, trailingMemberCount: number): string | undefined {
+    if (!call.baseExpression) {
+      return undefined;
+    }
+
+    const memberChain = call.memberChain || [];
+    const receiverSegments = memberChain.slice(0, Math.max(0, memberChain.length - trailingMemberCount));
+    const parts = [call.baseExpression, ...receiverSegments].filter(Boolean);
+    return parts.length > 0 ? parts.join('.') : undefined;
+  }
+
+  private findAssignments(reference: string, context: ResolutionContext): AssignmentInfo[] {
     const assignments = this.assignmentsByFile.get(context.filePath) || [];
 
     if (reference.startsWith('self.') && context.className) {
-      return assignments.find((assignment) => assignment.target === reference && assignment.enclosingClass === context.className);
+      return assignments.filter((assignment) => assignment.target === reference && assignment.enclosingClass === context.className);
     }
 
-    return assignments.find((assignment) => assignment.target === reference && !assignment.enclosingFunction);
+    return assignments.filter((assignment) => assignment.target === reference && !assignment.enclosingFunction);
   }
 
   private resolveImportedSymbol(reference: string, filePath: string): ImportBinding | undefined {
@@ -560,12 +572,12 @@ export class PythonSemanticIndex {
       return false;
     }
 
-    const memberChain = call.memberChain.join('.');
+    const memberChain = call.memberChain.slice(-3).join('.');
     if (memberChain !== 'chat.completions.create') {
       return false;
     }
 
-    const receiver = this.resolveAssignedConstructor(call.baseExpression, context);
+    const receiver = this.resolveAssignedConstructor(this.buildReceiverReference(call, 3), context);
     return receiver.modulePath === 'openai' && ['OpenAI', 'AsyncOpenAI'].includes(receiver.importedName || '');
   }
 }

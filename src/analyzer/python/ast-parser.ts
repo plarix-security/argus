@@ -575,6 +575,16 @@ function extractAssignmentTarget(node: Parser.SyntaxNode | null): string | null 
   return null;
 }
 
+function extractMutationTarget(callNode: Parser.SyntaxNode): string | null {
+  const calleeInfo = extractCalleeInfo(callNode);
+  const operation = calleeInfo.memberChain[calleeInfo.memberChain.length - 1];
+  if (!calleeInfo.baseExpression || !['extend', 'append'].includes(operation || '')) {
+    return null;
+  }
+
+  return calleeInfo.baseExpression;
+}
+
 /**
  * Find enclosing function for a node
  */
@@ -1355,6 +1365,18 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
         baseExpression: calleeInfo.baseExpression,
         memberChain: calleeInfo.memberChain,
       });
+
+      const mutationTarget = extractMutationTarget(callNode);
+      const mutationArgument = extractArgumentDetails(callNode)[0];
+      if (mutationTarget && mutationArgument) {
+        assignments.push({
+          target: mutationTarget,
+          value: mutationArgument.value,
+          startLine: callNode.startPosition.row + 1,
+          enclosingFunction: enclosingFunc ? extractFunctionName(enclosingFunc) : undefined,
+          enclosingClass: enclosingClass ? extractClassName(enclosingClass) : undefined,
+        });
+      }
     }
 
     for (const assignmentNode of assignmentNodes) {

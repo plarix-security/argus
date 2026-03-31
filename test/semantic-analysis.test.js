@@ -144,6 +144,44 @@ describe('semantic-first python analysis', () => {
     expect(report.cees[0].evidenceKind).not.toBe('heuristic');
   });
 
+  test('extended tool bundles keep framework attachment for later-added tools', async () => {
+    const projectDir = makeTempProject({
+      'graph.py': [
+        'from langgraph.prebuilt import create_react_agent',
+        'from tools import BASE_TOOLS',
+        '',
+        'def build_agent(model):',
+        '    return create_react_agent(model, BASE_TOOLS)',
+        '',
+      ].join('\n'),
+      'tools.py': [
+        'from langchain_core.tools import tool',
+        'import shutil',
+        '',
+        '@tool',
+        'def low_level(target: str):',
+        '    shutil.rmtree(target)',
+        '',
+        '@tool',
+        'def high_level(target: str):',
+        '    return low_level.invoke({"target": target})',
+        '',
+        'BASE_TOOLS = [low_level]',
+        'BASE_TOOLS.extend([high_level])',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+    const highLevel = report.cees.filter((cee) => cee.tool === 'high_level');
+
+    expect(highLevel).toHaveLength(1);
+    expect(highLevel[0].framework).toBe('langgraph');
+    expect(highLevel[0].callPath).toHaveLength(2);
+  });
+
   test('cee evidence records traced input flow into dangerous operations', async () => {
     const projectDir = makeTempProject({
       'tools.py': [
