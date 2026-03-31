@@ -544,6 +544,10 @@ function buildExplanation(exposed: ExposedPath, op: DangerousOperation): string 
   if (!exposed.hasGateInPath) {
     explanation += 'No policy gate detected in the analyzed call path. ';
 
+    if (exposed.hasHeuristicGateInPath) {
+      explanation += 'Authorization-like decorator names were present, but the analyzed path did not provide structural gate evidence. ';
+    }
+
     if (exposed.hasValidationHelperInPath) {
       explanation += 'The analyzed path includes a probable validation-helper name. This is heuristic and only affected severity. ';
     }

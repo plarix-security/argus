@@ -82,6 +82,8 @@ export interface CallGraphNode {
   dangerousOps: DangerousOperation[];
   /** Whether this function is a structural policy gate */
   hasPolicyGate: boolean;
+  /** Whether this node only has auth-like naming evidence, not structural proof */
+  hasHeuristicGateIndicator?: boolean;
   /** Whether this function is a likely validation helper */
   isValidationHelper: boolean;
   /** Control flow information */
@@ -140,6 +142,8 @@ export interface ExposedPath {
   path: string[];
   /** Whether any node in path has a policy gate */
   hasGateInPath: boolean;
+  /** Whether auth-like gate names appeared without structural proof */
+  hasHeuristicGateInPath?: boolean;
   /** Whether any node in path is a likely validation helper */
   hasValidationHelperInPath: boolean;
   /** File path */
@@ -904,8 +908,9 @@ export function buildCallGraph(
         callers: new Set(),
         isToolRegistration: false,
         dangerousOps: [],
-        // Use structural analysis + decorator analysis + known auth patterns to determine if this is a policy gate
-        hasPolicyGate: hasStructuralGate || hasDecoratorGate || hasKnownAuthDecorator,
+        // Full gate credit requires structural proof in the analyzed code path.
+        hasPolicyGate: hasStructuralGate || hasDecoratorGate,
+        hasHeuristicGateIndicator: hasKnownAuthDecorator && !(hasStructuralGate || hasDecoratorGate),
         // Check if this function name suggests it's a validation helper
         isValidationHelper: isLikelyValidationHelper(func.name),
         controlFlow: func.controlFlow,
@@ -974,8 +979,9 @@ export function buildCallGraph(
           toolDetectionKind: toolInfo?.kind,
           toolDetectionEvidence: toolInfo?.evidence,
           dangerousOps: [],
-          // Use structural analysis + decorator analysis + known auth patterns to determine if this is a policy gate
-          hasPolicyGate: hasStructuralGate || hasDecoratorGate || hasKnownAuthDecorator,
+          // Full gate credit requires structural proof in the analyzed code path.
+          hasPolicyGate: hasStructuralGate || hasDecoratorGate,
+          hasHeuristicGateIndicator: hasKnownAuthDecorator && !(hasStructuralGate || hasDecoratorGate),
           // Check if this method name suggests it's a validation helper
           isValidationHelper: isLikelyValidationHelper(method.name),
           controlFlow: method.controlFlow,
@@ -1082,12 +1088,21 @@ export function buildCallGraph(
         const node = nodes.get(nodeId);
         return node?.isValidationHelper || false;
       });
+      const hasHeuristicGateInPath = path.some((nodeId) => {
+        const node = nodes.get(nodeId);
+        return node?.hasHeuristicGateIndicator || false;
+      });
+      const supportingEvidence = [...(flowEvidence.supportingEvidence || [])];
+      if (hasHeuristicGateInPath) {
+        supportingEvidence.push('Authorization-like decorator names were present, but no structural gate was proven in the analyzed path');
+      }
 
       exposedPaths.push({
         tool,
         operation,
         path,
         hasGateInPath: hasGate,
+        hasHeuristicGateInPath,
         hasValidationHelperInPath,
         file,
         involvesCrossFile,
@@ -1097,7 +1112,7 @@ export function buildCallGraph(
         instructionLikeInput: flowEvidence.instructionLikeInput,
         resourceHint: operation.resourceHint,
         changesState: operation.changesState,
-        supportingEvidence: flowEvidence.supportingEvidence,
+        supportingEvidence,
         evidenceKind: tool.toolDetectionKind === 'heuristic' ? 'heuristic' : (flowEvidence.inputFlowsToOperation ? 'structural' : 'semantic'),
       });
     }
