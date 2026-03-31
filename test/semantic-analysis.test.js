@@ -17,6 +17,42 @@ function makeTempProject(files) {
 }
 
 describe('semantic-first python analysis', () => {
+  test('manual OpenAI tool manifests resolve to semantic tool roots', async () => {
+    const projectDir = makeTempProject({
+      'agent.py': [
+        'import os',
+        'from openai import OpenAI',
+        'from tools import calculate, CALCULATOR_TOOLS',
+        '',
+        'class ReactAgent:',
+        '    def __init__(self):',
+        '        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))',
+        '        self.tools = CALCULATOR_TOOLS',
+        '        self.tool_functions = {"calculate": calculate}',
+        '',
+        '    def run(self, task: str):',
+        '        return self.client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": task}], tools=self.tools)',
+        '',
+      ].join('\n'),
+      'tools.py': [
+        'def calculate(expression: str):',
+        '    return eval(expression)',
+        '',
+        'CALCULATOR_TOOLS = [{"type": "function", "function": {"name": "calculate", "parameters": {"type": "object", "properties": {"expression": {"type": "string"}}}}}]',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(1);
+    expect(report.cees[0].tool).toBe('calculate');
+    expect(report.cees[0].framework).toBe('openai');
+    expect(report.cees[0].evidenceKind).not.toBe('heuristic');
+  });
+
   test('langgraph create_react_agent roots tools semantically', async () => {
     const projectDir = makeTempProject({
       'graph.py': [
@@ -68,6 +104,43 @@ describe('semantic-first python analysis', () => {
     expect(report.totalCEEs).toBe(1);
     expect(report.cees[0].tool).toBe('cleanup_workspace');
     expect(report.cees[0].framework).toBe('autogen');
+    expect(report.cees[0].evidenceKind).not.toBe('heuristic');
+  });
+
+  test('langchain create_tool_calling_agent roots tools semantically', async () => {
+    const projectDir = makeTempProject({
+      'agent.py': [
+        'from langchain.agents import create_tool_calling_agent, AgentExecutor',
+        'from langchain_openai import ChatOpenAI',
+        'from langchain_core.prompts import ChatPromptTemplate',
+        'from tools import execute_transform',
+        '',
+        'class RAGAgent:',
+        '    def __init__(self):',
+        '        self.llm = ChatOpenAI(model="gpt-4o")',
+        '        self.tools = [execute_transform]',
+        '        prompt = ChatPromptTemplate.from_messages([("human", "{input}")])',
+        '        agent = create_tool_calling_agent(self.llm, self.tools, prompt)',
+        '        self.executor = AgentExecutor(agent=agent, tools=self.tools)',
+        '',
+      ].join('\n'),
+      'tools.py': [
+        'from langchain_core.tools import tool',
+        '',
+        '@tool',
+        'def execute_transform(code: str):',
+        '    exec(code)',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(1);
+    expect(report.cees[0].tool).toBe('execute_transform');
+    expect(report.cees[0].framework).toBe('langchain');
     expect(report.cees[0].evidenceKind).not.toBe('heuristic');
   });
 

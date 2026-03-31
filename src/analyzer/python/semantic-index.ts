@@ -3,6 +3,8 @@ import {
   AssignmentInfo,
   CallArgumentInfo,
   CallSite,
+  FunctionDispatchMapping,
+  OpenAIToolSchema,
   ParsedPythonFile,
 } from './ast-parser';
 
@@ -104,6 +106,8 @@ export class PythonSemanticIndex {
   private readonly importBindings = new Map<string, Map<string, ImportBinding>>();
   private readonly functionsByFile = new Map<string, Map<string, string>>();
   private readonly assignmentsByFile = new Map<string, AssignmentInfo[]>();
+  private readonly openAIToolSchemasByFile = new Map<string, OpenAIToolSchema[]>();
+  private readonly dispatchMappingsByFile = new Map<string, FunctionDispatchMapping[]>();
 
   constructor(private readonly files: Map<string, ParsedPythonFile>) {
     this.allFilePaths = Array.from(files.keys());
@@ -152,6 +156,8 @@ export class PythonSemanticIndex {
 
       this.functionsByFile.set(filePath, localFunctions);
       this.assignmentsByFile.set(filePath, parsed.assignments);
+      this.openAIToolSchemasByFile.set(filePath, parsed.openaiToolSchemas);
+      this.dispatchMappingsByFile.set(filePath, parsed.dispatchMappings);
 
       const bindings = new Map<string, ImportBinding>();
       for (const imp of parsed.imports) {
@@ -188,6 +194,18 @@ export class PythonSemanticIndex {
       return;
     }
 
+    if (directImport?.modulePath === 'langchain.agents' && directImport.importedName === 'create_tool_calling_agent') {
+      const toolArg = getCallArgument(call, 'tools', 1);
+      this.addRootsFromArgument(toolArg, context, 'langchain', `create_tool_calling_agent at line ${call.startLine}`, roots);
+      return;
+    }
+
+    if (directImport?.modulePath === 'langchain.agents' && directImport.importedName === 'AgentExecutor') {
+      const toolArg = getCallArgument(call, 'tools', 1);
+      this.addRootsFromArgument(toolArg, context, 'langchain', `AgentExecutor tools at line ${call.startLine}`, roots);
+      return;
+    }
+
     if (directImport?.modulePath === 'smolagents' && ['CodeAgent', 'ToolCallingAgent'].includes(directImport.importedName || '')) {
       const toolArg = getCallArgument(call, 'tools', 0);
       this.addRootsFromArgument(toolArg, context, 'smolagents', `${directImport.importedName} tools at line ${call.startLine}`, roots);
@@ -221,6 +239,12 @@ export class PythonSemanticIndex {
         const toolArg = getCallArgument(call, 'tools', 0);
         this.addRootsFromArgument(toolArg, context, 'langgraph', `bind_tools at line ${call.startLine}`, roots);
       }
+      return;
+    }
+
+    if (this.isOpenAIChatCompletionCreate(call, context)) {
+      const toolArg = getCallArgument(call, 'tools');
+      this.addRootsFromOpenAITools(toolArg, context, `chat.completions.create at line ${call.startLine}`, roots);
     }
   }
 
@@ -294,6 +318,87 @@ export class PythonSemanticIndex {
     }
   }
 
+  private addRootsFromOpenAITools(
+    argument: CallArgumentInfo | undefined,
+    context: ResolutionContext,
+    evidence: string,
+    roots: Map<string, SemanticInvocationRoot>
+  ): void {
+    if (!argument) {
+      return;
+    }
+
+    const toolNames = this.resolveOpenAIToolNames(argument.value, context, new Set<string>());
+    if (toolNames.size === 0) {
+      return;
+    }
+
+    const dispatchMappings = this.dispatchMappingsByFile.get(context.filePath) || [];
+    for (const dispatchMapping of dispatchMappings) {
+      for (const toolName of toolNames) {
+        const functionReference = dispatchMapping.mappings.get(toolName);
+        if (!functionReference) {
+          continue;
+        }
+
+        for (const nodeId of this.resolveReferenceToFunctionNodes(functionReference, context, new Set<string>())) {
+          if (!roots.has(nodeId)) {
+            roots.set(nodeId, {
+              nodeId,
+              framework: 'openai',
+              evidence: `${evidence} via dispatch mapping ${dispatchMapping.variableName}`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  private resolveOpenAIToolNames(
+    expression: { references: string[] },
+    context: ResolutionContext,
+    visited: Set<string>
+  ): Set<string> {
+    const result = new Set<string>();
+
+    for (const reference of expression.references) {
+      const visitKey = `${context.filePath}:${reference}`;
+      if (visited.has(visitKey)) {
+        continue;
+      }
+
+      visited.add(visitKey);
+
+      for (const schema of this.openAIToolSchemasByFile.get(context.filePath) || []) {
+        if (schema.variableName === reference) {
+          for (const toolName of schema.toolNames) {
+            result.add(toolName);
+          }
+        }
+      }
+
+      const assignment = this.findAssignment(reference, context);
+      if (assignment) {
+        for (const toolName of this.resolveOpenAIToolNames(assignment.value, { filePath: context.filePath, className: assignment.enclosingClass }, visited)) {
+          result.add(toolName);
+        }
+      }
+
+      const imported = this.resolveImportedSymbol(reference, context.filePath);
+      if (imported?.resolvedFile) {
+        for (const schema of this.openAIToolSchemasByFile.get(imported.resolvedFile) || []) {
+          if (schema.variableName === (imported.importedName || reference)) {
+            for (const toolName of schema.toolNames) {
+              result.add(toolName);
+            }
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
   private expandMappingToFunctionNodes(expression: { references: string[]; mappingReferences: Array<{ key: string; reference: string }> }, context: ResolutionContext, visited: Set<string>): Set<string> {
     const result = new Set<string>();
 
@@ -340,6 +445,20 @@ export class PythonSemanticIndex {
     visited.add(visitKey);
     const result = new Set<string>();
     const localFunctions = this.functionsByFile.get(context.filePath) || new Map<string, string>();
+
+    if (reference.includes('.')) {
+      const parts = reference.split('.');
+      const lastPart = parts[parts.length - 1];
+      if (['invoke', 'ainvoke', 'run', 'arun', 'execute', '_run', '_execute', '__call__'].includes(lastPart)) {
+        const receiverReference = parts.slice(0, -1).join('.');
+        for (const nodeId of this.resolveReferenceToFunctionNodes(receiverReference, context, visited)) {
+          result.add(nodeId);
+        }
+        if (result.size > 0) {
+          return result;
+        }
+      }
+    }
 
     if (reference.startsWith('self.') && context.className) {
       const methodName = reference.slice('self.'.length);
@@ -434,6 +553,20 @@ export class PythonSemanticIndex {
   private resolveImportedSymbol(reference: string, filePath: string): ImportBinding | undefined {
     const baseName = reference.split('.')[0];
     return this.importBindings.get(filePath)?.get(baseName);
+  }
+
+  private isOpenAIChatCompletionCreate(call: CallSite, context: ResolutionContext): boolean {
+    if (!call.memberChain || call.memberChain.length < 3) {
+      return false;
+    }
+
+    const memberChain = call.memberChain.join('.');
+    if (memberChain !== 'chat.completions.create') {
+      return false;
+    }
+
+    const receiver = this.resolveAssignedConstructor(call.baseExpression, context);
+    return receiver.modulePath === 'openai' && ['OpenAI', 'AsyncOpenAI'].includes(receiver.importedName || '');
   }
 }
 
