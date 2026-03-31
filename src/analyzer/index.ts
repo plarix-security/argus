@@ -95,6 +95,14 @@ export class AFBAnalyzer {
 
   private buildReport(repository: string, results: FileAnalysisResult[], failedFiles: string[], startTime: number): AnalysisReport {
     const allFindings = results.flatMap(r => r.findings).filter(f => f.confidence >= this.config.minConfidence);
+    const skippedFiles = results
+      .filter((result) => result.skipped)
+      .map((result) => ({
+        file: result.file,
+        language: result.language,
+        reason: result.skipReason || 'File skipped.',
+      }));
+
     allFindings.sort((a, b) => {
       const severityOrder = { critical: 0, warning: 1, info: 2, suppressed: 3 };
       const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
@@ -114,7 +122,13 @@ export class AFBAnalyzer {
         suppressed: allFindings.filter(f => f.severity === Severity.SUPPRESSED).length,
       },
       findings: allFindings,
-      metadata: { scannerVersion: VERSION, timestamp: new Date().toISOString(), totalTimeMs: Date.now() - startTime, failedFiles },
+      metadata: {
+        scannerVersion: VERSION,
+        timestamp: new Date().toISOString(),
+        totalTimeMs: Date.now() - startTime,
+        failedFiles,
+        skippedFiles,
+      },
     };
   }
 }

@@ -169,6 +169,12 @@ export interface AnalysisReport {
     totalTimeMs: number;
     /** Files that failed to analyze */
     failedFiles: string[];
+    /** Files that were skipped explicitly */
+    skippedFiles: Array<{
+      file: string;
+      language: SupportedLanguage;
+      reason: string;
+    }>;
   };
 }
 

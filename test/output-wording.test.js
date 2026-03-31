@@ -35,6 +35,7 @@ const report = {
     timestamp: '2026-03-31T00:00:00.000Z',
     totalTimeMs: 10,
     failedFiles: [],
+    skippedFiles: [],
   },
 };
 

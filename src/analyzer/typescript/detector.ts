@@ -15,7 +15,8 @@
  * planned for a future release.
  */
 
-import { FileAnalysisResult } from "../../types";
+import * as path from 'path';
+import { FileAnalysisResult } from '../../types';
 
 /**
  * Analyzes a TypeScript/JavaScript file for AFB04 boundaries.
@@ -26,20 +27,21 @@ import { FileAnalysisResult } from "../../types";
  */
 export function analyzeTypeScriptFile(filePath: string, sourceCode: string): FileAnalysisResult {
   const startTime = Date.now();
+  const ext = path.extname(filePath).toLowerCase();
+  const language = ext === '.js' || ext === '.jsx' ? 'javascript' : 'typescript';
+  const displayLanguage = language === 'javascript' ? 'JavaScript' : 'TypeScript';
 
-  // Emit INFO-level message to stderr (not a finding, just notification)
-  // Only emit once per file, and only if the file is not empty
   if (sourceCode.trim().length > 0) {
-    console.error(`INFO: TypeScript support is in progress. No findings will be reported for: ${filePath}`);
+    console.error(`INFO: Skipping unsupported ${displayLanguage} file: ${filePath}`);
   }
 
   return {
     file: filePath,
-    language: "typescript",
+    language,
     findings: [],
     success: true,
     analysisTimeMs: Date.now() - startTime,
     skipped: true,
-    skipReason: "TypeScript/JavaScript detection not yet implemented. Full call graph analysis required.",
+    skipReason: `${displayLanguage} scanning is not implemented in this version. File skipped.`,
   };
 }

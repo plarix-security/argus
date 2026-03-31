@@ -11,6 +11,47 @@ import {
   Severity,
 } from '../types';
 
+function getCoverageLines(report: AnalysisReport): string[] {
+  const skippedFiles = report.metadata.skippedFiles;
+  const failedFiles = report.metadata.failedFiles;
+  const skippedLanguages = Array.from(new Set(skippedFiles.map((file) => file.language))).sort();
+  const partialCoverage = skippedFiles.length > 0 || failedFiles.length > 0;
+  const lines = [
+    `**Coverage:** ${partialCoverage ? 'partial' : 'full'}`,
+  ];
+
+  if (failedFiles.length > 0) {
+    lines.push(`**Files failed:** ${failedFiles.length}`);
+  }
+
+  if (skippedFiles.length > 0) {
+    lines.push(`**Files skipped:** ${skippedFiles.length}`);
+  }
+
+  if (skippedLanguages.length > 0) {
+    lines.push(`**Skipped languages:** ${skippedLanguages.join(', ')}`);
+  }
+
+  return lines;
+}
+
+function getCoverageNotes(report: AnalysisReport): string[] {
+  const notes = [
+    'Python files are analyzed independently in the shipped scan flow. Repository-wide cross-file tracing is not guaranteed.',
+  ];
+
+  if (report.metadata.failedFiles.length > 0) {
+    notes.push(`Some files failed to analyze: ${report.metadata.failedFiles.slice(0, 5).join(', ')}`);
+  }
+
+  if (report.metadata.skippedFiles.length > 0) {
+    const skippedExamples = report.metadata.skippedFiles.slice(0, 5).map((file) => `${file.file} (${file.language})`);
+    notes.push(`Some files were skipped explicitly: ${skippedExamples.join(', ')}`);
+  }
+
+  return notes;
+}
+
 /**
  * Format a single finding as a markdown block per spec
  */
@@ -27,13 +68,21 @@ export function generatePRComment(report: AnalysisReport): string {
   const { findings, totalFindings } = report;
 
   if (totalFindings === 0) {
+    const coverageLines = getCoverageLines(report);
+    const coverageNotes = getCoverageNotes(report);
+
     return `## WyScan Report
 
 **Scan scope:** Python AFB04 scan
 **Files analyzed:** ${report.filesAnalyzed.length}
 **Findings reported:** 0
+${coverageLines.join('\n')}
 
-No findings were reported in the analyzed files.`;
+No findings were reported in the analyzed files.
+
+---
+
+${coverageNotes.join('\n')}`;
   }
 
   const criticalFindings = findings.filter((f) => f.severity === Severity.CRITICAL);
@@ -46,7 +95,8 @@ No findings were reported in the analyzed files.`;
 
 **Scan scope:** Python AFB04 scan
 **Files analyzed:** ${report.filesAnalyzed.length}
-**Findings reported:** ${totalFindings}`);
+**Findings reported:** ${totalFindings}
+${getCoverageLines(report).join('\n')}`);
 
   if (criticalFindings.length > 0) {
     sections.push(`---
@@ -94,6 +144,8 @@ No findings were reported in the analyzed files.`;
   }
 
   sections.push(`---
+
+${getCoverageNotes(report).join('\n')}
 
 AFB01, AFB02, and AFB03 are out of scope for this scanner.`);
 

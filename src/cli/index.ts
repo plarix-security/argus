@@ -374,6 +374,11 @@ async function runScan(args: string[]): Promise<number> {
           timestamp: new Date().toISOString(),
           totalTimeMs: result.analysisTimeMs,
           failedFiles: result.success ? [] : [result.file],
+          skippedFiles: result.skipped ? [{
+            file: result.file,
+            language: result.language,
+            reason: result.skipReason || 'File skipped.',
+          }] : [],
         },
       };
 
