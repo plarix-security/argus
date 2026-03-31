@@ -2,6 +2,7 @@ import express from 'express';
 import { Webhooks, createNodeMiddleware } from '@octokit/webhooks';
 import * as dotenv from 'dotenv';
 import { handlePushEvent, handlePullRequestEvent, GitHubAppConfig } from './github/webhook-handler';
+import { NAME, VERSION } from './cli/version';
 
 dotenv.config();
 
@@ -28,4 +29,4 @@ function createApp(): express.Application {
 validateEnv();
 const app = createApp();
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`\n🛡️  AFB Scanner v0.1.0\nRunning on port ${port}\n`));
+app.listen(port, () => console.log(`\n${NAME} ${VERSION}\nRunning on port ${port}\n`));
