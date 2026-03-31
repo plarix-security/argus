@@ -433,6 +433,10 @@ function createCEEFromPath(
     gateStatus: exposed.hasGateInPath ? 'present' : 'absent',
     afbType: exposed.hasGateInPath ? null : AFBType.UNAUTHORIZED_ACTION,
     classificationNote: buildCEEClassificationNote(exposed),
+    evidenceKind: exposed.evidenceKind,
+    supportingEvidence: exposed.supportingEvidence,
+    resource: exposed.resourceHint,
+    changesState: exposed.changesState,
     involvesCrossFile: exposed.involvesCrossFile,
     unresolvedCalls: exposed.unresolvedCrossFileCalls,
     depthLimitHit: exposed.depthLimitHit,
@@ -452,7 +456,7 @@ function createFindingFromCEE(cee: CEERecord, parsed: ParsedPythonFile): AFBFind
     codeSnippet: cee.codeSnippet,
     operation: cee.operation,
     explanation: cee.classificationNote,
-    confidence: 0.95,
+    confidence: calculateConfidenceForCEE(cee),
     context: {
       enclosingFunction: call?.enclosingFunction,
       enclosingClass: call?.enclosingClass,
@@ -464,8 +468,42 @@ function createFindingFromCEE(cee: CEERecord, parsed: ParsedPythonFile): AFBFind
       involvesCrossFile: cee.involvesCrossFile,
       unresolvedCalls: cee.unresolvedCalls,
       depthLimitHit: cee.depthLimitHit,
+      evidenceKind: cee.evidenceKind,
+      supportingEvidence: cee.supportingEvidence,
+      resource: cee.resource,
+      changesState: cee.changesState,
     },
   };
+}
+
+function calculateConfidenceForCEE(cee: CEERecord): number {
+  let confidence = 0.72;
+
+  if (cee.evidenceKind === 'structural') {
+    confidence += 0.18;
+  } else if (cee.evidenceKind === 'semantic') {
+    confidence += 0.12;
+  } else if (cee.evidenceKind === 'heuristic') {
+    confidence -= 0.08;
+  }
+
+  if (cee.supportingEvidence && cee.supportingEvidence.length > 0) {
+    confidence += Math.min(0.08, cee.supportingEvidence.length * 0.02);
+  }
+
+  if (cee.unresolvedCalls && cee.unresolvedCalls.length > 0) {
+    confidence -= 0.08;
+  }
+
+  if (cee.depthLimitHit) {
+    confidence -= 0.1;
+  }
+
+  if (cee.gateStatus === 'present') {
+    confidence -= 0.04;
+  }
+
+  return Math.max(0.45, Math.min(0.98, Number(confidence.toFixed(2))));
 }
 
 /**
@@ -511,6 +549,18 @@ function buildExplanation(exposed: ExposedPath, op: DangerousOperation): string 
     }
   }
 
+  if (exposed.inputFlowsToOperation) {
+    explanation += 'Traced tool-controlled input into the matched operation arguments. ';
+  }
+
+  if (exposed.instructionLikeInput) {
+    explanation += 'Instruction or context-like input is present in the analyzed path. ';
+  }
+
+  if (exposed.resourceHint) {
+    explanation += `Resource hint: ${exposed.resourceHint}. `;
+  }
+
   if (exposed.unresolvedCrossFileCalls && exposed.unresolvedCrossFileCalls.length > 0) {
     explanation += `Unresolved call targets while tracing: ${exposed.unresolvedCrossFileCalls.slice(0, 5).join(', ')}. `;
   }
@@ -530,6 +580,14 @@ function buildCEEClassificationNote(exposed: ExposedPath): string {
 
     if (exposed.involvesCrossFile) {
       note += ' The analyzed path crosses file boundaries.';
+    }
+
+    if (exposed.inputFlowsToOperation) {
+      note += ' Tool-controlled input was traced into the matched operation arguments.';
+    }
+
+    if (exposed.instructionLikeInput) {
+      note += ' Instruction or context-like input is present in the analyzed path.';
     }
 
     if (exposed.unresolvedCrossFileCalls && exposed.unresolvedCrossFileCalls.length > 0) {

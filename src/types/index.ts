@@ -98,6 +98,10 @@ export interface CEERecord {
   gateStatus: GateStatus;
   afbType: AFBType | null;
   classificationNote: string;
+  evidenceKind?: 'structural' | 'semantic' | 'heuristic';
+  supportingEvidence?: string[];
+  resource?: string;
+  changesState?: boolean;
   involvesCrossFile?: boolean;
   unresolvedCalls?: string[];
   depthLimitHit?: boolean;
@@ -149,6 +153,14 @@ export interface AFBFinding {
     unresolvedCalls?: string[];
     /** Whether call tracing hit the configured depth limit */
     depthLimitHit?: boolean;
+    /** Evidence kind used for the matched path */
+    evidenceKind?: 'structural' | 'semantic' | 'heuristic';
+    /** Supporting evidence gathered during analysis */
+    supportingEvidence?: string[];
+    /** Resource hint derived from the matched operation */
+    resource?: string;
+    /** Whether the matched operation likely changes state */
+    changesState?: boolean;
   };
 }
 

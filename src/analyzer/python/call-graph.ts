@@ -24,6 +24,7 @@ import {
   DecoratorDef,
   OpenAIToolSchema,
   FunctionDispatchMapping,
+  CallArgumentInfo,
 } from './ast-parser';
 import {
   PythonSemanticIndex,
@@ -87,6 +88,13 @@ export interface CallGraphNode {
   controlFlow?: ControlFlowInfo;
   /** Source file path */
   sourceFile?: string;
+  /** Declared parameter names in source order */
+  parameters?: string[];
+  /** Outgoing callsites captured for path reconstruction */
+  outgoingCalls: Array<{
+    targetId?: string;
+    call: CallSite;
+  }>;
   /** Whether this node was resolved from a cross-file import */
   isCrossFileResolved?: boolean;
 }
@@ -103,6 +111,9 @@ export interface DangerousOperation {
   codeSnippet: string;
   sourceFile?: string;
   enclosingNodeId?: string;
+  argumentDetails?: CallArgumentInfo[];
+  resourceHint?: string;
+  changesState?: boolean;
 }
 
 /**
@@ -139,6 +150,18 @@ export interface ExposedPath {
   unresolvedCrossFileCalls?: string[];
   /** Whether depth limit was hit during path tracing */
   depthLimitHit?: boolean;
+  /** Whether tool input was traced into the operation */
+  inputFlowsToOperation?: boolean;
+  /** Whether the path carries instruction or context-like input */
+  instructionLikeInput?: boolean;
+  /** Resource hint derived from the operation arguments */
+  resourceHint?: string;
+  /** Whether the operation likely changes state */
+  changesState?: boolean;
+  /** Supporting evidence gathered while tracing */
+  supportingEvidence?: string[];
+  /** Strongest proof category used on this path */
+  evidenceKind?: 'structural' | 'semantic' | 'heuristic';
 }
 
 /**
@@ -887,6 +910,8 @@ export function buildCallGraph(
         isValidationHelper: isLikelyValidationHelper(func.name),
         controlFlow: func.controlFlow,
         sourceFile: filePath,
+        parameters: func.parameters,
+        outgoingCalls: [],
       };
 
       // Prefer semantic framework roots; keep pattern-based registration as fallback.
@@ -955,6 +980,8 @@ export function buildCallGraph(
           isValidationHelper: isLikelyValidationHelper(method.name),
           controlFlow: method.controlFlow,
           sourceFile: filePath,
+          parameters: method.parameters,
+          outgoingCalls: [],
         };
 
         if (node.isToolRegistration) {
@@ -1012,6 +1039,7 @@ export function buildCallGraph(
         if (resolvedCalleeIds.length > 0) {
           for (const resolvedCalleeId of resolvedCalleeIds) {
             callerNode.callees.add(resolvedCalleeId);
+            callerNode.outgoingCalls.push({ targetId: resolvedCalleeId, call });
 
             if (nodes.has(resolvedCalleeId)) {
               const calleeNode = nodes.get(resolvedCalleeId)!;
@@ -1020,6 +1048,7 @@ export function buildCallGraph(
           }
         } else {
           callerNode.callees.add(call.callee);
+          callerNode.outgoingCalls.push({ call });
         }
 
         // Check if this call is a dangerous operation
@@ -1046,6 +1075,7 @@ export function buildCallGraph(
 
     for (const { operation, path, hasGate, involvesCrossFile, unresolvedCalls, depthLimitHit } of paths) {
       const file = operation.sourceFile || tool.sourceFile || '<unknown>';
+      const flowEvidence = analyzePathFlow(tool, path, operation, nodes, files);
 
       // Check if any node in the path is a validation helper
       const hasValidationHelperInPath = path.some(nodeId => {
@@ -1063,6 +1093,12 @@ export function buildCallGraph(
         involvesCrossFile,
         unresolvedCrossFileCalls: unresolvedCalls,
         depthLimitHit,
+        inputFlowsToOperation: flowEvidence.inputFlowsToOperation,
+        instructionLikeInput: flowEvidence.instructionLikeInput,
+        resourceHint: operation.resourceHint,
+        changesState: operation.changesState,
+        supportingEvidence: flowEvidence.supportingEvidence,
+        evidenceKind: tool.toolDetectionKind === 'heuristic' ? 'heuristic' : (flowEvidence.inputFlowsToOperation ? 'structural' : 'semantic'),
       });
     }
   }
@@ -1291,10 +1327,153 @@ function detectDangerousOperation(call: CallSite, callerId: string, filePath: st
         codeSnippet: call.codeSnippet,
         sourceFile: filePath,
         enclosingNodeId: callerId,
+        argumentDetails: call.argumentDetails,
+        resourceHint: summarizeOperationResource(call),
+        changesState: severity === Severity.WARNING || severity === Severity.CRITICAL,
       };
     }
   }
   return null;
+}
+
+function summarizeOperationResource(call: CallSite): string | undefined {
+  for (const arg of call.argumentDetails) {
+    const candidate = arg.value.stringLiterals[0] || arg.value.references[0];
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+function analyzePathFlow(
+  tool: CallGraphNode,
+  path: string[],
+  operation: DangerousOperation,
+  nodes: Map<string, CallGraphNode>,
+  files: Map<string, ParsedPythonFile>
+): { inputFlowsToOperation: boolean; instructionLikeInput: boolean; supportingEvidence: string[] } {
+  const supportingEvidence: string[] = [];
+  const taintedByNode = new Map<string, Set<string>>();
+  const toolInputs = new Set(tool.parameters || []);
+  taintedByNode.set(tool.id, new Set(toolInputs));
+
+  let instructionLikeInput = Array.from(toolInputs).some(isInstructionLikeName);
+
+  for (let index = 0; index < path.length; index++) {
+    const nodeId = path[index];
+    const node = nodes.get(nodeId);
+    if (!node?.sourceFile) {
+      continue;
+    }
+
+    const parsed = files.get(node.sourceFile);
+    if (!parsed) {
+      continue;
+    }
+
+    const tainted = expandScopedTaint(parsed, node, taintedByNode.get(nodeId) || new Set<string>());
+    taintedByNode.set(nodeId, tainted);
+
+    const nextNodeId = path[index + 1];
+    if (!nextNodeId) {
+      continue;
+    }
+
+    const nextNode = nodes.get(nextNodeId);
+    if (!nextNode?.parameters || nextNode.parameters.length === 0) {
+      continue;
+    }
+
+    const matchingCalls = node.outgoingCalls.filter((outgoing) => outgoing.targetId === nextNodeId);
+    if (matchingCalls.length === 0) {
+      continue;
+    }
+
+    const nextTaint = new Set(taintedByNode.get(nextNodeId) || []);
+    for (const outgoing of matchingCalls) {
+      const positionalArguments = outgoing.call.argumentDetails.filter((arg) => !arg.name);
+      for (let paramIndex = 0; paramIndex < nextNode.parameters.length; paramIndex++) {
+        const parameterName = nextNode.parameters[paramIndex];
+        const argument = outgoing.call.argumentDetails.find((arg) => arg.name === parameterName) || positionalArguments[paramIndex];
+        if (!argument) {
+          continue;
+        }
+
+        if (expressionTouchesTaint(argument.value, tainted)) {
+          nextTaint.add(parameterName);
+          supportingEvidence.push(`${node.name} passes traced input into ${nextNode.name}.${parameterName}`);
+        }
+
+        if (!instructionLikeInput && expressionLooksInstructionLike(argument.value)) {
+          instructionLikeInput = true;
+        }
+      }
+    }
+
+    taintedByNode.set(nextNodeId, nextTaint);
+  }
+
+  const operationNode = operation.enclosingNodeId ? nodes.get(operation.enclosingNodeId) : undefined;
+  const operationTaint = operationNode?.id ? (taintedByNode.get(operationNode.id) || new Set<string>()) : new Set<string>();
+  const inputFlowsToOperation = Boolean(operation.argumentDetails?.some((argument) => expressionTouchesTaint(argument.value, operationTaint)));
+
+  if (inputFlowsToOperation && operation.callee) {
+    supportingEvidence.push(`Traced tool input into ${operation.callee} arguments`);
+  }
+
+  if (!instructionLikeInput && operation.argumentDetails) {
+    instructionLikeInput = operation.argumentDetails.some((argument) => expressionLooksInstructionLike(argument.value));
+  }
+
+  return {
+    inputFlowsToOperation,
+    instructionLikeInput,
+    supportingEvidence: Array.from(new Set(supportingEvidence)),
+  };
+}
+
+function expandScopedTaint(parsed: ParsedPythonFile, node: CallGraphNode, seed: Set<string>): Set<string> {
+  const tainted = new Set(seed);
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const assignment of parsed.assignments) {
+      if (assignment.enclosingFunction !== node.name) {
+        continue;
+      }
+
+      if ((assignment.enclosingClass || undefined) !== (node.className || undefined)) {
+        continue;
+      }
+
+      if (!expressionTouchesTaint(assignment.value, tainted) || tainted.has(assignment.target)) {
+        continue;
+      }
+
+      tainted.add(assignment.target);
+      changed = true;
+    }
+  }
+
+  return tainted;
+}
+
+function expressionTouchesTaint(
+  expression: { references: string[]; stringLiterals: string[] },
+  tainted: Set<string>
+): boolean {
+  return expression.references.some((reference) => tainted.has(reference));
+}
+
+function expressionLooksInstructionLike(expression: { references: string[]; stringLiterals: string[] }): boolean {
+  return expression.references.some(isInstructionLikeName) || expression.stringLiterals.some((value) => /system|prompt|instruction|history|context|message/i.test(value));
+}
+
+function isInstructionLikeName(name: string): boolean {
+  return /input|prompt|message|history|context|task|query|request|instruction|content|payload|state/i.test(name);
 }
 
 /**
