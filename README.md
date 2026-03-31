@@ -5,7 +5,7 @@ Static analyzer for agentic AI codebases that detects unsafe tool boundaries.
 WyScan finds places in your Python agent code where tools can execute dangerous operations without authorization checks. It builds a call graph from tool registrations (like `@tool` decorators) and traces paths to dangerous operations (like `subprocess.run` or `shutil.rmtree`). If there is no policy gate in the path, WyScan reports it.
 
 ```
-wyscan  v1.1.0  by Plarix
+wyscan  v1.0.0  by Plarix
 AFB Scanner
 
 Scanning: ./agent-project
@@ -123,17 +123,20 @@ WyScan uses the CEE (Comprehensive Exposure Evaluation) severity model, which co
 
 | Category | Operations |
 |----------|-----------|
-| Shell execution | `subprocess.run`, `subprocess.Popen`, `subprocess.call`, `os.system`, `os.popen`, `os.exec*`, `asyncio.create_subprocess_*` |
-| Code execution | `eval`, `exec` |
+| Shell execution | `subprocess.run`, `subprocess.Popen`, `subprocess.call`, `os.system`, `os.popen`, `os.exec*`, `asyncio.create_subprocess_*`, `pty.spawn`, `pexpect.*`, `fabric.*`, `paramiko.exec_command` |
+| Code execution | `eval`, `exec`, `compile`, `__import__`, `importlib.import_module` |
+| Deserialization | `pickle.load*`, `yaml.unsafe_load`, `yaml.full_load`, `marshal.load*`, `shelve.open` |
+| Native code | `ctypes.CDLL`, `ctypes.cdll.*`, `cffi.*` |
 | File deletion | `shutil.rmtree`, `os.remove`, `os.unlink`, `os.rmdir`, `Path.unlink`, `Path.rmdir` |
 
 **WARNING** - Recoverable but consequential state modification
 
 | Category | Operations |
 |----------|-----------|
-| File writes | `Path.write_text`, `Path.write_bytes`, `file.write`, `Path.mkdir`, `shutil.copy`, `shutil.move`, `os.rename`, `os.makedirs` |
-| HTTP mutations | `requests.post`, `requests.put`, `requests.patch`, `requests.delete`, `httpx.*`, `aiohttp.*` |
-| Database writes | `session.add`, `session.delete`, `session.commit`, `session.flush`, `model.save`, `model.create`, `cursor.insert`, `bulk_create` |
+| File writes | `Path.write_text`, `Path.write_bytes`, `file.write`, `Path.mkdir`, `shutil.copy`, `shutil.move`, `os.rename`, `os.makedirs`, `tempfile.*`, `zipfile.write`, `tarfile.add` |
+| HTTP mutations | `requests.post`, `requests.put`, `requests.patch`, `requests.delete`, `httpx.*`, `aiohttp.*`, `urllib.request.urlopen` (POST) |
+| Database writes | `session.add`, `session.delete`, `session.commit`, `session.flush`, `model.save`, `model.create`, `cursor.execute` (INSERT/UPDATE/DELETE), `bulk_create` |
+| NoSQL | `pymongo.insert_*`, `pymongo.update_*`, `pymongo.delete_*`, `redis.set`, `redis.delete`, `redis.hset`, `redis.lpush` |
 | Email | `smtp.send_message`, `smtp.send_email`, `smtp.sendmail` |
 
 **INFO** - Read-only access to sensitive data or external systems
@@ -157,6 +160,12 @@ WyScan detects tool registrations in these frameworks:
 | LlamaIndex | `FunctionTool`, `QueryEngineTool`, `ToolOutput` |
 | MCP | `mcp.server`, `@server.tool`, `tool_handler`, `ToolProvider` |
 | OpenAI | `tools=[...]`, `function_call`, `tool_choice`, `"type": "function"` |
+| Anthropic | `anthropic.tool`, `tool_use`, `@claude_tool` |
+| Google Gemini | `FunctionDeclaration`, `genai.tool`, `gemini.tool` |
+| HuggingFace | `transformers.tool`, `@agent_tool`, `AgentTool` |
+| Smolagents | `@smolagent`, `smolagents.tool`, `SmolTool` |
+| DSPy | `dspy.tool`, `@dspy_tool`, `DSPyTool` |
+| Generic | `@*tool`, `@action`, `@capability`, `@skill`, `@llm_*`, `@ai_*`, `@agent_*` |
 
 ## How It Works
 
@@ -187,7 +196,7 @@ wyscan scan ./project --json
 
 ```json
 {
-  "version": "1.1.0",
+  "version": "1.0.0",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,
@@ -214,7 +223,7 @@ wyscan scan ./project --json
     "frameworks_detected": ["langchain", "crewai"],
     "files_analyzed": 34,
     "files_skipped": 2,
-    "call_graph_depth_used": 3,
+    "call_graph_depth_used": 5,
     "confidence_note": "Non-comprehensive. Static analysis only. Runtime-generated tool wiring and external package internals are not traced."
   }
 }
@@ -264,7 +273,7 @@ These are honest limitations of the current version:
 
 1. **TypeScript/JavaScript detection is disabled.** The TypeScript detector emits an INFO notice and returns no findings to avoid false positives from pattern matching. Python is the only working language.
 
-2. **Cross-file call resolution is limited to depth 5.** If your tool -> helper1 -> helper2 -> helper3 -> helper4 -> subprocess.run, the path may not be fully detected. Transitive import resolution stops at 3 levels to balance coverage and performance.
+2. **Cross-file call resolution is limited to depth 5.** If your tool -> helper1 -> helper2 -> helper3 -> helper4 -> helper5 -> subprocess.run, the path may not be fully detected. Transitive import resolution stops at 5 levels to balance coverage and performance.
 
 3. **External package calls are not traced.** If your tool calls a function from a third-party package that internally calls subprocess.run, WyScan will not detect it.
 

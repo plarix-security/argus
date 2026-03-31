@@ -12,27 +12,27 @@ If you have TypeScript agent code, WyScan will not detect any issues in it. Use 
 
 ## Cross-File Resolution Limited to Depth 5
 
-WyScan resolves imports transitively up to 3 levels deep.
+WyScan resolves imports transitively up to 5 levels deep.
 
 **Detected:**
 
 ```python
-# tools.py -> helpers.py -> utils.py (3 levels)
+# tools.py -> helpers.py -> utils.py -> common.py -> base.py (5 levels)
 from helpers import do_stuff
 
 @tool
 def my_tool():
-    do_stuff()  # Traced through 3 levels of imports
+    do_stuff()  # Traced through up to 5 levels of imports
 ```
 
 **Not Detected:**
 
 ```python
-# tools.py -> a.py -> b.py -> c.py -> d.py (4+ levels)
+# tools.py -> a.py -> b.py -> c.py -> d.py -> e.py -> f.py (6+ levels)
 # The path beyond depth 5 may not be fully traced
 ```
 
-If your tool calls through more than 3 levels of helper functions across files, WyScan may not trace the full path.
+If your tool calls through more than 5 levels of helper functions across files, WyScan may not trace the full path.
 
 ## External Packages Not Traced
 
