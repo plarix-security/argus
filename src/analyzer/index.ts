@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ASTWalker, astWalker } from './ast-walker';
+import { FileLanguageRouter, fileLanguageRouter } from './file-language-router';
 import { analyzePythonFile, ensureParserInitialized } from './python/detector';
 import { analyzeTypeScriptFile } from './typescript/detector';
 import { AFBFinding, AnalysisReport, AnalyzerConfig, FileAnalysisResult, SupportedLanguage, Severity } from '../types';
@@ -15,13 +15,13 @@ const DEFAULT_CONFIG: Required<AnalyzerConfig> = {
 };
 
 export class AFBAnalyzer {
-  private walker: ASTWalker;
+  private walker: FileLanguageRouter;
   private config: Required<AnalyzerConfig>;
   private initialized = false;
 
   constructor(config?: AnalyzerConfig) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.walker = astWalker;
+    this.walker = fileLanguageRouter;
   }
 
   async ensureInitialized() {
@@ -133,4 +133,4 @@ export class AFBAnalyzer {
   }
 }
 
-export { ASTWalker } from './ast-walker';
+export { FileLanguageRouter } from './file-language-router';

@@ -72,8 +72,6 @@ export interface CallGraphNode {
   dangerousOps: DangerousOperation[];
   /** Whether this function is a structural policy gate */
   hasPolicyGate: boolean;
-  /** Whether this function has framework-level authorization (human_in_loop, etc.) */
-  hasFrameworkAuth: boolean;
   /** Whether this function is a likely validation helper */
   isValidationHelper: boolean;
   /** Control flow information */
@@ -530,21 +528,6 @@ export function isLikelyValidationHelper(functionName: string): boolean {
 }
 
 /**
- * Framework-level authorization indicators.
- * If these are present in a tool registration's keyword arguments,
- * the tool is considered to have framework-level authorization.
- */
-const FRAMEWORK_AUTH_INDICATORS = [
-  'human_in_the_loop',
-  'require_approval',
-  'approval_callback',
-  'human_input_mode',
-  'user_confirm',
-  'await_user',
-  'confirm_action',
-];
-
-/**
  * Determine if a function is a structural policy gate.
  *
  * STRICT THREE-PROPERTY VALIDATION (per AFB specification):
@@ -878,8 +861,6 @@ export function buildCallGraph(
         dangerousOps: [],
         // Use structural analysis + decorator analysis + known auth patterns to determine if this is a policy gate
         hasPolicyGate: hasStructuralGate || hasDecoratorGate || hasKnownAuthDecorator,
-        // Framework-level auth is detected from tool registration kwargs (checked below)
-        hasFrameworkAuth: false,
         // Check if this function name suggests it's a validation helper
         isValidationHelper: isLikelyValidationHelper(func.name),
         controlFlow: func.controlFlow,
@@ -928,8 +909,6 @@ export function buildCallGraph(
           dangerousOps: [],
           // Use structural analysis + decorator analysis + known auth patterns to determine if this is a policy gate
           hasPolicyGate: hasStructuralGate || hasDecoratorGate || hasKnownAuthDecorator,
-          // Framework-level auth not detected for class methods yet
-          hasFrameworkAuth: false,
           // Check if this method name suggests it's a validation helper
           isValidationHelper: isLikelyValidationHelper(method.name),
           controlFlow: method.controlFlow,
