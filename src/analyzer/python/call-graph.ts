@@ -1208,9 +1208,8 @@ function hasAutoGenImport(imports: ImportInfo[]): boolean {
  *
  * Supports:
  * 1. Decorator-based detection (LangChain @tool, CrewAI @task, etc.)
- * 2. Function name heuristics with framework imports
- * 3. OpenAI SDK dictionary-based schemas
- * 4. AutoGen function_map patterns
+ * 2. OpenAI SDK dictionary-based schemas
+ * 3. AutoGen function_map patterns
  *
  * Note: For OpenAI schemas, the presence of the schema pattern itself
  * ({"type": "function", "function": {"name": "..."}}) is strong enough
@@ -1263,25 +1262,6 @@ function detectToolRegistration(
           return { framework: 'autogen' };
         }
       }
-    }
-  }
-
-  // Check if function name suggests tool registration
-  const funcNameLower = func.name.toLowerCase();
-  if (
-    funcNameLower.includes('tool') ||
-    funcNameLower.includes('action') ||
-    funcNameLower.includes('capability')
-  ) {
-    // Only if there's a framework import
-    for (const imp of imports) {
-      const moduleLower = imp.module.toLowerCase();
-      if (moduleLower.includes('langchain')) return { framework: 'langchain' };
-      if (moduleLower.includes('crewai')) return { framework: 'crewai' };
-      if (moduleLower.includes('autogen')) return { framework: 'autogen' };
-      if (moduleLower.includes('llama_index') || moduleLower.includes('llamaindex')) return { framework: 'llamaindex' };
-      if (moduleLower.includes('mcp')) return { framework: 'mcp' };
-      if (moduleLower.includes('openai')) return { framework: 'openai' };
     }
   }
 
@@ -1338,16 +1318,6 @@ function detectToolClass(
       if (pattern.pattern.test(base)) {
         return { framework: pattern.framework };
       }
-    }
-  }
-
-  // Check class name
-  const classNameLower = cls.name.toLowerCase();
-  if (classNameLower.includes('tool')) {
-    for (const imp of imports) {
-      const moduleLower = imp.module.toLowerCase();
-      if (moduleLower.includes('langchain')) return { framework: 'langchain' };
-      if (moduleLower.includes('crewai')) return { framework: 'crewai' };
     }
   }
 
