@@ -29,6 +29,7 @@ import {
 import {
   PythonSemanticIndex,
   extractSemanticInvocationRoots,
+  SemanticCallIdentity,
   SemanticInvocationRoot,
 } from './semantic-index';
 import { ExecutionCategory, Severity } from '../../types';
@@ -116,6 +117,9 @@ export interface DangerousOperation {
   argumentDetails?: CallArgumentInfo[];
   resourceHint?: string;
   changesState?: boolean;
+  detectionKind?: 'semantic' | 'heuristic';
+  detectionEvidence?: string;
+  resolvedIdentity?: string;
 }
 
 /**
@@ -468,6 +472,36 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.glob$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File glob' },
   { pattern: /\.rglob$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Recursive file glob' },
   { pattern: /\.iterdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory iteration' },
+];
+
+const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: {
+  identity: RegExp;
+  category: ExecutionCategory;
+  severity: Severity;
+  description: string;
+}[] = [
+  { identity: /^builtins\.(eval|exec)$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'Built-in dynamic code execution' },
+  { identity: /^subprocess\.(run|Popen|call|check_output|check_call|getoutput|getstatusoutput)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Subprocess execution' },
+  { identity: /^asyncio\.create_subprocess_(exec|shell)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Async subprocess execution' },
+  { identity: /^os\.(system|popen|popen2|popen3|popen4|exec.*|spawn[lv]p?e?)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'OS process execution' },
+  { identity: /^shutil\.rmtree$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.CRITICAL, description: 'Recursive directory deletion' },
+  { identity: /^os\.(remove|unlink|rmdir|removedirs)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.CRITICAL, description: 'File deletion' },
+  { identity: /^pathlib\.Path\.(unlink|rmdir)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.CRITICAL, description: 'Path deletion' },
+  { identity: /^pathlib\.Path\.(write_text|write_bytes|mkdir|touch)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'Path state change' },
+  { identity: /^pathlib\.Path\.(read_text|read_bytes|glob|rglob|iterdir)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Path read/list operation' },
+  { identity: /^builtins\.open$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Built-in file open' },
+  { identity: /^requests\.(get)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP GET request' },
+  { identity: /^requests\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP write request' },
+  { identity: /^httpx\.(get)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP GET request' },
+  { identity: /^httpx\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP write request' },
+  { identity: /^httpx\.Client\.(get)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP client GET request' },
+  { identity: /^httpx\.Client\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP client write request' },
+  { identity: /^aiohttp\.ClientSession\.(get)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Async HTTP GET request' },
+  { identity: /^aiohttp\.ClientSession\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Async HTTP write request' },
+  { identity: /^smtplib\.SMTP\.(sendmail|send_message)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Email sending' },
+  { identity: /^sqlite3\.(Connection|Cursor)\.executescript$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.CRITICAL, description: 'SQL script execution' },
+  { identity: /^sqlite3\.(Connection|Cursor)\.executemany$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Batch SQL execution' },
+  { identity: /^sqlite3\.(Connection|Cursor)\.execute$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'SQL execution' },
 ];
 
 /**
@@ -1025,7 +1059,8 @@ export function buildCallGraph(
           resolvedCalleeIds = semanticIndex.resolveCallableNodeIds(
             call.callee,
             filePath,
-            call.enclosingClass
+            call.enclosingClass,
+            call.enclosingFunction
           );
 
           if (resolvedCalleeIds.length === 0) {
@@ -1058,7 +1093,7 @@ export function buildCallGraph(
         }
 
         // Check if this call is a dangerous operation
-        const dangerousOp = detectDangerousOperation(call, callerId, filePath);
+        const dangerousOp = detectDangerousOperation(call, callerId, filePath, semanticIndex);
         if (dangerousOp) {
           callerNode.dangerousOps.push(dangerousOp);
         }
@@ -1093,9 +1128,17 @@ export function buildCallGraph(
         return node?.hasHeuristicGateIndicator || false;
       });
       const supportingEvidence = [...(flowEvidence.supportingEvidence || [])];
+      if (tool.toolDetectionEvidence) {
+        supportingEvidence.unshift(`Tool registration evidence: ${tool.toolDetectionEvidence}`);
+      }
+      if (operation.detectionEvidence) {
+        supportingEvidence.push(`Operation evidence: ${operation.detectionEvidence}`);
+      }
       if (hasHeuristicGateInPath) {
         supportingEvidence.push('Authorization-like decorator names were present, but no structural gate was proven in the analyzed path');
       }
+
+      const evidenceKind = determinePathEvidenceKind(tool.toolDetectionKind, operation.detectionKind, flowEvidence.inputFlowsToOperation);
 
       exposedPaths.push({
         tool,
@@ -1113,7 +1156,7 @@ export function buildCallGraph(
         resourceHint: operation.resourceHint,
         changesState: operation.changesState,
         supportingEvidence,
-        evidenceKind: tool.toolDetectionKind === 'heuristic' ? 'heuristic' : (flowEvidence.inputFlowsToOperation ? 'structural' : 'semantic'),
+        evidenceKind,
       });
     }
   }
@@ -1304,34 +1347,21 @@ function detectToolClass(
  * For open() calls, checks the mode argument to determine if write (WARNING)
  * or read (INFO). Default mode 'r' is read.
  */
-function detectDangerousOperation(call: CallSite, callerId: string, filePath: string): DangerousOperation | null {
+function detectDangerousOperation(
+  call: CallSite,
+  callerId: string,
+  filePath: string,
+  semanticIndex: PythonSemanticIndex
+): DangerousOperation | null {
+  const semanticCall = semanticIndex.resolveCallIdentity(call, filePath, call.enclosingClass);
+  const semanticDangerousOp = detectSemanticDangerousOperation(call, callerId, filePath, semanticCall);
+  if (semanticDangerousOp) {
+    return semanticDangerousOp;
+  }
+
   for (const pattern of DANGEROUS_OPERATION_PATTERNS) {
     if (pattern.pattern.test(call.callee)) {
-      let severity = pattern.severity;
-
-      // Special handling for open() - check mode argument
-      // write modes: 'w', 'wb', 'a', 'ab', 'x', 'xb', 'r+', 'rb+', 'w+', 'wb+', 'a+', 'ab+'
-      // read modes: 'r', 'rb', '' (default)
-      if (call.callee === 'open') {
-        const args = call.arguments;
-        // Mode is typically the second argument
-        if (args.length >= 2) {
-          const modeArg = args[1].toLowerCase().replace(/['"]/g, '');
-          // Check for write modes
-          if (modeArg.includes('w') || modeArg.includes('a') || modeArg.includes('x') || modeArg.includes('+')) {
-            severity = Severity.WARNING;
-          }
-        }
-        // Also check keyword argument mode=
-        for (const arg of args) {
-          const lowerArg = arg.toLowerCase();
-          if (lowerArg.includes('mode=') || lowerArg.includes('mode =')) {
-            if (lowerArg.includes('w') || lowerArg.includes('a') || lowerArg.includes('x') || lowerArg.includes('+')) {
-              severity = Severity.WARNING;
-            }
-          }
-        }
-      }
+      const severity = adjustSeverityForOpen(call, pattern.severity);
 
       return {
         callee: call.callee,
@@ -1345,10 +1375,79 @@ function detectDangerousOperation(call: CallSite, callerId: string, filePath: st
         argumentDetails: call.argumentDetails,
         resourceHint: summarizeOperationResource(call),
         changesState: severity === Severity.WARNING || severity === Severity.CRITICAL,
+        detectionKind: 'heuristic',
+        detectionEvidence: `pattern fallback matched ${pattern.pattern}`,
       };
     }
   }
   return null;
+}
+
+function detectSemanticDangerousOperation(
+  call: CallSite,
+  callerId: string,
+  filePath: string,
+  semanticCall: SemanticCallIdentity | undefined
+): DangerousOperation | null {
+  if (!semanticCall) {
+    return null;
+  }
+
+  for (const pattern of SEMANTIC_DANGEROUS_OPERATION_PATTERNS) {
+    if (!pattern.identity.test(semanticCall.identity)) {
+      continue;
+    }
+
+    const severity = adjustSeverityForOpen(call, pattern.severity, semanticCall.identity);
+    return {
+      callee: semanticCall.identity,
+      category: pattern.category,
+      severity,
+      line: call.startLine,
+      column: call.startColumn,
+      codeSnippet: call.codeSnippet,
+      sourceFile: filePath,
+      enclosingNodeId: callerId,
+      argumentDetails: call.argumentDetails,
+      resourceHint: summarizeOperationResource(call),
+      changesState: severity === Severity.WARNING || severity === Severity.CRITICAL,
+      detectionKind: semanticCall.kind === 'structural' ? 'semantic' : 'semantic',
+      detectionEvidence: semanticCall.evidence,
+      resolvedIdentity: semanticCall.identity,
+    };
+  }
+
+  return null;
+}
+
+function adjustSeverityForOpen(call: CallSite, baseSeverity: Severity, resolvedIdentity?: string): Severity {
+  if (call.callee !== 'open' && resolvedIdentity !== 'builtins.open') {
+    return baseSeverity;
+  }
+
+  const modeArgument = call.argumentDetails.find((arg) => arg.name === 'mode') || call.argumentDetails.filter((arg) => !arg.name)[1];
+  const modeValue = modeArgument?.value.stringLiterals[0] || modeArgument?.value.text || '';
+  if (/[wax+]/i.test(modeValue)) {
+    return Severity.WARNING;
+  }
+
+  return Severity.INFO;
+}
+
+function determinePathEvidenceKind(
+  toolDetectionKind: 'semantic' | 'heuristic' | undefined,
+  operationDetectionKind: 'semantic' | 'heuristic' | undefined,
+  inputFlowsToOperation: boolean
+): 'structural' | 'semantic' | 'heuristic' {
+  if (toolDetectionKind === 'heuristic' || operationDetectionKind === 'heuristic') {
+    return 'heuristic';
+  }
+
+  if (inputFlowsToOperation) {
+    return 'structural';
+  }
+
+  return 'semantic';
 }
 
 function summarizeOperationResource(call: CallSite): string | undefined {

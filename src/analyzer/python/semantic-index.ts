@@ -14,6 +14,12 @@ export interface SemanticInvocationRoot {
   evidence: string;
 }
 
+export interface SemanticCallIdentity {
+  identity: string;
+  kind: 'structural' | 'semantic';
+  evidence: string;
+}
+
 interface ImportBinding {
   alias: string;
   modulePath: string;
@@ -24,11 +30,13 @@ interface ImportBinding {
 interface ResolutionContext {
   filePath: string;
   className?: string;
+  functionName?: string;
 }
 
 interface ConstructorBinding {
   modulePath?: string;
   importedName?: string;
+  matchedReference?: string;
 }
 
 function makeNodeId(filePath: string, localName: string): string {
@@ -122,6 +130,7 @@ export class PythonSemanticIndex {
         const context: ResolutionContext = {
           filePath,
           className: call.enclosingClass,
+          functionName: call.enclosingFunction,
         };
 
         this.extractFrameworkCallRoots(call, context, roots);
@@ -142,8 +151,76 @@ export class PythonSemanticIndex {
     return roots;
   }
 
-  resolveCallableNodeIds(reference: string, filePath: string, className?: string): string[] {
-    return Array.from(this.resolveReferenceToFunctionNodes(reference, { filePath, className }, new Set<string>()));
+  resolveCallableNodeIds(reference: string, filePath: string, className?: string, functionName?: string): string[] {
+    return Array.from(this.resolveReferenceToFunctionNodes(reference, { filePath, className, functionName }, new Set<string>()));
+  }
+
+  resolveCallIdentity(call: CallSite, filePath: string, className?: string): SemanticCallIdentity | undefined {
+    const context: ResolutionContext = { filePath, className, functionName: call.enclosingFunction };
+    const memberChain = call.memberChain || [];
+
+    if (call.callee === 'open') {
+      return {
+        identity: 'builtins.open',
+        kind: 'structural',
+        evidence: 'built-in open call',
+      };
+    }
+
+    if (call.callee === 'eval' || call.callee === 'exec') {
+      return {
+        identity: `builtins.${call.callee}`,
+        kind: 'structural',
+        evidence: `built-in ${call.callee} call`,
+      };
+    }
+
+    const directImport = this.resolveImportedSymbol(call.callee, filePath);
+    if (directImport?.modulePath && directImport.importedName) {
+      return {
+        identity: `${directImport.modulePath}.${directImport.importedName}`,
+        kind: 'semantic',
+        evidence: `resolved imported callable ${call.callee}`,
+      };
+    }
+
+    if (call.baseExpression) {
+      const moduleBinding = this.resolveImportedSymbol(call.baseExpression, filePath);
+      if (moduleBinding?.modulePath && memberChain.length > 0) {
+        return {
+          identity: `${moduleBinding.modulePath}.${memberChain.join('.')}`,
+          kind: 'semantic',
+          evidence: `resolved module alias ${call.baseExpression}`,
+        };
+      }
+
+      const receiverReference = this.buildReceiverReference(call, 1);
+      const constructor = this.resolveAssignedConstructor(receiverReference, context);
+      if (constructor.modulePath && constructor.importedName && constructor.matchedReference) {
+        const receiverSegments = splitReferenceSegments(receiverReference);
+        const matchedSegments = splitReferenceSegments(constructor.matchedReference);
+        const trailingSegments = receiverSegments.slice(matchedSegments.length);
+        const lastMember = memberChain[memberChain.length - 1];
+
+        return {
+          identity: [constructor.modulePath, constructor.importedName, ...trailingSegments, lastMember].filter(Boolean).join('.'),
+          kind: 'semantic',
+          evidence: `resolved receiver constructor ${constructor.importedName} from ${constructor.matchedReference}`,
+        };
+      }
+
+      const inlineConstructor = this.resolveInlineConstructor(call.baseExpression, filePath);
+      if (inlineConstructor?.modulePath && inlineConstructor.importedName) {
+        const lastMember = memberChain[memberChain.length - 1];
+        return {
+          identity: `${inlineConstructor.modulePath}.${inlineConstructor.importedName}.${lastMember}`,
+          kind: 'semantic',
+          evidence: `resolved inline constructor ${inlineConstructor.importedName}`,
+        };
+      }
+    }
+
+    return undefined;
   }
 
   private buildIndex(): void {
@@ -378,7 +455,7 @@ export class PythonSemanticIndex {
       }
 
       for (const assignment of this.findAssignments(reference, context)) {
-        for (const toolName of this.resolveOpenAIToolNames(assignment.value, { filePath: context.filePath, className: assignment.enclosingClass }, visited)) {
+        for (const toolName of this.resolveOpenAIToolNames(assignment.value, { filePath: context.filePath, className: assignment.enclosingClass, functionName: assignment.enclosingFunction }, visited)) {
           result.add(toolName);
         }
       }
@@ -410,7 +487,7 @@ export class PythonSemanticIndex {
     for (const reference of expression.references) {
       for (const assignment of this.findAssignments(reference, context)) {
         for (const mapping of assignment.value.mappingReferences) {
-          for (const nodeId of this.resolveReferenceToFunctionNodes(mapping.reference, { filePath: context.filePath, className: assignment.enclosingClass }, visited)) {
+          for (const nodeId of this.resolveReferenceToFunctionNodes(mapping.reference, { filePath: context.filePath, className: assignment.enclosingClass, functionName: assignment.enclosingFunction }, visited)) {
             result.add(nodeId);
           }
         }
@@ -433,7 +510,7 @@ export class PythonSemanticIndex {
   }
 
   private resolveReferenceToFunctionNodes(reference: string, context: ResolutionContext, visited: Set<string>): Set<string> {
-    const visitKey = `${context.filePath}:${context.className || ''}:${reference}`;
+    const visitKey = `${context.filePath}:${context.className || ''}:${context.functionName || ''}:${reference}`;
     if (visited.has(visitKey)) {
       return new Set<string>();
     }
@@ -473,7 +550,7 @@ export class PythonSemanticIndex {
     const assignments = this.findAssignments(reference, context);
     if (assignments.length > 0) {
       for (const assignment of assignments) {
-        for (const nodeId of this.expandExpressionToFunctionNodes(assignment.value, { filePath: context.filePath, className: assignment.enclosingClass }, visited)) {
+        for (const nodeId of this.expandExpressionToFunctionNodes(assignment.value, { filePath: context.filePath, className: assignment.enclosingClass, functionName: assignment.enclosingFunction }, visited)) {
           result.add(nodeId);
         }
       }
@@ -491,7 +568,7 @@ export class PythonSemanticIndex {
       }
 
       for (const importedAssignment of this.findAssignments(imported.importedName, { filePath: imported.resolvedFile })) {
-        for (const nodeId of this.expandExpressionToFunctionNodes(importedAssignment.value, { filePath: imported.resolvedFile, className: importedAssignment.enclosingClass }, visited)) {
+        for (const nodeId of this.expandExpressionToFunctionNodes(importedAssignment.value, { filePath: imported.resolvedFile, className: importedAssignment.enclosingClass, functionName: importedAssignment.enclosingFunction }, visited)) {
           result.add(nodeId);
         }
       }
@@ -507,7 +584,7 @@ export class PythonSemanticIndex {
         }
 
         for (const importedAssignment of this.findAssignments(member, { filePath: importedBase.resolvedFile })) {
-          for (const nodeId of this.expandExpressionToFunctionNodes(importedAssignment.value, { filePath: importedBase.resolvedFile, className: importedAssignment.enclosingClass }, visited)) {
+          for (const nodeId of this.expandExpressionToFunctionNodes(importedAssignment.value, { filePath: importedBase.resolvedFile, className: importedAssignment.enclosingClass, functionName: importedAssignment.enclosingFunction }, visited)) {
             result.add(nodeId);
           }
         }
@@ -522,23 +599,28 @@ export class PythonSemanticIndex {
       return {};
     }
 
-    const assignment = this.findAssignments(baseExpression, context)
-      .slice()
-      .reverse()
-      .find((candidate) => candidate.value.callCallee);
-    if (!assignment?.value.callCallee) {
-      return {};
+    for (const candidateReference of iterateReferenceCandidates(baseExpression)) {
+      const assignment = this.findAssignments(candidateReference, context)
+        .slice()
+        .reverse()
+        .find((candidate) => candidate.value.callCallee);
+      if (!assignment?.value.callCallee) {
+        continue;
+      }
+
+      const imported = this.resolveImportedSymbol(assignment.value.callCallee, context.filePath);
+      if (!imported?.modulePath) {
+        continue;
+      }
+
+      return {
+        modulePath: imported.modulePath,
+        importedName: imported.importedName,
+        matchedReference: candidateReference,
+      };
     }
 
-    const imported = this.resolveImportedSymbol(assignment.value.callCallee, context.filePath);
-    if (!imported) {
-      return {};
-    }
-
-    return {
-      modulePath: imported.modulePath,
-      importedName: imported.importedName,
-    };
+    return this.resolveInlineConstructor(baseExpression, context.filePath);
   }
 
   private buildReceiverReference(call: CallSite, trailingMemberCount: number): string | undefined {
@@ -559,12 +641,49 @@ export class PythonSemanticIndex {
       return assignments.filter((assignment) => assignment.target === reference && assignment.enclosingClass === context.className);
     }
 
-    return assignments.filter((assignment) => assignment.target === reference && !assignment.enclosingFunction);
+    return assignments.filter((assignment) => {
+      if (assignment.target !== reference) {
+        return false;
+      }
+
+      if ((assignment.enclosingClass || undefined) !== (context.className || undefined)) {
+        return false;
+      }
+
+      if (!assignment.enclosingFunction) {
+        return true;
+      }
+
+      return assignment.enclosingFunction === context.functionName;
+    });
   }
 
   private resolveImportedSymbol(reference: string, filePath: string): ImportBinding | undefined {
     const baseName = reference.split('.')[0];
     return this.importBindings.get(filePath)?.get(baseName);
+  }
+
+  private resolveInlineConstructor(baseExpression: string | undefined, filePath: string): ConstructorBinding {
+    if (!baseExpression) {
+      return {};
+    }
+
+    const constructorMatch = baseExpression.match(/^([A-Za-z_][A-Za-z0-9_\.]*)\(/);
+    if (!constructorMatch) {
+      return {};
+    }
+
+    const constructorReference = constructorMatch[1];
+    const imported = this.resolveImportedSymbol(constructorReference, filePath);
+    if (!imported?.modulePath) {
+      return {};
+    }
+
+    return {
+      modulePath: imported.modulePath,
+      importedName: imported.importedName,
+      matchedReference: constructorReference,
+    };
   }
 
   private isOpenAIChatCompletionCreate(call: CallSite, context: ResolutionContext): boolean {
@@ -579,6 +698,17 @@ export class PythonSemanticIndex {
 
     const receiver = this.resolveAssignedConstructor(this.buildReceiverReference(call, 3), context);
     return receiver.modulePath === 'openai' && ['OpenAI', 'AsyncOpenAI'].includes(receiver.importedName || '');
+  }
+}
+
+function splitReferenceSegments(reference: string | undefined): string[] {
+  return (reference || '').split('.').filter(Boolean);
+}
+
+function* iterateReferenceCandidates(reference: string): Generator<string> {
+  const segments = splitReferenceSegments(reference);
+  for (let index = segments.length; index >= 1; index--) {
+    yield segments.slice(0, index).join('.');
   }
 }
 

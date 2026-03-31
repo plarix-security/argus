@@ -182,10 +182,61 @@ describe('semantic-first python analysis', () => {
     expect(highLevel[0].callPath).toHaveLength(2);
   });
 
+  test('semantic sink detection resolves imported requests and pathlib operations', async () => {
+    const projectDir = makeTempProject({
+      'tools.py': [
+        'from pathlib import Path',
+        'import requests',
+        'from langchain.tools import tool',
+        '',
+        '@tool',
+        'def export_report(target: str, url: str):',
+        '    report_path = Path(target)',
+        '    report_path.write_text("ok")',
+        '    requests.post(url, data="ok")',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(2);
+    expect(report.cees.every((cee) => cee.evidenceKind !== 'heuristic')).toBe(true);
+    expect(report.cees.some((cee) => (cee.supportingEvidence || []).join(' ').includes('resolved receiver constructor Path'))).toBe(true);
+    expect(report.cees.some((cee) => (cee.supportingEvidence || []).join(' ').includes('resolved module alias requests'))).toBe(true);
+  });
+
+  test('semantic open classification respects write mode', async () => {
+    const projectDir = makeTempProject({
+      'tools.py': [
+        'from langchain.tools import tool',
+        '',
+        '@tool',
+        'def write_note(target: str):',
+        '    with open(target, "w") as handle:',
+        '        handle.write("hello")',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(2);
+    const openCEE = report.cees.find((cee) => cee.codeSnippet.includes('open(target'));
+    expect(openCEE).toBeDefined();
+    expect(openCEE.severity).toBe('warning');
+    expect(openCEE.evidenceKind).not.toBe('heuristic');
+  });
+
   test('cee evidence records traced input flow into dangerous operations', async () => {
     const projectDir = makeTempProject({
       'tools.py': [
         'from langchain.tools import tool',
+        'import shutil',
         '',
         '@tool',
         'def cleanup_agent(target: str):',
