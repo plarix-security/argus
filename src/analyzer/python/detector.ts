@@ -320,22 +320,20 @@ function buildExplanation(exposed: ExposedPath, op: DangerousOperation): string 
   const framework = exposed.tool.framework || 'agent framework';
   const pathLen = exposed.path.length;
 
-  let explanation = `Tool "${toolName}" (${framework}) can reach ${op.callee}`;
+  let explanation = `Detected reachable call from tool "${toolName}" (${framework}) to ${op.callee}`;
 
   if (pathLen > 1) {
-    explanation += ` through ${pathLen - 1} call(s)`;
+    explanation += ` through ${pathLen - 1} intermediate call(s)`;
   }
 
   explanation += '. ';
 
   if (!exposed.hasGateInPath) {
-    explanation += 'No policy gate or authorization check detected in call path. ';
+    explanation += 'No policy gate detected in the analyzed call path. ';
 
     if (exposed.hasValidationHelperInPath) {
-      explanation += 'Path includes probable validation helper (severity downgraded). ';
+      explanation += 'The analyzed path includes a probable validation-helper name. This is heuristic and only affected severity. ';
     }
-
-    explanation += 'Agent can execute this operation without authorization basis.';
   }
 
   return explanation;

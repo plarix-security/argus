@@ -291,83 +291,7 @@ function detectRiskFactors(snippet: string, callee: { module: string; method: st
  * based on their module and method semantics, not hardcoded templates.
  */
 function getDescription(finding: AFBFinding): string {
-  const callee = parseCallee(finding.operation);
-  const snippet = finding.codeSnippet;
-
-  // Build operation description
-  let operationDesc: string;
-  const moduleDesc = getModuleDescription(callee);
-  const verbCap = getVerbCapability(callee.method);
-
-  // Determine a clean subject for the operation (avoid redundant "Evaluates eval")
-  const lowerMethod = callee.method.toLowerCase();
-  const isBareFn = !callee.module; // Functions like eval, exec with no module prefix
-
-  if (verbCap) {
-    if (isBareFn) {
-      // Bare function: "Evaluates Python expression" / "Executes Python code"
-      const subject = getSubjectForVerb(lowerMethod, finding.category);
-      operationDesc = `${verbCap.verb} ${subject}`;
-    } else if (moduleDesc) {
-      // Module function: "Makes HTTP request via httpx.get"
-      const contextualSubject = getContextualSubject(callee, finding.category);
-      // Handle HTTP special case: "Sends HTTP POST request" not "Sends _HTTP_POST_"
-      if (contextualSubject.startsWith('_HTTP_')) {
-        const httpMethod = contextualSubject.replace(/_HTTP_|_/g, '');
-        operationDesc = `Sends HTTP ${httpMethod} request`;
-      } else {
-        operationDesc = `${verbCap.verb} ${contextualSubject}`;
-      }
-    } else {
-      // Object method: "Writes to filepath.write_text" -> "Writes to file"
-      const contextualSubject = getContextualSubject(callee, finding.category);
-      if (contextualSubject.startsWith('_HTTP_')) {
-        const httpMethod = contextualSubject.replace(/_HTTP_|_/g, '');
-        operationDesc = `Sends HTTP ${httpMethod} request`;
-      } else {
-        operationDesc = `${verbCap.verb} ${contextualSubject}`;
-      }
-    }
-  } else if (moduleDesc) {
-    // Use module-based description: "Subprocess execution via subprocess.Popen"
-    operationDesc = `${moduleDesc} via ${callee.raw}`;
-  } else {
-    // Fallback: use raw callee
-    operationDesc = `Calls ${callee.raw}`;
-  }
-
-  // Build capability description
-  let capability: string;
-  if (verbCap) {
-    capability = verbCap.capability;
-  } else {
-    // Derive capability from category
-    switch (finding.category) {
-      case ExecutionCategory.SHELL_EXECUTION:
-        capability = 'execute system commands';
-        break;
-      case ExecutionCategory.CODE_EXECUTION:
-        capability = 'execute arbitrary code';
-        break;
-      case ExecutionCategory.FILE_OPERATION:
-        capability = 'access the filesystem';
-        break;
-      case ExecutionCategory.API_CALL:
-        capability = 'make network requests';
-        break;
-      case ExecutionCategory.DATABASE_OPERATION:
-        capability = 'access database';
-        break;
-      default:
-        capability = 'perform sensitive operations';
-    }
-  }
-
-  // Build risk factors
-  const risks = detectRiskFactors(snippet, callee);
-  const riskStr = risks.length > 0 ? ' ' + risks.join(' ') : '';
-
-  return `${operationDesc}. Agent can ${capability}.${riskStr}`;
+  return finding.explanation;
 }
 
 /**
@@ -563,7 +487,7 @@ export function printSummaryCounts(report: AnalysisReport): void {
   }
 
   if (parts.length === 0) {
-    console.log(`  ${styled('No AFB exposures detected.', chalk.green)}`);
+    console.log(`  ${styled('No findings reported.', chalk.green)}`);
   } else {
     console.log(`  ${parts.join(styled('  ·  ', chalk.dim))}`);
   }
@@ -689,6 +613,6 @@ export function printZeroFindings(report: AnalysisReport, targetPath: string): v
   printScanTarget(targetPath);
   console.log();
   console.log(`  ${styled(DIVIDER, chalk.dim)}`);
-  console.log(`  ${styled('No AFB exposures detected.', chalk.green)}`);
+  console.log(`  ${styled('No findings reported.', chalk.green)}`);
   printFooter(report);
 }

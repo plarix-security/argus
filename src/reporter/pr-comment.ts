@@ -9,118 +9,50 @@ import {
   AFBFinding,
   AnalysisReport,
   Severity,
-  ExecutionCategory,
 } from '../types';
-
-/**
- * Category to action description mapping
- */
-const CATEGORY_ACTION: Record<ExecutionCategory, string> = {
-  [ExecutionCategory.TOOL_CALL]: 'tool registered',
-  [ExecutionCategory.SHELL_EXECUTION]: 'shell command execution',
-  [ExecutionCategory.FILE_OPERATION]: 'file operation',
-  [ExecutionCategory.API_CALL]: 'external API call',
-  [ExecutionCategory.DATABASE_OPERATION]: 'database operation',
-  [ExecutionCategory.CODE_EXECUTION]: 'dynamic code execution',
-};
-
-/**
- * Get capability description for a finding
- */
-function getCapabilityDescription(finding: AFBFinding): string {
-  const category = finding.category;
-  const snippet = finding.codeSnippet.toLowerCase();
-
-  switch (category) {
-    case ExecutionCategory.SHELL_EXECUTION:
-      return 'shell/execute capability';
-    case ExecutionCategory.FILE_OPERATION:
-      if (snippet.includes('write') || snippet.includes('remove') || snippet.includes('delete') || snippet.includes('unlink') || snippet.includes('rmtree')) {
-        return 'write/delete capability';
-      }
-      return 'file access capability';
-    case ExecutionCategory.API_CALL:
-      if (snippet.includes('post') || snippet.includes('put') || snippet.includes('delete')) {
-        return 'write/send capability';
-      }
-      return 'external request capability';
-    case ExecutionCategory.DATABASE_OPERATION:
-      return 'database write capability';
-    case ExecutionCategory.CODE_EXECUTION:
-      return 'code execution capability';
-    case ExecutionCategory.TOOL_CALL:
-      return 'agent-callable capability';
-    default:
-      return 'external effect capability';
-  }
-}
 
 /**
  * Format a single finding as a markdown block per spec
  */
 function formatFinding(finding: AFBFinding): string {
-  const funcName = finding.context?.enclosingFunction || finding.codeSnippet.split('(')[0].trim();
-  const capability = getCapabilityDescription(finding);
-  const policyStatus = finding.context?.isToolDefinition
-    ? 'no policy gate in call path'
-    : 'verify policy gates exist';
-
   return `**\`${finding.file}\` line ${finding.line}**
-\`${funcName}(...)\` — ${CATEGORY_ACTION[finding.category]} with ${capability}, ${policyStatus}.
-AFB04: agent can execute this without authorization basis.`;
+\`${finding.codeSnippet}\`
+${finding.explanation}`;
 }
 
 /**
  * Generate the PR comment in the specified format
  */
 export function generatePRComment(report: AnalysisReport): string {
-  const { findings, findingsBySeverity, totalFindings } = report;
+  const { findings, totalFindings } = report;
 
-  // If no findings, return clean pass
   if (totalFindings === 0) {
-    return `## AFB Security Analysis
+    return `## WyScan Report
 
-**Scan scope:** AFB04 Unauthorized Action
+**Scan scope:** Python AFB04 scan
 **Files analyzed:** ${report.filesAnalyzed.length}
-**Execution points found:** 0
-**Exposures detected:** 0
+**Findings reported:** 0
 
----
-
-No AFB04 exposures detected. All analyzed files passed.
-
----
-
-### Not detected
-AFB01, AFB02, AFB03 are out of scope for this version.
-
----
-
-*AFB Scanner by Plarix — runtime enforcement: plarix.dev*`;
+No findings were reported in the analyzed files.`;
   }
 
-  // Group findings by severity (exclude SUPPRESSED from PR reports)
   const criticalFindings = findings.filter((f) => f.severity === Severity.CRITICAL);
   const warningFindings = findings.filter((f) => f.severity === Severity.WARNING);
   const infoFindings = findings.filter((f) => f.severity === Severity.INFO);
 
-  // Build sections
   const sections: string[] = [];
 
-  sections.push(`## AFB Security Analysis
+  sections.push(`## WyScan Report
 
-**Scan scope:** AFB04 Unauthorized Action
+**Scan scope:** Python AFB04 scan
 **Files analyzed:** ${report.filesAnalyzed.length}
-**Execution points found:** ${totalFindings}
-**Exposures detected:** ${totalFindings}`);
+**Findings reported:** ${totalFindings}`);
 
-  // Critical section
   if (criticalFindings.length > 0) {
     sections.push(`---
 
 ### Critical
 `);
-    // Limit to 5 critical findings to avoid huge comments
     const toShow = criticalFindings.slice(0, 5);
     for (const finding of toShow) {
       sections.push(formatFinding(finding));
@@ -131,7 +63,6 @@ AFB01, AFB02, AFB03 are out of scope for this version.
     }
   }
 
-  // Warning section
   if (warningFindings.length > 0) {
     sections.push(`---
 
@@ -147,7 +78,6 @@ AFB01, AFB02, AFB03 are out of scope for this version.
     }
   }
 
-  // Info section
   if (infoFindings.length > 0) {
     sections.push(`---
 
@@ -163,16 +93,9 @@ AFB01, AFB02, AFB03 are out of scope for this version.
     }
   }
 
-  // Not detected section
   sections.push(`---
 
-### Not detected
-AFB01, AFB02, AFB03 are out of scope for this version.`);
-
-  // Footer
-  sections.push(`---
-
-*AFB Scanner by Plarix — runtime enforcement: plarix.dev*`);
+AFB01, AFB02, and AFB03 are out of scope for this scanner.`);
 
   return sections.join('\n');
 }
@@ -198,17 +121,17 @@ export function generateTerminalReport(report: AnalysisReport): string {
   const BOLD = '\x1b[1m';
 
   let output = `
-${BOLD}${CYAN}AFB Security Analysis${RESET}
+${BOLD}${CYAN}WyScan Report${RESET}
 ${'='.repeat(50)}
 
-${BOLD}Scan scope:${RESET} AFB04 Unauthorized Action
+${BOLD}Scan scope:${RESET} Python AFB04 scan
 ${BOLD}Files analyzed:${RESET} ${report.filesAnalyzed.length}
-${BOLD}Exposures detected:${RESET} ${totalFindings}
+${BOLD}Findings reported:${RESET} ${totalFindings}
 `;
 
   if (totalFindings === 0) {
     output += `
-${GREEN}No AFB04 exposures detected.${RESET}
+${GREEN}No findings were reported in the analyzed files.${RESET}
 `;
     return output;
   }
@@ -227,12 +150,11 @@ ${BOLD}Findings:${RESET}
   for (const finding of toShow) {
     const severityColor = finding.severity === Severity.CRITICAL ? RED :
                           finding.severity === Severity.WARNING ? YELLOW : RESET;
-    const funcName = finding.context?.enclosingFunction || 'unknown';
 
     output += `
 ${severityColor}${BOLD}${finding.severity.toUpperCase()}${RESET} ${finding.file}:${finding.line}
-  ${CYAN}${funcName}${RESET} — ${CATEGORY_ACTION[finding.category]}
   ${finding.codeSnippet.slice(0, 80)}
+  ${finding.explanation}
 `;
   }
 
