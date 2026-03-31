@@ -60,6 +60,8 @@ export interface FunctionDef {
   isAsync: boolean;
   isMethod: boolean;
   className?: string;
+  /** Parameter names in declaration order */
+  parameters?: string[];
   /** Control flow information for policy gate detection */
   controlFlow?: ControlFlowInfo;
   /** Whether any decorator structurally acts as a gate */
@@ -131,6 +133,33 @@ export interface CallSite {
   enclosingFunction?: string;
   enclosingClass?: string;
   arguments: string[];
+  argumentDetails: CallArgumentInfo[];
+  baseExpression?: string;
+  memberChain?: string[];
+}
+
+export interface ExpressionSummary {
+  text: string;
+  references: string[];
+  stringLiterals: string[];
+  mappingReferences: Array<{
+    key: string;
+    reference: string;
+  }>;
+  callCallee?: string;
+}
+
+export interface CallArgumentInfo {
+  name?: string;
+  value: ExpressionSummary;
+}
+
+export interface AssignmentInfo {
+  target: string;
+  value: ExpressionSummary;
+  startLine: number;
+  enclosingFunction?: string;
+  enclosingClass?: string;
 }
 
 /**
@@ -150,6 +179,7 @@ export interface ParsedPythonFile {
   classes: ClassDef[];
   calls: CallSite[];
   imports: ImportInfo[];
+  assignments: AssignmentInfo[];
   /** Decorator functions defined in this file (for cross-file resolution) */
   decoratorDefs: DecoratorDef[];
   /** OpenAI tool schemas extracted from list/dict literals */
@@ -304,32 +334,59 @@ function extractClassName(node: Parser.SyntaxNode): string {
  * Get the callee string from a call expression
  */
 function extractCallee(callNode: Parser.SyntaxNode): string {
+  return extractCalleeInfo(callNode).callee;
+}
+
+function extractCalleeInfo(callNode: Parser.SyntaxNode): { callee: string; baseExpression?: string; memberChain: string[] } {
   const funcNode = callNode.childForFieldName('function');
-  if (!funcNode) return '';
-
-  // Handle attribute access: obj.method()
-  if (funcNode.type === 'attribute') {
-    return funcNode.text;
+  if (!funcNode) {
+    return { callee: '', memberChain: [] };
   }
 
-  // Handle simple identifier: func()
-  if (funcNode.type === 'identifier') {
-    return funcNode.text;
+  const parts = extractMemberChain(funcNode);
+  return {
+    callee: funcNode.text,
+    baseExpression: parts.baseExpression,
+    memberChain: parts.memberChain,
+  };
+}
+
+function extractMemberChain(node: Parser.SyntaxNode): { baseExpression?: string; memberChain: string[] } {
+  if (node.type === 'attribute') {
+    const objectNode = node.childForFieldName('object');
+    const attributeNode = node.childForFieldName('attribute');
+
+    if (objectNode && attributeNode) {
+      const inner = extractMemberChain(objectNode);
+      if (inner.baseExpression) {
+        return {
+          baseExpression: inner.baseExpression,
+          memberChain: [...inner.memberChain, attributeNode.text],
+        };
+      }
+
+      return {
+        baseExpression: objectNode.text,
+        memberChain: [attributeNode.text],
+      };
+    }
   }
 
-  // Handle subscript: arr[0]()
-  if (funcNode.type === 'subscript') {
-    return funcNode.text;
-  }
-
-  return funcNode.text;
+  return {
+    baseExpression: node.text,
+    memberChain: [],
+  };
 }
 
 /**
  * Extract call arguments
  */
 function extractArguments(callNode: Parser.SyntaxNode): string[] {
-  const args: string[] = [];
+  return extractArgumentDetails(callNode).map((arg) => arg.name ? `${arg.name}=${arg.value.text}` : arg.value.text);
+}
+
+function extractArgumentDetails(callNode: Parser.SyntaxNode): CallArgumentInfo[] {
+  const args: CallArgumentInfo[] = [];
   const argList = callNode.childForFieldName('arguments');
 
   if (argList) {
@@ -340,12 +397,182 @@ function extractArguments(callNode: Parser.SyntaxNode): string[] {
         child.type !== ',' &&
         child.type !== 'comment'
       ) {
-        args.push(child.text);
+        if (child.type === 'keyword_argument') {
+          const nameNode = child.childForFieldName('name');
+          const valueNode = child.childForFieldName('value');
+
+          if (valueNode) {
+            args.push({
+              name: nameNode?.text,
+              value: summarizeExpression(valueNode),
+            });
+          }
+
+          continue;
+        }
+
+        args.push({ value: summarizeExpression(child) });
       }
     }
   }
 
   return args;
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function uniqueMappingReferences(values: Array<{ key: string; reference: string }>): Array<{ key: string; reference: string }> {
+  const seen = new Set<string>();
+  const result: Array<{ key: string; reference: string }> = [];
+
+  for (const value of values) {
+    const key = `${value.key}:${value.reference}`;
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(value);
+  }
+
+  return result;
+}
+
+function summarizeExpression(node: Parser.SyntaxNode): ExpressionSummary {
+  const empty = (): ExpressionSummary => ({
+    text: node.text,
+    references: [],
+    stringLiterals: [],
+    mappingReferences: [],
+  });
+
+  if (node.type === 'identifier' || node.type === 'attribute') {
+    return {
+      text: node.text,
+      references: [node.text],
+      stringLiterals: [],
+      mappingReferences: [],
+    };
+  }
+
+  if (node.type === 'string') {
+    return {
+      text: node.text,
+      references: [],
+      stringLiterals: [extractStringValue(node) || node.text],
+      mappingReferences: [],
+    };
+  }
+
+  if (node.type === 'call') {
+    const calleeInfo = extractCalleeInfo(node);
+    const argumentDetails = extractArgumentDetails(node);
+
+    return {
+      text: node.text,
+      references: uniqueStrings(argumentDetails.flatMap((arg) => arg.value.references)),
+      stringLiterals: uniqueStrings(argumentDetails.flatMap((arg) => arg.value.stringLiterals)),
+      mappingReferences: uniqueMappingReferences(argumentDetails.flatMap((arg) => arg.value.mappingReferences)),
+      callCallee: calleeInfo.callee,
+    };
+  }
+
+  if (
+    node.type === 'list' ||
+    node.type === 'tuple' ||
+    node.type === 'set' ||
+    node.type === 'parenthesized_expression'
+  ) {
+    const childSummaries = node.children
+      .filter((child) => !['[', ']', '(', ')', '{', '}', ',', 'comment'].includes(child.type))
+      .map((child) => summarizeExpression(child));
+
+    return {
+      text: node.text,
+      references: uniqueStrings(childSummaries.flatMap((child) => child.references)),
+      stringLiterals: uniqueStrings(childSummaries.flatMap((child) => child.stringLiterals)),
+      mappingReferences: uniqueMappingReferences(childSummaries.flatMap((child) => child.mappingReferences)),
+      callCallee: childSummaries.find((child) => child.callCallee)?.callCallee,
+    };
+  }
+
+  if (node.type === 'dictionary') {
+    const summary = empty();
+
+    for (const child of node.children) {
+      if (child.type !== 'pair') {
+        continue;
+      }
+
+      const pairChildren = child.children.filter((pairChild) => pairChild.type !== ':');
+      if (pairChildren.length < 2) {
+        continue;
+      }
+
+      const keyNode = pairChildren[0];
+      const valueNode = pairChildren[1];
+      const valueSummary = summarizeExpression(valueNode);
+
+      summary.references.push(...valueSummary.references);
+      summary.stringLiterals.push(...valueSummary.stringLiterals);
+      summary.mappingReferences.push(...valueSummary.mappingReferences);
+
+      const key = extractStringValue(keyNode);
+      if (key && valueSummary.references.length === 1) {
+        summary.mappingReferences.push({
+          key,
+          reference: valueSummary.references[0],
+        });
+      }
+    }
+
+    summary.references = uniqueStrings(summary.references);
+    summary.stringLiterals = uniqueStrings(summary.stringLiterals);
+    summary.mappingReferences = uniqueMappingReferences(summary.mappingReferences);
+    return summary;
+  }
+
+  if (node.type === 'binary_operator') {
+    const childSummaries = node.children
+      .filter((child) => child.type !== '+' && child.type !== 'comment')
+      .map((child) => summarizeExpression(child));
+
+    return {
+      text: node.text,
+      references: uniqueStrings(childSummaries.flatMap((child) => child.references)),
+      stringLiterals: uniqueStrings(childSummaries.flatMap((child) => child.stringLiterals)),
+      mappingReferences: uniqueMappingReferences(childSummaries.flatMap((child) => child.mappingReferences)),
+      callCallee: childSummaries.find((child) => child.callCallee)?.callCallee,
+    };
+  }
+
+  const nestedChildren = node.children.filter((child) => child.type !== 'comment');
+  if (nestedChildren.length === 0) {
+    return empty();
+  }
+
+  const nestedSummaries = nestedChildren.map((child) => summarizeExpression(child));
+  return {
+    text: node.text,
+    references: uniqueStrings(nestedSummaries.flatMap((child) => child.references)),
+    stringLiterals: uniqueStrings(nestedSummaries.flatMap((child) => child.stringLiterals)),
+    mappingReferences: uniqueMappingReferences(nestedSummaries.flatMap((child) => child.mappingReferences)),
+    callCallee: nestedSummaries.find((child) => child.callCallee)?.callCallee,
+  };
+}
+
+function extractAssignmentTarget(node: Parser.SyntaxNode | null): string | null {
+  if (!node) {
+    return null;
+  }
+
+  if (node.type === 'identifier' || node.type === 'attribute') {
+    return node.text;
+  }
+
+  return null;
 }
 
 /**
@@ -880,6 +1107,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       classes: [],
       calls: [],
       imports: [],
+      assignments: [],
       decoratorDefs: [],
       openaiToolSchemas: [],
       dispatchMappings: [],
@@ -898,6 +1126,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
         classes: [],
         calls: [],
         imports: [],
+        assignments: [],
         decoratorDefs: [],
         openaiToolSchemas: [],
         dispatchMappings: [],
@@ -912,6 +1141,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
     const classes: ClassDef[] = [];
     const calls: CallSite[] = [];
     const imports: ImportInfo[] = [];
+    const assignments: AssignmentInfo[] = [];
     const decoratorDefs: DecoratorDef[] = [];
 
     // Find all decorated definitions, function definitions, and class definitions
@@ -926,6 +1156,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       root,
       new Set(['import_statement', 'import_from_statement'])
     );
+    const assignmentNodes = findAllNodes(root, new Set(['assignment']));
 
     // First pass: identify decorator definitions
     // A decorator is a function that returns a wrapper function
@@ -969,6 +1200,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
           className: enclosingClass
             ? extractClassName(enclosingClass)
             : undefined,
+          parameters: Array.from(extractParameterNames(innerDef)),
           controlFlow: analyzeControlFlow(innerDef),
           hasDecoratorGate: decoratorGateInfo.hasGate,
           gateDecorators: decoratorGateInfo.gateDecorators,
@@ -1005,6 +1237,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
                 isAsync: method.type === 'async_function_definition',
                 isMethod: true,
                 className: classDef.name,
+                parameters: Array.from(extractParameterNames(method)),
                 controlFlow: analyzeControlFlow(method),
               });
             }
@@ -1039,6 +1272,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
         isAsync: funcDef.type === 'async_function_definition',
         isMethod: !!enclosingClass,
         className: enclosingClass ? extractClassName(enclosingClass) : undefined,
+        parameters: Array.from(extractParameterNames(funcDef)),
         controlFlow: analyzeControlFlow(funcDef),
       });
     }
@@ -1080,6 +1314,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
             isAsync: method.type === 'async_function_definition',
             isMethod: true,
             className: def.name,
+            parameters: Array.from(extractParameterNames(method)),
             controlFlow: analyzeControlFlow(method),
           });
         }
@@ -1090,7 +1325,8 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
 
     // Process all function calls
     for (const callNode of callNodes) {
-      const callee = extractCallee(callNode);
+      const calleeInfo = extractCalleeInfo(callNode);
+      const callee = calleeInfo.callee;
       if (!callee) continue;
 
       const enclosingFunc = findEnclosingFunction(callNode);
@@ -1111,6 +1347,30 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
           ? extractClassName(enclosingClass)
           : undefined,
         arguments: extractArguments(callNode),
+        argumentDetails: extractArgumentDetails(callNode),
+        baseExpression: calleeInfo.baseExpression,
+        memberChain: calleeInfo.memberChain,
+      });
+    }
+
+    for (const assignmentNode of assignmentNodes) {
+      const leftNode = assignmentNode.childForFieldName('left');
+      const rightNode = assignmentNode.childForFieldName('right');
+      const target = extractAssignmentTarget(leftNode);
+
+      if (!target || !rightNode) {
+        continue;
+      }
+
+      const enclosingFunc = findEnclosingFunction(assignmentNode);
+      const enclosingClass = findEnclosingClass(assignmentNode);
+
+      assignments.push({
+        target,
+        value: summarizeExpression(rightNode),
+        startLine: assignmentNode.startPosition.row + 1,
+        enclosingFunction: enclosingFunc ? extractFunctionName(enclosingFunc) : undefined,
+        enclosingClass: enclosingClass ? extractClassName(enclosingClass) : undefined,
       });
     }
 
@@ -1179,6 +1439,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       classes,
       calls,
       imports,
+      assignments,
       decoratorDefs,
       openaiToolSchemas,
       dispatchMappings,
@@ -1190,6 +1451,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       classes: [],
       calls: [],
       imports: [],
+      assignments: [],
       decoratorDefs: [],
       openaiToolSchemas: [],
       dispatchMappings: [],
