@@ -161,6 +161,34 @@ describe('CLI behavior honesty', () => {
     expect(report.cees[0].afb_type).toBeNull();
   });
 
+  test('full terminal output shows unclassified CEEs when no AFB04 findings exist', () => {
+    const projectDir = makeTempProject({
+      'auth.py': [
+        'def login_required(fn):',
+        '    return fn',
+        '',
+      ].join('\n'),
+      'tools.py': [
+        'import shutil',
+        'from auth import login_required',
+        'from langchain.tools import tool',
+        '',
+        '@login_required',
+        '@tool',
+        'def cleanup_agent(target: str):',
+        '    shutil.rmtree(target)',
+        '',
+      ].join('\n'),
+    });
+
+    const result = runCli(['scan', projectDir]);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('No findings reported.');
+    expect(result.stdout).toContain('Unclassified CEEs');
+    expect(result.stdout).toContain('Policy gate detected in the analyzed call path');
+  });
+
   test('syntax-error Python files fail explicitly', () => {
     const projectDir = makeTempProject({
       'broken.py': [

@@ -7,7 +7,7 @@
 
 import chalk from 'chalk';
 import * as path from 'path';
-import { AFBFinding, AnalysisReport, Severity, ExecutionCategory } from '../types';
+import { AFBFinding, AnalysisReport, CEERecord, Severity, ExecutionCategory } from '../types';
 import { VERSION } from './version';
 
 const DIVIDER = '─'.repeat(53);
@@ -600,6 +600,37 @@ export function printFooter(report: AnalysisReport): void {
   }
 }
 
+function formatCEE(cee: CEERecord): string {
+  const filename = path.basename(cee.file);
+  const classification = cee.afbType || 'unclassified';
+  const lines = [
+    `  ${styled('○', chalk.dim)} ${styled(classification, chalk.dim)} ${styled(filename, chalk.white.bold)}${styled(`:${cee.line}:${cee.column || 0}`, chalk.dim)}`,
+    `    ${styled(formatSnippet(cee.codeSnippet), chalk.white)}`,
+    `    ${styled(cee.classificationNote, chalk.gray)}`,
+  ];
+
+  return lines.join('\n');
+}
+
+export function printUnclassifiedCEEs(report: AnalysisReport): void {
+  const unclassified = report.cees.filter((cee) => cee.afbType === null);
+
+  if (unclassified.length === 0) {
+    return;
+  }
+
+  console.log();
+  console.log(`  ${styled('Unclassified CEEs', chalk.white.bold)}`);
+  console.log(`  ${styled(DIVIDER, chalk.dim)}`);
+
+  for (let i = 0; i < unclassified.length; i++) {
+    console.log(formatCEE(unclassified[i]));
+    if (i < unclassified.length - 1) {
+      console.log();
+    }
+  }
+}
+
 /**
  * Print one-line summary (for --summary flag)
  */
@@ -675,5 +706,6 @@ export function printZeroFindings(report: AnalysisReport, targetPath: string, me
   if (report.totalCEEs > 0) {
     console.log(`  ${styled(`${report.totalCEEs} cees detected in the analyzed path set.`, chalk.dim)}`);
   }
+  printUnclassifiedCEEs(report);
   printFooter(report);
 }

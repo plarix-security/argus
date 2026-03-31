@@ -28,6 +28,7 @@ import {
   printScanTarget,
   printSummaryCounts,
   printFindings,
+  printUnclassifiedCEEs,
   printFooter,
   printOneLiner,
   printError,
@@ -504,6 +505,7 @@ async function runScan(args: string[]): Promise<number> {
           printScanTarget(resolvedPath);
           printSummaryCounts(filteredReport);
           printFindings(filteredReport.findings, options.level);
+          printUnclassifiedCEEs(filteredReport);
           printFooter(filteredReport);
         }
       }));
@@ -515,6 +517,7 @@ async function runScan(args: string[]): Promise<number> {
         printScanTarget(resolvedPath);
         printSummaryCounts(filteredReport);
         printFindings(filteredReport.findings, options.level);
+        printUnclassifiedCEEs(filteredReport);
         printFooter(filteredReport);
       }
     }
