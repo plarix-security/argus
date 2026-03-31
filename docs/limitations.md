@@ -10,7 +10,7 @@ WyScan will scan `.ts`, `.tsx`, `.js`, and `.jsx` files and emit an INFO-level n
 
 If you have TypeScript agent code, WyScan will not detect any issues in it. Use other tools for TypeScript security scanning.
 
-## Cross-File Resolution Limited to Depth 3
+## Cross-File Resolution Limited to Depth 5
 
 WyScan resolves imports transitively up to 3 levels deep.
 
@@ -29,7 +29,7 @@ def my_tool():
 
 ```python
 # tools.py -> a.py -> b.py -> c.py -> d.py (4+ levels)
-# The path beyond depth 3 may not be fully traced
+# The path beyond depth 5 may not be fully traced
 ```
 
 If your tool calls through more than 3 levels of helper functions across files, WyScan may not trace the full path.

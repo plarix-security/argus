@@ -40,7 +40,7 @@ It uses tree-sitter for real AST parsing and builds a call graph to trace from t
 - **Does not execute your code.** Static analysis only.
 - **Does not use LLMs or inference.** Pure call graph analysis.
 - **Does not scan TypeScript or JavaScript.** The TypeScript detector emits an INFO notice and returns no findings. Python is the only supported language.
-- **Does not resolve imports beyond depth 3.** Cross-file resolution is transitive up to 3 levels deep. Deeper call chains may not be fully traced.
+- **Does not resolve imports beyond depth 5.** Cross-file resolution is transitive up to 3 levels deep. Deeper call chains may not be fully traced.
 - **Does not trace calls into external packages.** Only project files are analyzed.
 
 ## Why This Exists
@@ -264,7 +264,7 @@ These are honest limitations of the current version:
 
 1. **TypeScript/JavaScript detection is disabled.** The TypeScript detector emits an INFO notice and returns no findings to avoid false positives from pattern matching. Python is the only working language.
 
-2. **Cross-file call resolution is limited to depth 3.** If your tool -> helper1 -> helper2 -> helper3 -> helper4 -> subprocess.run, the path may not be fully detected. Transitive import resolution stops at 3 levels to balance coverage and performance.
+2. **Cross-file call resolution is limited to depth 5.** If your tool -> helper1 -> helper2 -> helper3 -> helper4 -> subprocess.run, the path may not be fully detected. Transitive import resolution stops at 3 levels to balance coverage and performance.
 
 3. **External package calls are not traced.** If your tool calls a function from a third-party package that internally calls subprocess.run, WyScan will not detect it.
 

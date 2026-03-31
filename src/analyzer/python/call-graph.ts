@@ -148,7 +148,7 @@ export interface CrossFileImportMap {
  * Configuration for cross-file import resolution
  */
 export interface ImportResolutionConfig {
-  /** Maximum depth for transitive import resolution (default: 3) */
+  /** Maximum depth for transitive import resolution (default: 5) */
   maxDepth: number;
   /** Whether to emit SUPPRESSED findings when depth limit is hit (default: true) */
   emitSuppressedOnLimit: boolean;
@@ -156,7 +156,7 @@ export interface ImportResolutionConfig {
 
 /** Default import resolution configuration */
 export const DEFAULT_IMPORT_CONFIG: ImportResolutionConfig = {
-  maxDepth: 3,
+  maxDepth: 5,
   emitSuppressedOnLimit: true,
 };
 
