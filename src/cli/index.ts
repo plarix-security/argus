@@ -175,7 +175,7 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
       line: f.line,
       column: f.column || 0,
       operation: f.operation || f.codeSnippet.split('(')[0].trim(),
-      tool: f.context?.enclosingFunction || null,
+      tool: f.context?.toolName || f.context?.enclosingFunction || null,
       framework: f.context?.framework || null,
       tool_file: f.context?.toolFile || null,
       tool_line: f.context?.toolLine || null,

@@ -720,9 +720,13 @@ function extractParameterNames(funcNode: Parser.SyntaxNode): Set<string> {
   for (const child of parameters.children) {
     if (child.type === 'identifier') {
       params.add(child.text);
-    } else if (child.type === 'typed_parameter' || child.type === 'default_parameter') {
-      const nameNode = child.childForFieldName('name');
-      if (nameNode) {
+    } else if (
+      child.type === 'typed_parameter' ||
+      child.type === 'default_parameter' ||
+      child.type === 'typed_default_parameter'
+    ) {
+      const nameNode = child.childForFieldName('name') || child.children.find((grandchild) => grandchild.type === 'identifier');
+      if (nameNode?.text) {
         params.add(nameNode.text);
       }
     }

@@ -145,6 +145,8 @@ export interface AFBFinding {
     toolFile?: string;
     /** Line where the tool registration starts */
     toolLine?: number;
+    /** Originating tool registration name */
+    toolName?: string;
     /** Call path from tool registration to matched operation */
     callPath?: string[];
     /** Whether the matched path crossed file boundaries */

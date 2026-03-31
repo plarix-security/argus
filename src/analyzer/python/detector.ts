@@ -464,6 +464,7 @@ function createFindingFromCEE(cee: CEERecord, parsed: ParsedPythonFile): AFBFind
       framework: cee.framework,
       toolFile: cee.toolFile,
       toolLine: cee.toolLine,
+      toolName: cee.tool,
       callPath: cee.callPath,
       involvesCrossFile: cee.involvesCrossFile,
       unresolvedCalls: cee.unresolvedCalls,
@@ -477,14 +478,14 @@ function createFindingFromCEE(cee: CEERecord, parsed: ParsedPythonFile): AFBFind
 }
 
 function calculateConfidenceForCEE(cee: CEERecord): number {
-  let confidence = 0.72;
+  let confidence = 0.76;
 
   if (cee.evidenceKind === 'structural') {
     confidence += 0.18;
   } else if (cee.evidenceKind === 'semantic') {
     confidence += 0.12;
   } else if (cee.evidenceKind === 'heuristic') {
-    confidence -= 0.08;
+    confidence -= 0.04;
   }
 
   if (cee.supportingEvidence && cee.supportingEvidence.length > 0) {

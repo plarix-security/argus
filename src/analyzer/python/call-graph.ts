@@ -894,7 +894,7 @@ export function buildCallGraph(
       // 2. It has a decorator that acts as a structural gate (from same file), OR
       // 3. It has a decorator matching known authorization patterns (from any file)
       const hasStructuralGate = isStructuralPolicyGate(func.controlFlow);
-      const hasDecoratorGate = func.hasDecoratorGate || false;
+      const hasDecoratorGate = (func.hasDecoratorGate || false) || hasImportedStructuralDecoratorGate(func.decorators, filePath, importMap, files);
       const hasKnownAuthDecorator = func.decorators.some(d => isKnownAuthorizationDecorator(d));
 
       const node: CallGraphNode = {
@@ -962,7 +962,7 @@ export function buildCallGraph(
         // 2. It has a decorator that acts as a structural gate (from same file), OR
         // 3. It has a decorator matching known authorization patterns (from any file)
         const hasStructuralGate = isStructuralPolicyGate(method.controlFlow);
-        const hasDecoratorGate = method.hasDecoratorGate || false;
+        const hasDecoratorGate = (method.hasDecoratorGate || false) || hasImportedStructuralDecoratorGate(method.decorators, filePath, importMap, files);
         const hasKnownAuthDecorator = method.decorators.some(d => isKnownAuthorizationDecorator(d));
 
         const node: CallGraphNode = {
@@ -1360,6 +1360,35 @@ function summarizeOperationResource(call: CallSite): string | undefined {
   }
 
   return undefined;
+}
+
+function hasImportedStructuralDecoratorGate(
+  decorators: string[],
+  filePath: string,
+  importMap: CrossFileImportMap,
+  files: Map<string, ParsedPythonFile>
+): boolean {
+  const imports = importMap.fileImports.get(filePath) || [];
+
+  for (const decorator of decorators) {
+    const baseName = decorator.split('(')[0].trim();
+    const imported = imports.find((imp) => (imp.alias || imp.name) === baseName && imp.resolved && imp.resolvedFile);
+    if (!imported?.resolvedFile) {
+      continue;
+    }
+
+    const targetParsed = files.get(imported.resolvedFile);
+    if (!targetParsed) {
+      continue;
+    }
+
+    const decoratorDef = targetParsed.decoratorDefs.find((def) => def.name === imported.name);
+    if (decoratorDef?.isStructuralGate) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function analyzePathFlow(
