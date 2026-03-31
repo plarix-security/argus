@@ -2,7 +2,7 @@
   "$schema": "../cee_manifest_schema.json",
   "system": "07-langgraph-memory-agent",
   "version": "1.0.0",
-  "description": "Long-term memory agent with Redis for persistent cross-session storage",
+  "description": "Long-term memory agent with explicit LangGraph tool binding and Redis-backed persistent storage",
   "expected_findings": [
     {
       "id": "MEMORY-001",
@@ -17,6 +17,17 @@
     },
     {
       "id": "MEMORY-002",
+      "severity": "warning",
+      "category": "database_operation",
+      "file": "src/tools/memory.py",
+      "line": 33,
+      "operation": "redis_client.expire",
+      "tool_registration": "store_memory",
+      "description": "Persistent memory TTL mutation without namespace isolation",
+      "afb_type": "AFB04"
+    },
+    {
+      "id": "MEMORY-003",
       "severity": "info",
       "category": "database_operation",
       "file": "src/tools/memory.py",
@@ -27,7 +38,7 @@
       "afb_type": "AFB04"
     },
     {
-      "id": "MEMORY-003",
+      "id": "MEMORY-004",
       "severity": "warning",
       "category": "database_operation",
       "file": "src/tools/memory.py",
@@ -38,7 +49,7 @@
       "afb_type": "AFB04"
     },
     {
-      "id": "MEMORY-004",
+      "id": "MEMORY-005",
       "severity": "info",
       "category": "database_operation",
       "file": "src/tools/reflect.py",
@@ -49,7 +60,7 @@
       "afb_type": "AFB04"
     },
     {
-      "id": "MEMORY-005",
+      "id": "MEMORY-006",
       "severity": "warning",
       "category": "api_call",
       "file": "src/agent.py",
@@ -60,6 +71,6 @@
       "afb_type": "AFB04"
     }
   ],
-  "expected_summary": {"critical": 0, "warning": 3, "info": 2},
+  "expected_summary": {"critical": 0, "warning": 4, "info": 2},
   "metadata": {"difficulty": "4/5", "frameworks": ["langgraph"], "languages": ["python"], "created": "2026-03-26"}
 }

@@ -8,7 +8,7 @@ from typing import Optional
 def web_search(query: str, num_results: int = 5) -> str:
     """Search the web for information.
 
-    Uses Tavily API if available, otherwise returns mock results.
+    Uses Tavily API when configured.
 
     Args:
         query: Search query
@@ -37,9 +37,7 @@ def web_search(query: str, num_results: int = 5) -> str:
             return "\n".join(results) if results else "No results found"
         except Exception as e:
             return f"Search error: {e}"
-    else:
-        # Mock response when API key not configured
-        return f"Mock search results for: {query}\n- Result 1: Sample information about {query}\n- Result 2: More details about {query}"
+    raise RuntimeError("TAVILY_API_KEY not configured")
 
 
 WEB_SEARCH_TOOLS = [
