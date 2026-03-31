@@ -5,10 +5,11 @@ WyScan currently reports AFB04-style unauthorized action exposure in Python code
 The shipped detector does this:
 
 1. Parse Python source with tree-sitter.
-2. Detect tool registrations using framework and decorator patterns.
-3. Build call paths within the analyzed file.
-4. Match reachable operations against the current operation table.
-5. Credit a policy gate only when the analyzed path contains recognized structural authorization logic.
+2. Resolve tool registrations from framework-specific code structure when available.
+3. Fall back to framework or decorator patterns only when semantic resolution is incomplete.
+4. Build call paths across the analyzed Python file set.
+5. Match reachable operations against the current operation table.
+6. Credit a policy gate only when the analyzed path contains structural authorization logic.
 
 ## Severity Model
 
@@ -46,9 +47,9 @@ These adjustments are heuristic only.
 
 ## Framework Labels
 
-Framework labels are pattern-based and Python-only. They indicate that WyScan matched a registration pattern, not that it modeled the full runtime behavior of that framework.
+Framework labels are Python-only. They prefer semantic extraction from code structure, then fall back to matched registration patterns when semantic resolution is incomplete.
 
-The current detector includes labels for patterns associated with LangChain, CrewAI, AutoGen, OpenAI tool schemas and dispatch maps, LlamaIndex, MCP, and generic Python decorator-style tool registration.
+The current detector includes semantic handling for LangGraph/LangChain tool lists, CrewAI agent tool lists, AutoGen `function_map` registrations, imported tool decorators, OpenAI tool schemas and dispatch maps, plus fallback labels for generic Python decorator-style tool registration.
 
 ## Policy Gates
 
@@ -57,6 +58,6 @@ WyScan credits a policy gate when the analyzed path contains code it recognizes 
 - Conditional checks on parameters
 - Authorization-like exceptions raised on denied paths
 - Decorators that are structurally analyzed as wrappers that can prevent execution
-- Known authorization decorator names
+- Imported decorators whose wrapper logic is structurally analyzed as gates
 
-Validation helpers such as `validate_*` or `sanitize_*` are not credited as gates by themselves.
+Validation helpers such as `validate_*` or `sanitize_*` are not credited as gates by themselves. Authorization-like decorator names are treated as heuristic evidence, not full gate proof, when no structural gate is found.

@@ -2,7 +2,7 @@
 
 Static scanner for Python agent code that reports reachable operations from detected tool registrations.
 
-WyScan is currently a Python-first AFB04 scanner. It parses Python with tree-sitter, detects tool registrations using framework and decorator patterns, traces reachable calls within the analyzed file, and reports matched operations when no credited policy gate is detected in that analyzed path.
+WyScan is currently a Python-first AFB04 scanner. It parses Python with tree-sitter, resolves tool registrations semantically when the code structure allows it, traces reachable calls across the analyzed Python file set, and reports matched operations when no credited structural policy gate is detected in that analyzed path.
 
 TypeScript and JavaScript scanning are intentionally deferred. `.ts`, `.tsx`, `.js`, and `.jsx` files are skipped explicitly and produce no findings.
 
@@ -35,10 +35,10 @@ Detected reachable call from tool registration to requests.post. No policy gate 
 WyScan currently does all of the following:
 
 - Parses Python source with tree-sitter.
-- Detects Python tool registrations using framework-specific and generic decorator or registration patterns.
+- Resolves Python tool registrations from framework-specific code structure first, then falls back to registration patterns when semantic resolution is incomplete.
 - Matches reachable operations such as shell execution, file mutation, file reads, HTTP requests, email sends, and common database calls.
 - Suppresses findings when a structural policy gate is detected in the analyzed path.
-- Downgrades severity when the analyzed path passes through a probable validation helper name such as `validate_*` or `sanitize_*`.
+- Carries supporting evidence such as traced input flow, resource hints, and structural versus fallback registration evidence into CEEs.
 
 WyScan currently does not do any of the following:
 
@@ -126,7 +126,7 @@ These severity adjustments are heuristic. They are not proof of attacker intent,
 
 ## Framework Labels
 
-Framework detection is Python-only and pattern-based. A framework label means WyScan matched one of its registration patterns. It does not mean complete semantic coverage of that framework.
+Framework detection is Python-only. WyScan now prefers semantic extraction from framework code structure such as decorator imports, tool lists, `create_react_agent(...)`, `bind_tools(...)`, and `function_map` style registrations. Pattern matching remains as fallback when structural resolution is incomplete.
 
 The shipped detector currently labels patterns for frameworks such as:
 
@@ -148,11 +148,12 @@ Current gate credit comes from:
 
 - A function with conditional branches that check parameters and raise an authorization-like exception
 - Decorators that are structurally analyzed as wrappers that can prevent execution
-- Known authorization decorator names such as `@require_permission`, `@permission_required`, or `@login_required`
+- Imported decorators whose wrapper logic is structurally analyzed as gates
 
 Current non-gates:
 
 - Validation-helper names alone
+- Authorization-like decorator names alone
 - Logging calls
 - `try/except` around an operation
 - Generic exceptions that do not look authorization-related
