@@ -540,6 +540,25 @@ export function printFindings(findings: AFBFinding[], level: Severity = Severity
   }
 }
 
+function getCoverageNotes(report: AnalysisReport): string[] {
+  const notes: string[] = [];
+  const failedFiles = report.metadata.failedFiles;
+  const skippedFiles = report.metadata.skippedFiles;
+
+  if (failedFiles.length > 0) {
+    const label = failedFiles.length === 1 ? 'file' : 'files';
+    notes.push(`Failed to analyze ${failedFiles.length} ${label}. Exit code reflects scan failure.`);
+  }
+
+  if (skippedFiles.length > 0) {
+    const skippedLanguages = Array.from(new Set(skippedFiles.map((file) => file.language))).sort();
+    const label = skippedFiles.length === 1 ? 'file' : 'files';
+    notes.push(`Skipped ${skippedFiles.length} unsupported ${label}: ${skippedLanguages.join(', ')}.`);
+  }
+
+  return notes;
+}
+
 /**
  * Print footer with file count and timing
  */
@@ -552,6 +571,10 @@ export function printFooter(report: AnalysisReport): void {
   console.log();
   console.log(`  ${styled(DIVIDER, chalk.dim)}`);
   console.log(`  ${styled(`${fileCount} ${fileLabel}  ·  ${runtimeSec}s`, chalk.dim)}`);
+
+  for (const note of getCoverageNotes(report)) {
+    console.log(`  ${styled(note, chalk.dim)}`);
+  }
 }
 
 /**
@@ -575,6 +598,14 @@ export function printOneLiner(report: AnalysisReport): void {
 
   const fileCount = filesAnalyzed.length;
   const fileLabel = fileCount === 1 ? 'file' : 'files';
+
+  if (metadata.failedFiles.length > 0) {
+    parts.push(`${metadata.failedFiles.length} failed`);
+  }
+
+  if (metadata.skippedFiles.length > 0) {
+    parts.push(`${metadata.skippedFiles.length} skipped`);
+  }
 
   if (parts.length === 0) {
     console.log(`0 findings  ·  ${fileCount} ${fileLabel}  ·  ${runtimeSec}s`);
@@ -608,11 +639,11 @@ export function printCheckStatus(name: string, ok: boolean, detail?: string): vo
 /**
  * Zero findings output
  */
-export function printZeroFindings(report: AnalysisReport, targetPath: string): void {
+export function printZeroFindings(report: AnalysisReport, targetPath: string, message: string = 'No findings reported.'): void {
   printHeader();
   printScanTarget(targetPath);
   console.log();
   console.log(`  ${styled(DIVIDER, chalk.dim)}`);
-  console.log(`  ${styled('No findings reported.', chalk.green)}`);
+  console.log(`  ${styled(message, chalk.green)}`);
   printFooter(report);
 }

@@ -77,7 +77,6 @@ wyscan scan ./my-agent-project
 | `--output <file>` | `-o` | Writes terminal or JSON output to a file |
 | `--json` | `-j` | Emits structured JSON |
 | `--summary` | `-s` | Prints a one-line summary |
-| `--recursive` | `-r` | Accepted, but scanning is already recursive |
 | `--quiet` | `-q` | Suppresses output and relies on exit code |
 | `--debug` | `-d` | Prints thrown errors during failures |
 
@@ -88,9 +87,9 @@ wyscan scan ./my-agent-project
 | 0 | No critical or warning findings were reported |
 | 1 | At least one warning finding was reported and no critical finding was reported |
 | 2 | At least one critical finding was reported |
-| 3 | Scanner initialization failed, the target path was invalid, or a single-file scan failed |
+| 3 | Scanner initialization failed, the target path was invalid, or one or more files failed to analyze |
 
-Directory scans currently record failed files in report metadata rather than converting the whole run to exit code `3`.
+Exit codes follow the filtered report level. For example, `--level critical` ignores warning-only results when computing the exit code.
 
 ## Detection Model
 
@@ -181,7 +180,7 @@ Current CLI JSON shape:
       "operation": "File system operation: shutil.rmtree",
       "tool": "setup_agent",
       "framework": "langchain",
-      "description": "Tool \"setup_agent\" (langchain) can reach shutil.rmtree through 1 call(s). No policy gate or authorization check detected in call path. Agent can execute this operation without authorization basis.",
+      "description": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). No policy gate detected in the analyzed call path.",
       "code_snippet": "shutil.rmtree(agent_dir)",
       "category": "file_operation"
     }
@@ -197,7 +196,19 @@ Current CLI JSON shape:
     "languages_skipped": ["typescript", "javascript"],
     "frameworks_detected": ["langchain", "openai"],
     "files_analyzed": 34,
-    "files_skipped": 2
+    "files_skipped": 2,
+    "failed_files": [],
+    "skipped_files": [
+      {
+        "file": "/absolute/path/src/tool.ts",
+        "language": "typescript",
+        "reason": "TypeScript scanning is not implemented in this version. File skipped."
+      }
+    ],
+    "partial": true,
+    "limitations": [
+      "Python files are analyzed independently in the shipped scan flow. Repository-wide cross-file tracing is not guaranteed."
+    ]
   }
 }
 ```

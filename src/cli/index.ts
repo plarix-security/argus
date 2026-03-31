@@ -54,7 +54,6 @@ interface ScanOptions {
   output: string | null;
   json: boolean;
   summary: boolean;
-  recursive: boolean;
   quiet: boolean;
   debug: boolean;
 }
@@ -79,7 +78,6 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
     output: null,
     json: false,
     summary: false,
-    recursive: true,
     quiet: false,
     debug: false,
   };
@@ -98,11 +96,6 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
     }
     if (arg === '-s' || arg === '--summary') {
       options.summary = true;
-      i++;
-      continue;
-    }
-    if (arg === '-r' || arg === '--recursive') {
-      options.recursive = true;
       i++;
       continue;
     }
@@ -158,12 +151,10 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
  * Generate JSON report
  */
 function generateJSON(report: AnalysisReport, scannedPath: string): string {
-  // Count files by language
   const pythonFiles = report.filesAnalyzed.filter(f => f.endsWith('.py')).length;
-  const tsFiles = report.filesAnalyzed.filter(f => f.endsWith('.ts') || f.endsWith('.tsx')).length;
-  const jsFiles = report.filesAnalyzed.filter(f => f.endsWith('.js') || f.endsWith('.jsx')).length;
+  const skippedFiles = report.metadata.skippedFiles;
+  const skippedLanguages = Array.from(new Set(skippedFiles.map((file) => file.language))).sort();
 
-  // Detect frameworks from findings
   const frameworks = new Set<string>();
   for (const finding of report.findings) {
     if (finding.context?.framework) {
@@ -195,14 +186,64 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
       suppressed: report.findingsBySeverity.suppressed,
     },
     coverage: {
-      languages_scanned: ['python'],
-      languages_skipped: tsFiles + jsFiles > 0 ? ['typescript', 'javascript'] : [],
+      languages_scanned: pythonFiles > 0 ? ['python'] : [],
+      languages_skipped: skippedLanguages,
       frameworks_detected: Array.from(frameworks).sort(),
       files_analyzed: pythonFiles,
-      files_skipped: tsFiles + jsFiles,
+      files_skipped: skippedFiles.length,
+      failed_files: report.metadata.failedFiles,
+      skipped_files: skippedFiles,
+      partial: skippedFiles.length > 0 || report.metadata.failedFiles.length > 0,
+      limitations: [
+        'Python files are analyzed independently in the shipped scan flow. Repository-wide cross-file tracing is not guaranteed.',
+      ],
     },
   };
   return JSON.stringify(output, null, 2);
+}
+
+function countFindingsBySeverity(report: AnalysisReport): AnalysisReport['findingsBySeverity'] {
+  return {
+    critical: report.findings.filter((finding) => finding.severity === Severity.CRITICAL).length,
+    warning: report.findings.filter((finding) => finding.severity === Severity.WARNING).length,
+    info: report.findings.filter((finding) => finding.severity === Severity.INFO).length,
+    suppressed: report.findings.filter((finding) => finding.severity === Severity.SUPPRESSED).length,
+  };
+}
+
+function filterReportByLevel(report: AnalysisReport, level: Severity): AnalysisReport {
+  const severityOrder: Record<Severity, number> = {
+    [Severity.CRITICAL]: 0,
+    [Severity.WARNING]: 1,
+    [Severity.INFO]: 2,
+    [Severity.SUPPRESSED]: 3,
+  };
+  const filteredFindings = report.findings.filter((finding) => severityOrder[finding.severity] <= severityOrder[level]);
+
+  return {
+    ...report,
+    findings: filteredFindings,
+    totalFindings: filteredFindings.length,
+    findingsBySeverity: countFindingsBySeverity({ ...report, findings: filteredFindings } as AnalysisReport),
+  };
+}
+
+function captureConsoleOutput(run: () => void): string {
+  const origTTY = process.stdout.isTTY;
+  Object.defineProperty(process.stdout, 'isTTY', { value: false, writable: true });
+
+  const captured: string[] = [];
+  const origLog = console.log;
+  console.log = (...args) => captured.push(args.join(' '));
+
+  try {
+    run();
+  } finally {
+    console.log = origLog;
+    Object.defineProperty(process.stdout, 'isTTY', { value: origTTY, writable: true });
+  }
+
+  return captured.join('\n') + '\n';
 }
 
 /**
@@ -236,17 +277,17 @@ function printHelp(command?: string): void {
   console.log(`
   ${NAME} v${VERSION}
 
-  Find dangerous operations in AI agent tools before they reach production.
-  Detects unsafe tool boundaries in LangChain, CrewAI, AutoGen, and more.
+  Python-first AFB04 scanner for agent code.
+  TypeScript and JavaScript files are skipped explicitly.
 
   Usage:
-    ${NAME} scan <path>     Scan files for dangerous operations
+    ${NAME} scan <path>     Scan a file or directory
     ${NAME} check           Verify scanner dependencies
     ${NAME} help [command]  Show help
 
-  Supported frameworks:
-    Python: LangChain, LangGraph, CrewAI, AutoGen, LlamaIndex,
-            smolagents, MCP servers, OpenAI function calling
+  Registration patterns:
+    Python: LangChain, CrewAI, AutoGen, OpenAI tool schemas,
+            and generic decorator-style tool registrations
 
   Options:
     -l, --level <level>   Filter by severity (critical|warning|info)
@@ -254,6 +295,7 @@ function printHelp(command?: string): void {
     -o, --output <file>   Write to file
     -s, --summary         Counts only
     -q, --quiet           Exit code only
+    -d, --debug           Show thrown errors on failure
 
   Exit codes:
     0 = No issues    1 = Warnings    2 = Critical    3 = Error
@@ -397,19 +439,12 @@ async function runScan(args: string[]): Promise<number> {
     return EXIT.ERROR;
   }
 
-  // Filter findings by level
-  const severityOrder: Record<Severity, number> = {
-    [Severity.CRITICAL]: 0,
-    [Severity.WARNING]: 1,
-    [Severity.INFO]: 2,
-    [Severity.SUPPRESSED]: 3,
-  };
-  const filteredFindings = report.findings.filter(f => severityOrder[f.severity] <= severityOrder[options.level]);
-  const filteredReport = { ...report, findings: filteredFindings, totalFindings: filteredFindings.length };
+  const filteredReport = filterReportByLevel(report, options.level);
+  const zeroMessage = report.totalFindings > 0 && filteredReport.totalFindings === 0
+    ? `No findings reported at level ${options.level}.`
+    : 'No findings reported.';
 
-  // Generate output
   if (options.quiet) {
-    // No output, just exit code
   } else if (options.json) {
     const json = generateJSON(filteredReport, resolvedPath);
     if (options.output) {
@@ -418,51 +453,44 @@ async function runScan(args: string[]): Promise<number> {
       console.log(json);
     }
   } else if (options.summary) {
-    printOneLiner(report);
-  } else {
-    // Full terminal output
     if (options.output) {
-      // Capture output for file (strip colors)
-      const origTTY = process.stdout.isTTY;
-      Object.defineProperty(process.stdout, 'isTTY', { value: false, writable: true });
-
-      const captured: string[] = [];
-      const origLog = console.log;
-      console.log = (...a) => captured.push(a.join(' '));
-
-      if (report.totalFindings === 0) {
-        printZeroFindings(report, resolvedPath);
-      } else {
-        printHeader();
-        printScanTarget(resolvedPath);
-        printSummaryCounts(report);
-        printFindings(filteredFindings, options.level);
-        printFooter(report);
-      }
-
-      console.log = origLog;
-      Object.defineProperty(process.stdout, 'isTTY', { value: origTTY, writable: true });
-
-      fs.writeFileSync(options.output, captured.join('\n') + '\n');
+      fs.writeFileSync(options.output, captureConsoleOutput(() => printOneLiner(filteredReport)));
     } else {
-      // Print to console
-      if (report.totalFindings === 0) {
-        printZeroFindings(report, resolvedPath);
+      printOneLiner(filteredReport);
+    }
+  } else {
+    if (options.output) {
+      fs.writeFileSync(options.output, captureConsoleOutput(() => {
+        if (filteredReport.totalFindings === 0) {
+          printZeroFindings(filteredReport, resolvedPath, zeroMessage);
+        } else {
+          printHeader();
+          printScanTarget(resolvedPath);
+          printSummaryCounts(filteredReport);
+          printFindings(filteredReport.findings, options.level);
+          printFooter(filteredReport);
+        }
+      }));
+    } else {
+      if (filteredReport.totalFindings === 0) {
+        printZeroFindings(filteredReport, resolvedPath, zeroMessage);
       } else {
         printHeader();
         printScanTarget(resolvedPath);
-        printSummaryCounts(report);
-        printFindings(filteredFindings, options.level);
-        printFooter(report);
+        printSummaryCounts(filteredReport);
+        printFindings(filteredReport.findings, options.level);
+        printFooter(filteredReport);
       }
     }
   }
 
-  // Exit code based on unfiltered findings
-  if (report.findingsBySeverity.critical > 0) {
+  if (report.metadata.failedFiles.length > 0) {
+    return EXIT.ERROR;
+  }
+  if (filteredReport.findingsBySeverity.critical > 0) {
     return EXIT.CRITICAL;
   }
-  if (report.findingsBySeverity.warning > 0) {
+  if (filteredReport.findingsBySeverity.warning > 0) {
     return EXIT.WARNING;
   }
   return EXIT.CLEAN;
