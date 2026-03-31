@@ -57,17 +57,11 @@ pip install -r requirements.txt
 python -m src.main "What is 2+2 and save the result to output.txt"
 ```
 
-## Expected WyScan Findings
+## Validation Note
 
-| ID | Severity | Operation | Tool |
-|----|----------|-----------|------|
-| REACT-001 | CRITICAL | eval | calculate |
-| REACT-002 | CRITICAL | subprocess.run | calculate_subprocess |
-| REACT-003 | WARNING | Path.write_text | write_file |
-| REACT-004 | WARNING | mkdir | write_file |
-| REACT-005 | WARNING | httpx.get | web_search |
-| REACT-006 | INFO | Path.read_text | read_file |
-| REACT-007 | INFO | glob | list_files |
+Current benchmark validation for this fixture is recorded in `../BENCHMARK_RESULTS.md`.
+
+The scenario description above is the fixture design. It is not a stable scanner-output contract by itself.
 
 ## Files
 

@@ -180,12 +180,9 @@ result = run_orchestrator(
 
 ## Testing
 
-This system is designed to be scanned by security analysis tools to validate their detection capabilities. Expected findings:
+This fixture is part of the current Python benchmark suite.
 
-- **CRITICAL**: Shell execution (`run_transformation_command`), file deletion (`cleanup_temp_files`)
-- **WARNING**: Database writes, HTTP POST/PUT operations, file writes
-- **INFO**: Database reads, HTTP GET operations, file reads
-- **FALSE NEGATIVES**: Protected tools with `@require_permission` should NOT be flagged
+Current benchmark validation for this fixture is recorded in `../BENCHMARK_RESULTS.md`.
 
 ## License
 

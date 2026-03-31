@@ -46,12 +46,8 @@ npm install
 npx ts-node src/main.ts "Help me with order #12345"
 ```
 
-## Expected WyScan Findings
+## Validation Note
 
-| ID | Severity | Operation | Tool |
-|----|----------|-----------|------|
-| ASST-001 | CRITICAL | db.exec | query_orders |
-| ASST-002 | CRITICAL | db.exec | process_refund |
-| ASST-003 | WARNING | sendMail | send_email |
-| ASST-004 | WARNING | appendFileSync | escalate_to_human |
-| ASST-005 | INFO | db.prepare | get_customer |
+This fixture currently does not include analyzable source files in the repository snapshot.
+
+Current benchmark validation status is recorded in `../BENCHMARK_RESULTS.md`.

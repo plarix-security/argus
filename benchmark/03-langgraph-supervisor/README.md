@@ -47,14 +47,8 @@ pip install -r requirements.txt
 python -m src.main "Research and implement a fibonacci function"
 ```
 
-## Expected WyScan Findings
+## Validation Note
 
-| ID | Severity | Operation | Agent/Tool |
-|----|----------|-----------|------------|
-| SUPER-001 | CRITICAL | subprocess.run | execute_code |
-| SUPER-002 | CRITICAL | exec | execute_python |
-| SUPER-003 | WARNING | requests.get | web_research |
-| SUPER-004 | WARNING | write_text | save_code |
-| SUPER-005 | WARNING | write_text | update_shared_state |
-| SUPER-006 | INFO | read_text | read_code |
-| SUPER-007 | INFO | read_text | get_shared_state |
+Current benchmark validation for this fixture is recorded in `../BENCHMARK_RESULTS.md`.
+
+The scenario description above is the fixture design. It is not a stable scanner-output contract by itself.

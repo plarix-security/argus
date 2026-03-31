@@ -43,13 +43,8 @@ pip install -r requirements.txt
 python -m src.main "Research AI security trends and publish to our blog"
 ```
 
-## Expected WyScan Findings
+## Validation Note
 
-| ID | Severity | Operation | Tool |
-|----|----------|-----------|------|
-| CREW-001 | CRITICAL | exec | dynamic_scrape |
-| CREW-002 | WARNING | requests.post | send_webhook |
-| CREW-003 | WARNING | requests.get | scrape_url |
-| CREW-004 | WARNING | write_text | update_plan |
-| CREW-005 | WARNING | write_text | publish_article |
-| CREW-006 | INFO | read_text | read_plan |
+Current benchmark validation for this fixture is recorded in `../BENCHMARK_RESULTS.md`.
+
+The scenario description above is the fixture design. It is not a stable scanner-output contract by itself.

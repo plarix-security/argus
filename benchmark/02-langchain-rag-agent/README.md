@@ -54,15 +54,8 @@ pip install -r requirements.txt
 python -m src.main "What documents do we have about security?"
 ```
 
-## Expected WyScan Findings
+## Validation Note
 
-| ID | Severity | Operation | Tool |
-|----|----------|-----------|------|
-| RAG-001 | CRITICAL | exec | execute_transform |
-| RAG-002 | WARNING | write_text | rewrite_document |
-| RAG-003 | WARNING | requests.get | search_web |
-| RAG-004 | WARNING | requests.get | fetch_url |
-| RAG-005 | WARNING | write_text | add_document |
-| RAG-006 | INFO | read_text | read_document |
-| RAG-007 | INFO | read_text | load_documents |
-| RAG-008 | INFO | glob | load_documents |
+Current benchmark validation for this fixture is recorded in `../BENCHMARK_RESULTS.md`.
+
+The scenario description above is the fixture design. It is not a stable scanner-output contract by itself.
