@@ -13,6 +13,153 @@ import { VERSION } from './version';
 const DIVIDER = '─'.repeat(53);
 
 /**
+ * Module descriptions for dynamic description generation
+ * Maps module names to their general purpose
+ */
+const MODULE_DESCRIPTIONS: Record<string, string> = {
+  // Process/shell
+  subprocess: 'Executes system processes',
+  os: 'System operations',
+  asyncio: 'Async operations',
+  pty: 'Pseudo-terminal control',
+  pexpect: 'Interactive process control',
+  multiprocessing: 'Process spawning',
+  fabric: 'Remote execution',
+  paramiko: 'SSH operations',
+
+  // Code execution
+  pickle: 'Object deserialization',
+  marshal: 'Code object serialization',
+  yaml: 'YAML parsing',
+  ctypes: 'Native code interface',
+  importlib: 'Dynamic imports',
+
+  // File system
+  shutil: 'File operations',
+  pathlib: 'Path operations',
+  tempfile: 'Temporary files',
+  io: 'I/O operations',
+  zipfile: 'Archive operations',
+  tarfile: 'Archive operations',
+  builtins: 'Built-in operations',
+
+  // Network
+  requests: 'HTTP requests',
+  httpx: 'HTTP requests',
+  urllib: 'URL operations',
+  aiohttp: 'Async HTTP requests',
+  socket: 'Network socket operations',
+  http: 'HTTP operations',
+
+  // Database
+  sqlite3: 'SQLite database operations',
+  psycopg2: 'PostgreSQL database operations',
+  psycopg: 'PostgreSQL database operations',
+  pymysql: 'MySQL database operations',
+  pymongo: 'MongoDB operations',
+  redis: 'Redis operations',
+
+  // Email
+  smtplib: 'Email sending',
+  email: 'Email operations',
+};
+
+/**
+ * Verb-to-capability mapping for dynamic descriptions
+ * Maps method verbs to what they enable an agent to do
+ */
+const VERB_CAPABILITIES: Record<string, { verb: string; capability: string }> = {
+  // Critical operations
+  delete: { verb: 'Deletes', capability: 'remove data permanently' },
+  remove: { verb: 'Removes', capability: 'delete files or resources' },
+  unlink: { verb: 'Unlinks', capability: 'delete files' },
+  rmtree: { verb: 'Removes', capability: 'recursively delete directories' },
+  rmdir: { verb: 'Removes', capability: 'delete directories' },
+  exec: { verb: 'Executes', capability: 'run arbitrary code' },
+  eval: { verb: 'Evaluates', capability: 'execute arbitrary expressions' },
+  run: { verb: 'Runs', capability: 'execute commands or processes' },
+  spawn: { verb: 'Spawns', capability: 'create new processes' },
+  popen: { verb: 'Opens', capability: 'execute shell commands' },
+  system: { verb: 'Executes', capability: 'run system commands' },
+  call: { verb: 'Calls', capability: 'invoke external processes' },
+  kill: { verb: 'Kills', capability: 'terminate processes' },
+  terminate: { verb: 'Terminates', capability: 'stop processes' },
+  load: { verb: 'Deserializes', capability: 'execute code during loading' },
+  loads: { verb: 'Deserializes', capability: 'execute code during loading' },
+
+  // Write operations
+  write: { verb: 'Writes', capability: 'modify or create files' },
+  writelines: { verb: 'Writes', capability: 'modify files' },
+  write_text: { verb: 'Writes', capability: 'create or modify text files' },
+  write_bytes: { verb: 'Writes', capability: 'create or modify binary files' },
+  save: { verb: 'Saves', capability: 'persist data' },
+  dump: { verb: 'Dumps', capability: 'serialize and write data' },
+  mkdir: { verb: 'Creates', capability: 'create directories' },
+  makedirs: { verb: 'Creates', capability: 'create directory trees' },
+  copy: { verb: 'Copies', capability: 'duplicate files' },
+  copy2: { verb: 'Copies', capability: 'duplicate files with metadata' },
+  copytree: { verb: 'Copies', capability: 'duplicate directory trees' },
+  move: { verb: 'Moves', capability: 'relocate files' },
+  rename: { verb: 'Renames', capability: 'change file names' },
+  replace: { verb: 'Replaces', capability: 'overwrite files' },
+  insert: { verb: 'Inserts', capability: 'add data to storage' },
+  insert_one: { verb: 'Inserts', capability: 'add records' },
+  insert_many: { verb: 'Inserts', capability: 'add multiple records' },
+  update: { verb: 'Updates', capability: 'modify stored data' },
+  update_one: { verb: 'Updates', capability: 'modify records' },
+  update_many: { verb: 'Updates', capability: 'modify multiple records' },
+  upsert: { verb: 'Upserts', capability: 'insert or update data' },
+  set: { verb: 'Sets', capability: 'store key-value data' },
+  hset: { verb: 'Sets', capability: 'store hash data' },
+  lpush: { verb: 'Pushes', capability: 'add to lists' },
+  rpush: { verb: 'Pushes', capability: 'add to lists' },
+  sadd: { verb: 'Adds', capability: 'modify sets' },
+
+  // Network write operations
+  post: { verb: 'Sends', capability: 'submit data externally' },
+  put: { verb: 'Sends', capability: 'update external resources' },
+  patch: { verb: 'Sends', capability: 'partially update external data' },
+  send: { verb: 'Sends', capability: 'transmit data externally' },
+  sendmail: { verb: 'Sends', capability: 'transmit emails' },
+  upload: { verb: 'Uploads', capability: 'transfer files externally' },
+  connect: { verb: 'Connects', capability: 'establish network connections' },
+
+  // Read operations
+  read: { verb: 'Reads', capability: 'access file contents' },
+  readline: { verb: 'Reads', capability: 'access file contents' },
+  readlines: { verb: 'Reads', capability: 'access file contents' },
+  read_text: { verb: 'Reads', capability: 'access text file contents' },
+  read_bytes: { verb: 'Reads', capability: 'access binary file contents' },
+  open: { verb: 'Opens', capability: 'access files' },
+  get: { verb: 'Gets', capability: 'retrieve data' },
+  fetch: { verb: 'Fetches', capability: 'retrieve external data' },
+  download: { verb: 'Downloads', capability: 'retrieve files externally' },
+  find: { verb: 'Finds', capability: 'query data' },
+  find_one: { verb: 'Finds', capability: 'query records' },
+  find_many: { verb: 'Finds', capability: 'query multiple records' },
+  select: { verb: 'Selects', capability: 'query data' },
+  query: { verb: 'Queries', capability: 'access stored data' },
+  execute: { verb: 'Executes', capability: 'run database queries' },
+  executemany: { verb: 'Executes', capability: 'run batch database queries' },
+  fetchone: { verb: 'Fetches', capability: 'retrieve query results' },
+  fetchall: { verb: 'Fetches', capability: 'retrieve all query results' },
+  fetchmany: { verb: 'Fetches', capability: 'retrieve query results' },
+  hget: { verb: 'Gets', capability: 'retrieve hash data' },
+  hgetall: { verb: 'Gets', capability: 'retrieve all hash data' },
+  keys: { verb: 'Lists', capability: 'enumerate keys' },
+  values: { verb: 'Lists', capability: 'enumerate values' },
+  lrange: { verb: 'Gets', capability: 'retrieve list data' },
+  smembers: { verb: 'Gets', capability: 'retrieve set members' },
+
+  // List/glob operations
+  listdir: { verb: 'Lists', capability: 'enumerate directory contents' },
+  scandir: { verb: 'Scans', capability: 'enumerate directory contents' },
+  walk: { verb: 'Walks', capability: 'traverse directory trees' },
+  glob: { verb: 'Globs', capability: 'find files by pattern' },
+  iterdir: { verb: 'Iterates', capability: 'enumerate directory contents' },
+};
+
+/**
  * Check if stdout is a TTY (supports colors)
  */
 export function isTTY(): boolean {
@@ -27,84 +174,319 @@ function styled(text: string, styleFn: (s: string) => string): string {
 }
 
 /**
- * Get specific description for a finding based on category and severity
+ * Parse callee from the operation field
+ * Operation format: "Category description: callee" (e.g., "File system operation: filepath.write_text")
+ */
+function parseCallee(operation: string): { module: string; method: string; raw: string } {
+  // Extract callee after the colon
+  const colonIdx = operation.indexOf(':');
+  const raw = colonIdx >= 0 ? operation.slice(colonIdx + 1).trim() : operation;
+
+  // Split by last dot to get module.method
+  const lastDotIdx = raw.lastIndexOf('.');
+  if (lastDotIdx >= 0) {
+    return {
+      module: raw.slice(0, lastDotIdx),
+      method: raw.slice(lastDotIdx + 1),
+      raw,
+    };
+  }
+
+  // No dot - it's a bare function name (e.g., "eval", "exec")
+  return { module: '', method: raw, raw };
+}
+
+/**
+ * Get module description for a callee
+ */
+function getModuleDescription(callee: { module: string; method: string }): string | null {
+  // Try exact module match
+  if (MODULE_DESCRIPTIONS[callee.module]) {
+    return MODULE_DESCRIPTIONS[callee.module];
+  }
+
+  // Try first part of module path (e.g., "http.client" -> "http")
+  const firstPart = callee.module.split('.')[0];
+  if (firstPart && MODULE_DESCRIPTIONS[firstPart]) {
+    return MODULE_DESCRIPTIONS[firstPart];
+  }
+
+  return null;
+}
+
+/**
+ * Get verb-based capability for a method
+ */
+function getVerbCapability(method: string): { verb: string; capability: string } | null {
+  // Check exact match first
+  const lowerMethod = method.toLowerCase();
+  if (VERB_CAPABILITIES[lowerMethod]) {
+    return VERB_CAPABILITIES[lowerMethod];
+  }
+
+  // Check if method starts with a known verb
+  for (const [verb, info] of Object.entries(VERB_CAPABILITIES)) {
+    if (lowerMethod.startsWith(verb)) {
+      return info;
+    }
+  }
+
+  // Check if method contains a known verb
+  for (const [verb, info] of Object.entries(VERB_CAPABILITIES)) {
+    if (lowerMethod.includes(verb)) {
+      return info;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Detect risk factors from code snippet and callee
+ */
+function detectRiskFactors(snippet: string, callee: { module: string; method: string }): string[] {
+  const risks: string[] = [];
+  const lowerSnippet = snippet.toLowerCase();
+
+  // Shell execution risks
+  if (lowerSnippet.includes('shell=true') || lowerSnippet.includes('shell = true')) {
+    risks.push('Command passed to shell for execution.');
+  }
+
+  // Path traversal risks
+  if (callee.method.includes('path') || callee.method.includes('file')) {
+    if (!lowerSnippet.includes('sanitize') && !lowerSnippet.includes('validate')) {
+      risks.push('Path parameter may allow directory traversal.');
+    }
+  }
+
+  // URL/SSRF risks
+  if (lowerSnippet.includes('url') || lowerSnippet.includes('http')) {
+    risks.push('URL parameter may enable SSRF.');
+  }
+
+  // SQL injection risks
+  if (lowerSnippet.includes("f'") || lowerSnippet.includes('f"') || lowerSnippet.includes('.format(')) {
+    if (['execute', 'executemany', 'query'].includes(callee.method.toLowerCase())) {
+      risks.push('Query may be vulnerable to injection.');
+    }
+  }
+
+  // Deserialization risks
+  if (['load', 'loads', 'Unpickler'].includes(callee.method)) {
+    if (callee.module.includes('pickle') || callee.module.includes('yaml') || callee.module.includes('marshal')) {
+      risks.push('Deserialization can execute arbitrary code.');
+    }
+  }
+
+  return risks;
+}
+
+/**
+ * Generate description dynamically from callee semantics
+ *
+ * Format: "{Operation description}. Agent can {capability}. {Risk factors}"
+ *
+ * This approach ensures novel operations get meaningful descriptions
+ * based on their module and method semantics, not hardcoded templates.
  */
 function getDescription(finding: AFBFinding): string {
-  const snippet = finding.codeSnippet.toLowerCase();
+  const callee = parseCallee(finding.operation);
+  const snippet = finding.codeSnippet;
 
-  // CRITICAL operations
-  if (finding.severity === Severity.CRITICAL) {
-    if (finding.category === ExecutionCategory.SHELL_EXECUTION) {
-      return 'Executes shell commands. Agent can run arbitrary system commands.';
-    }
-    if (finding.category === ExecutionCategory.CODE_EXECUTION) {
-      if (snippet.includes('eval')) {
-        return 'Evaluates arbitrary code. Agent can execute any Python expression.';
+  // Build operation description
+  let operationDesc: string;
+  const moduleDesc = getModuleDescription(callee);
+  const verbCap = getVerbCapability(callee.method);
+
+  // Determine a clean subject for the operation (avoid redundant "Evaluates eval")
+  const lowerMethod = callee.method.toLowerCase();
+  const isBareFn = !callee.module; // Functions like eval, exec with no module prefix
+
+  if (verbCap) {
+    if (isBareFn) {
+      // Bare function: "Evaluates Python expression" / "Executes Python code"
+      const subject = getSubjectForVerb(lowerMethod, finding.category);
+      operationDesc = `${verbCap.verb} ${subject}`;
+    } else if (moduleDesc) {
+      // Module function: "Makes HTTP request via httpx.get"
+      const contextualSubject = getContextualSubject(callee, finding.category);
+      // Handle HTTP special case: "Sends HTTP POST request" not "Sends _HTTP_POST_"
+      if (contextualSubject.startsWith('_HTTP_')) {
+        const httpMethod = contextualSubject.replace(/_HTTP_|_/g, '');
+        operationDesc = `Sends HTTP ${httpMethod} request`;
+      } else {
+        operationDesc = `${verbCap.verb} ${contextualSubject}`;
       }
-      return 'Executes dynamic code. Agent can run arbitrary operations.';
-    }
-    if (finding.category === ExecutionCategory.FILE_OPERATION) {
-      if (snippet.includes('rmtree') || snippet.includes('remove') || snippet.includes('unlink')) {
-        return 'Deletes files or directories. Agent can remove data permanently.';
+    } else {
+      // Object method: "Writes to filepath.write_text" -> "Writes to file"
+      const contextualSubject = getContextualSubject(callee, finding.category);
+      if (contextualSubject.startsWith('_HTTP_')) {
+        const httpMethod = contextualSubject.replace(/_HTTP_|_/g, '');
+        operationDesc = `Sends HTTP ${httpMethod} request`;
+      } else {
+        operationDesc = `${verbCap.verb} ${contextualSubject}`;
       }
+    }
+  } else if (moduleDesc) {
+    // Use module-based description: "Subprocess execution via subprocess.Popen"
+    operationDesc = `${moduleDesc} via ${callee.raw}`;
+  } else {
+    // Fallback: use raw callee
+    operationDesc = `Calls ${callee.raw}`;
+  }
+
+  // Build capability description
+  let capability: string;
+  if (verbCap) {
+    capability = verbCap.capability;
+  } else {
+    // Derive capability from category
+    switch (finding.category) {
+      case ExecutionCategory.SHELL_EXECUTION:
+        capability = 'execute system commands';
+        break;
+      case ExecutionCategory.CODE_EXECUTION:
+        capability = 'execute arbitrary code';
+        break;
+      case ExecutionCategory.FILE_OPERATION:
+        capability = 'access the filesystem';
+        break;
+      case ExecutionCategory.API_CALL:
+        capability = 'make network requests';
+        break;
+      case ExecutionCategory.DATABASE_OPERATION:
+        capability = 'access database';
+        break;
+      default:
+        capability = 'perform sensitive operations';
     }
   }
 
-  // WARNING operations
-  if (finding.severity === Severity.WARNING) {
-    if (finding.category === ExecutionCategory.FILE_OPERATION) {
-      if (snippet.includes('write')) {
-        return 'Writes to files. Agent can modify or create files.';
-      }
-      if (snippet.includes('mkdir')) {
-        return 'Creates directories. Agent can modify filesystem structure.';
-      }
-      if (snippet.includes('copy') || snippet.includes('move')) {
-        return 'Moves or copies files. Agent can reorganize filesystem.';
-      }
-      return 'Modifies filesystem. Agent can change files or directories.';
-    }
-    if (finding.category === ExecutionCategory.API_CALL) {
-      if (snippet.includes('post')) {
-        return 'Sends HTTP POST requests. Agent can submit data externally.';
-      }
-      if (snippet.includes('put') || snippet.includes('patch')) {
-        return 'Sends HTTP mutation requests. Agent can modify external data.';
-      }
-      if (snippet.includes('delete')) {
-        return 'Sends HTTP DELETE requests. Agent can delete external resources.';
-      }
-      return 'Mutates external API. Agent can modify external state.';
-    }
-    if (finding.category === ExecutionCategory.DATABASE_OPERATION) {
-      return 'Writes to database. Agent can modify stored data.';
+  // Build risk factors
+  const risks = detectRiskFactors(snippet, callee);
+  const riskStr = risks.length > 0 ? ' ' + risks.join(' ') : '';
+
+  return `${operationDesc}. Agent can ${capability}.${riskStr}`;
+}
+
+/**
+ * Get a clean subject for bare functions based on verb
+ */
+function getSubjectForVerb(method: string, category: ExecutionCategory): string {
+  // Map common bare functions to clean subjects
+  const bareSubjects: Record<string, string> = {
+    eval: 'Python expression',
+    exec: 'Python code',
+    compile: 'Python code',
+    open: 'file handle',
+    input: 'user input',
+    print: 'to output',
+    __import__: 'module dynamically',
+  };
+
+  if (bareSubjects[method]) {
+    return bareSubjects[method];
+  }
+
+  // Derive from category
+  switch (category) {
+    case ExecutionCategory.CODE_EXECUTION:
+      return 'code';
+    case ExecutionCategory.SHELL_EXECUTION:
+      return 'command';
+    case ExecutionCategory.FILE_OPERATION:
+      return 'file';
+    case ExecutionCategory.API_CALL:
+      return 'request';
+    case ExecutionCategory.DATABASE_OPERATION:
+      return 'query';
+    default:
+      return 'operation';
+  }
+}
+
+/**
+ * Get contextual subject for module.method calls
+ */
+function getContextualSubject(callee: { module: string; method: string; raw: string }, category: ExecutionCategory): string {
+  const lowerMethod = callee.method.toLowerCase();
+  const lowerModule = callee.module.toLowerCase();
+
+  // HTTP methods - return full phrase, verb will be skipped
+  if (['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(lowerMethod)) {
+    if (lowerModule.includes('http') || lowerModule.includes('requests') || lowerModule.includes('aiohttp')) {
+      return `_HTTP_${lowerMethod.toUpperCase()}_`; // Special marker for HTTP methods
     }
   }
 
-  // INFO operations
-  if (finding.severity === Severity.INFO) {
-    if (finding.category === ExecutionCategory.API_CALL) {
-      return 'Reads from external API. Agent can access external data.';
-    }
-    if (finding.category === ExecutionCategory.DATABASE_OPERATION) {
-      if (snippet.includes('execute')) {
-        return 'Executes database queries. Agent can run SQL statements.';
-      }
-      return 'Reads from database. Agent can access stored data.';
-    }
-    if (finding.category === ExecutionCategory.FILE_OPERATION) {
-      if (snippet.includes('read') || snippet.includes('open')) {
-        return 'Reads files. Agent can access file contents.';
-      }
-      if (snippet.includes('listdir') || snippet.includes('glob')) {
-        return 'Lists directories. Agent can discover files.';
-      }
-      return 'Accesses filesystem. Agent can read file metadata.';
+  // File operations - use cleaner subjects
+  if (lowerMethod.includes('write')) {
+    return 'to file';
+  }
+  if (lowerMethod.includes('read')) {
+    return 'file contents';
+  }
+  if (lowerMethod === 'mkdir' || lowerMethod === 'makedirs') {
+    return 'directory';
+  }
+  if (lowerMethod === 'glob' || lowerMethod === 'iterdir' || lowerMethod === 'listdir') {
+    return 'directory contents';
+  }
+  if (lowerMethod === 'remove' || lowerMethod === 'unlink' || lowerMethod === 'rmdir') {
+    return 'file or directory';
+  }
+  if (lowerMethod === 'rmtree') {
+    return 'directory tree';
+  }
+
+  // Database operations
+  if (lowerMethod === 'execute' || lowerMethod === 'executemany') {
+    return 'database query';
+  }
+  if (lowerMethod.startsWith('fetch')) {
+    return 'query results';
+  }
+  if (lowerMethod.startsWith('insert')) {
+    return 'database record';
+  }
+  if (lowerMethod.startsWith('update')) {
+    return 'database record';
+  }
+  if (lowerMethod.startsWith('delete')) {
+    return 'database record';
+  }
+
+  // Redis operations
+  if (lowerMethod === 'set' || lowerMethod === 'hset') {
+    return 'key-value data';
+  }
+  if (lowerMethod === 'keys') {
+    return 'stored keys';
+  }
+
+  // Process operations
+  if (lowerMethod === 'run' || lowerMethod === 'popen' || lowerMethod === 'call') {
+    if (lowerModule.includes('subprocess') || lowerModule.includes('os')) {
+      return 'system process';
     }
   }
 
-  // Default
-  return 'Reachable from agent tool without authorization check.';
+  // Fallback: derive from category
+  switch (category) {
+    case ExecutionCategory.FILE_OPERATION:
+      return 'filesystem';
+    case ExecutionCategory.API_CALL:
+      return 'external data';
+    case ExecutionCategory.DATABASE_OPERATION:
+      return 'database';
+    case ExecutionCategory.SHELL_EXECUTION:
+      return 'system command';
+    case ExecutionCategory.CODE_EXECUTION:
+      return 'code';
+    default:
+      return 'data';
+  }
 }
 
 /**
