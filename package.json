@@ -1,6 +1,6 @@
 {
   "name": "wyscan",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Agent Failure Boundary Scanner - Detects AFB04 (Unauthorized Action) boundaries in agentic AI codebases through static analysis",
   "main": "dist/app.js",
   "bin": {
