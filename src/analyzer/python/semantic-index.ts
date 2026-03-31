@@ -6,6 +6,7 @@ import {
   FunctionDispatchMapping,
   OpenAIToolSchema,
   ParsedPythonFile,
+  ReturnInfo,
 } from './ast-parser';
 
 export interface SemanticInvocationRoot {
@@ -37,6 +38,7 @@ interface ConstructorBinding {
   modulePath?: string;
   importedName?: string;
   matchedReference?: string;
+  identity?: string;
 }
 
 function makeNodeId(filePath: string, localName: string): string {
@@ -114,6 +116,7 @@ export class PythonSemanticIndex {
   private readonly importBindings = new Map<string, Map<string, ImportBinding>>();
   private readonly functionsByFile = new Map<string, Map<string, string>>();
   private readonly assignmentsByFile = new Map<string, AssignmentInfo[]>();
+  private readonly returnsByFile = new Map<string, ReturnInfo[]>();
   private readonly openAIToolSchemasByFile = new Map<string, OpenAIToolSchema[]>();
   private readonly dispatchMappingsByFile = new Map<string, FunctionDispatchMapping[]>();
 
@@ -196,26 +199,26 @@ export class PythonSemanticIndex {
 
       const receiverReference = this.buildReceiverReference(call, 1);
       const constructor = this.resolveAssignedConstructor(receiverReference, context);
-      if (constructor.modulePath && constructor.importedName && constructor.matchedReference) {
+      if (constructor.identity) {
         const receiverSegments = splitReferenceSegments(receiverReference);
         const matchedSegments = splitReferenceSegments(constructor.matchedReference);
         const trailingSegments = receiverSegments.slice(matchedSegments.length);
         const lastMember = memberChain[memberChain.length - 1];
 
         return {
-          identity: [constructor.modulePath, constructor.importedName, ...trailingSegments, lastMember].filter(Boolean).join('.'),
+          identity: [constructor.identity, ...trailingSegments, lastMember].filter(Boolean).join('.'),
           kind: 'semantic',
-          evidence: `resolved receiver constructor ${constructor.importedName} from ${constructor.matchedReference}`,
+          evidence: `resolved receiver constructor ${constructor.identity} from ${constructor.matchedReference}`,
         };
       }
 
       const inlineConstructor = this.resolveInlineConstructor(call.baseExpression, filePath);
-      if (inlineConstructor?.modulePath && inlineConstructor.importedName) {
+      if (inlineConstructor.identity) {
         const lastMember = memberChain[memberChain.length - 1];
         return {
-          identity: `${inlineConstructor.modulePath}.${inlineConstructor.importedName}.${lastMember}`,
+          identity: `${inlineConstructor.identity}.${lastMember}`,
           kind: 'semantic',
-          evidence: `resolved inline constructor ${inlineConstructor.importedName}`,
+          evidence: `resolved inline constructor ${inlineConstructor.identity}`,
         };
       }
     }
@@ -233,6 +236,7 @@ export class PythonSemanticIndex {
 
       this.functionsByFile.set(filePath, localFunctions);
       this.assignmentsByFile.set(filePath, parsed.assignments);
+      this.returnsByFile.set(filePath, parsed.returns);
       this.openAIToolSchemasByFile.set(filePath, parsed.openaiToolSchemas);
       this.dispatchMappingsByFile.set(filePath, parsed.dispatchMappings);
 
@@ -594,30 +598,56 @@ export class PythonSemanticIndex {
     return result;
   }
 
-  private resolveAssignedConstructor(baseExpression: string | undefined, context: ResolutionContext): ConstructorBinding {
+  private resolveAssignedConstructor(
+    baseExpression: string | undefined,
+    context: ResolutionContext,
+    visited = new Set<string>()
+  ): ConstructorBinding {
     if (!baseExpression) {
       return {};
     }
 
     for (const candidateReference of iterateReferenceCandidates(baseExpression)) {
+      const visitKey = `${context.filePath}:${context.className || ''}:${context.functionName || ''}:ctor:${candidateReference}`;
+      if (visited.has(visitKey)) {
+        continue;
+      }
+
+      visited.add(visitKey);
+
       const assignment = this.findAssignments(candidateReference, context)
         .slice()
         .reverse()
-        .find((candidate) => candidate.value.callCallee);
-      if (!assignment?.value.callCallee) {
+        .find((candidate) => candidate.value.callCallee || candidate.value.references.length > 0);
+      if (!assignment) {
         continue;
       }
 
-      const imported = this.resolveImportedSymbol(assignment.value.callCallee, context.filePath);
-      if (!imported?.modulePath) {
-        continue;
-      }
-
-      return {
-        modulePath: imported.modulePath,
-        importedName: imported.importedName,
-        matchedReference: candidateReference,
+      const assignmentContext: ResolutionContext = {
+        filePath: context.filePath,
+        className: assignment.enclosingClass,
+        functionName: assignment.enclosingFunction,
       };
+
+      if (assignment.value.callCallee) {
+        const binding = this.resolveCallResultBinding(assignment.value.callCallee, assignmentContext, visited);
+        if (binding.identity) {
+          return {
+            ...binding,
+            matchedReference: candidateReference,
+          };
+        }
+      }
+
+      for (const reference of assignment.value.references) {
+        const aliasBinding = this.resolveAssignedConstructor(reference, assignmentContext, visited);
+        if (aliasBinding.identity) {
+          return {
+            ...aliasBinding,
+            matchedReference: candidateReference,
+          };
+        }
+      }
     }
 
     return this.resolveInlineConstructor(baseExpression, context.filePath);
@@ -663,6 +693,139 @@ export class PythonSemanticIndex {
     return this.importBindings.get(filePath)?.get(baseName);
   }
 
+  private resolveCallResultBinding(
+    callCallee: string,
+    context: ResolutionContext,
+    visited: Set<string>
+  ): ConstructorBinding {
+    if (callCallee === 'open' || callCallee === 'eval' || callCallee === 'exec') {
+      return {
+        modulePath: 'builtins',
+        importedName: callCallee,
+        matchedReference: callCallee,
+        identity: `builtins.${callCallee}`,
+      };
+    }
+
+    const imported = this.resolveImportedSymbol(callCallee, context.filePath);
+    if (imported?.modulePath) {
+      return {
+        modulePath: imported.modulePath,
+        importedName: imported.importedName,
+        matchedReference: callCallee,
+        identity: imported.importedName ? `${imported.modulePath}.${imported.importedName}` : callCallee,
+      };
+    }
+
+    if (callCallee.includes('.')) {
+      const parts = callCallee.split('.');
+      const lastMember = parts.pop()!;
+      const receiverReference = parts.join('.');
+      const receiverBinding = this.resolveAssignedConstructor(receiverReference, context, visited);
+      if (receiverBinding.identity) {
+        const resolvedIdentity = this.resolveMethodResultIdentity(receiverBinding.identity, lastMember);
+        return {
+          ...receiverBinding,
+          matchedReference: receiverReference,
+          importedName: lastMember,
+          identity: resolvedIdentity,
+        };
+      }
+    }
+
+    return this.resolveFunctionReturnBinding(callCallee, context, visited);
+  }
+
+  private resolveFunctionReturnBinding(
+    reference: string,
+    context: ResolutionContext,
+    visited: Set<string>
+  ): ConstructorBinding {
+    const target = this.resolveFunctionReference(reference, context);
+    if (!target) {
+      return {};
+    }
+
+    const targetContext: ResolutionContext = {
+      filePath: target.filePath,
+      className: target.className,
+      functionName: target.functionName,
+    };
+
+    for (const returnInfo of this.findReturns(target.functionName, targetContext)) {
+      if (returnInfo.value.callCallee) {
+        const binding = this.resolveCallResultBinding(returnInfo.value.callCallee, {
+          filePath: target.filePath,
+          className: returnInfo.enclosingClass,
+          functionName: returnInfo.enclosingFunction,
+        }, visited);
+        if (binding.identity) {
+          return binding;
+        }
+      }
+
+      for (const returnReference of returnInfo.value.references) {
+        const binding = this.resolveAssignedConstructor(returnReference, {
+          filePath: target.filePath,
+          className: returnInfo.enclosingClass,
+          functionName: returnInfo.enclosingFunction,
+        }, visited);
+        if (binding.identity) {
+          return binding;
+        }
+      }
+    }
+
+    return {};
+  }
+
+  private resolveFunctionReference(
+    reference: string,
+    context: ResolutionContext
+  ): { filePath: string; functionName: string; className?: string } | undefined {
+    const localFunctions = this.functionsByFile.get(context.filePath) || new Map<string, string>();
+    if (reference.startsWith('self.') && context.className) {
+      const methodName = reference.slice('self.'.length);
+      const selfNodeId = makeNodeId(context.filePath, `${context.className}.${methodName}`);
+      if (Array.from(localFunctions.values()).includes(selfNodeId)) {
+        return { filePath: context.filePath, functionName: methodName, className: context.className };
+      }
+    }
+
+    if (localFunctions.has(reference)) {
+      return { filePath: context.filePath, functionName: reference };
+    }
+
+    const imported = this.resolveImportedSymbol(reference, context.filePath);
+    if (imported?.resolvedFile && imported.importedName) {
+      const targetFunctions = this.functionsByFile.get(imported.resolvedFile) || new Map<string, string>();
+      if (targetFunctions.has(imported.importedName)) {
+        return { filePath: imported.resolvedFile, functionName: imported.importedName };
+      }
+    }
+
+    return undefined;
+  }
+
+  private findReturns(functionName: string, context: ResolutionContext): ReturnInfo[] {
+    const returns = this.returnsByFile.get(context.filePath) || [];
+    return returns.filter((entry) => {
+      if (entry.enclosingFunction !== functionName) {
+        return false;
+      }
+
+      return (entry.enclosingClass || undefined) === (context.className || undefined);
+    });
+  }
+
+  private resolveMethodResultIdentity(receiverIdentity: string, methodName: string): string {
+    if (/^(sqlite3|psycopg2)(\.|$)/i.test(receiverIdentity) && methodName === 'cursor') {
+      return `${receiverIdentity}.cursor`;
+    }
+
+    return `${receiverIdentity}.${methodName}`;
+  }
+
   private resolveInlineConstructor(baseExpression: string | undefined, filePath: string): ConstructorBinding {
     if (!baseExpression) {
       return {};
@@ -683,6 +846,7 @@ export class PythonSemanticIndex {
       modulePath: imported.modulePath,
       importedName: imported.importedName,
       matchedReference: constructorReference,
+      identity: imported.importedName ? `${imported.modulePath}.${imported.importedName}` : constructorReference,
     };
   }
 

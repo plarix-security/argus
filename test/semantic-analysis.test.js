@@ -204,8 +204,113 @@ describe('semantic-first python analysis', () => {
 
     expect(report.totalCEEs).toBe(2);
     expect(report.cees.every((cee) => cee.evidenceKind !== 'heuristic')).toBe(true);
-    expect(report.cees.some((cee) => (cee.supportingEvidence || []).join(' ').includes('resolved receiver constructor Path'))).toBe(true);
+    expect(report.cees.some((cee) => (cee.supportingEvidence || []).join(' ').includes('resolved receiver constructor pathlib.Path'))).toBe(true);
     expect(report.cees.some((cee) => (cee.supportingEvidence || []).join(' ').includes('resolved module alias requests'))).toBe(true);
+  });
+
+  test('path parent mkdir resolves semantically', async () => {
+    const projectDir = makeTempProject({
+      'tools.py': [
+        'from pathlib import Path',
+        'from langchain.tools import tool',
+        '',
+        '@tool',
+        'def prepare_target(target: str):',
+        '    full_path = Path(target)',
+        '    full_path.parent.mkdir(parents=True, exist_ok=True)',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(1);
+    expect(report.cees[0].evidenceKind).not.toBe('heuristic');
+    expect(report.cees[0].supportingEvidence.join(' ')).toContain('resolved receiver constructor pathlib.Path');
+  });
+
+  test('with-open file handle writes resolve semantically', async () => {
+    const projectDir = makeTempProject({
+      'tools.py': [
+        'from langchain.tools import tool',
+        '',
+        '@tool',
+        'def append_note(target: str, message: str):',
+        '    with open(target, "a", encoding="utf-8") as handle:',
+        '        handle.write(message)',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(2);
+    expect(report.cees.some((cee) => cee.operation.includes('builtins.open.write'))).toBe(true);
+    expect(report.cees.every((cee) => cee.evidenceKind !== 'heuristic')).toBe(true);
+  });
+
+  test('helper-returned smtp clients keep semantic sink identity', async () => {
+    const projectDir = makeTempProject({
+      'tools.py': [
+        'import smtplib',
+        'from langchain.tools import tool',
+        '',
+        'def create_client():',
+        '    return smtplib.SMTP("smtp.example.com", 25)',
+        '',
+        '@tool',
+        'def send_notice(to_address: str, message: str):',
+        '    client = create_client()',
+        '    client.sendmail("from@example.com", [to_address], message)',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(2);
+    expect(report.cees.some((cee) => cee.operation.includes('smtplib.SMTP.sendmail'))).toBe(true);
+    expect(report.cees.every((cee) => cee.evidenceKind !== 'heuristic')).toBe(true);
+  });
+
+  test('database cursors and redis clients resolve semantically', async () => {
+    const projectDir = makeTempProject({
+      'tools.py': [
+        'import sqlite3',
+        'import redis',
+        'from langchain.tools import tool',
+        '',
+        'redis_client = redis.Redis(host="localhost", port=6379, db=0)',
+        '',
+        'def get_db_connection():',
+        '    return sqlite3.connect("test.db")',
+        '',
+        '@tool',
+        'def run_query(sql: str, key: str):',
+        '    conn = get_db_connection()',
+        '    with conn.cursor() as cursor:',
+        '        cursor.execute(sql)',
+        '        cursor.fetchall()',
+        '    redis_client.set(key, sql)',
+        '    redis_client.get(key)',
+        '',
+      ].join('\n'),
+    });
+
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(projectDir);
+
+    expect(report.totalCEEs).toBe(4);
+    expect(report.cees.every((cee) => cee.evidenceKind !== 'heuristic')).toBe(true);
+    expect(report.cees.some((cee) => cee.operation.includes('sqlite3.connect.cursor.execute'))).toBe(true);
+    expect(report.cees.some((cee) => cee.operation.includes('redis.Redis.set'))).toBe(true);
   });
 
   test('semantic open classification respects write mode', async () => {

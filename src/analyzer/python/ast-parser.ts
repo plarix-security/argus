@@ -146,6 +146,11 @@ export interface ExpressionSummary {
     key: string;
     reference: string;
   }>;
+  subscriptReferences: Array<{
+    base: string;
+    keyReference?: string;
+    keyString?: string;
+  }>;
   callCallee?: string;
 }
 
@@ -156,6 +161,13 @@ export interface CallArgumentInfo {
 
 export interface AssignmentInfo {
   target: string;
+  value: ExpressionSummary;
+  startLine: number;
+  enclosingFunction?: string;
+  enclosingClass?: string;
+}
+
+export interface ReturnInfo {
   value: ExpressionSummary;
   startLine: number;
   enclosingFunction?: string;
@@ -180,6 +192,7 @@ export interface ParsedPythonFile {
   calls: CallSite[];
   imports: ImportInfo[];
   assignments: AssignmentInfo[];
+  returns: ReturnInfo[];
   /** Decorator functions defined in this file (for cross-file resolution) */
   decoratorDefs: DecoratorDef[];
   /** OpenAI tool schemas extracted from list/dict literals */
@@ -440,12 +453,32 @@ function uniqueMappingReferences(values: Array<{ key: string; reference: string 
   return result;
 }
 
+function uniqueSubscriptReferences(
+  values: Array<{ base: string; keyReference?: string; keyString?: string }>
+): Array<{ base: string; keyReference?: string; keyString?: string }> {
+  const seen = new Set<string>();
+  const result: Array<{ base: string; keyReference?: string; keyString?: string }> = [];
+
+  for (const value of values) {
+    const key = `${value.base}:${value.keyReference || ''}:${value.keyString || ''}`;
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(value);
+  }
+
+  return result;
+}
+
 function summarizeExpression(node: Parser.SyntaxNode): ExpressionSummary {
   const empty = (): ExpressionSummary => ({
     text: node.text,
     references: [],
     stringLiterals: [],
     mappingReferences: [],
+    subscriptReferences: [],
   });
 
   if (node.type === 'identifier' || node.type === 'attribute') {
@@ -454,6 +487,7 @@ function summarizeExpression(node: Parser.SyntaxNode): ExpressionSummary {
       references: [node.text],
       stringLiterals: [],
       mappingReferences: [],
+      subscriptReferences: [],
     };
   }
 
@@ -463,6 +497,33 @@ function summarizeExpression(node: Parser.SyntaxNode): ExpressionSummary {
       references: [],
       stringLiterals: [extractStringValue(node) || node.text],
       mappingReferences: [],
+      subscriptReferences: [],
+    };
+  }
+
+  if (node.type === 'subscript') {
+    const significantChildren = node.children.filter((child) => child.type !== '[' && child.type !== ']' && child.type !== 'comment');
+    const valueNode = node.childForFieldName('value') || significantChildren[0];
+    const subscriptNode = node.childForFieldName('subscript') || significantChildren[1];
+    const valueSummary = valueNode ? summarizeExpression(valueNode) : empty();
+    const keySummary = subscriptNode ? summarizeExpression(subscriptNode) : empty();
+    const baseReference = valueSummary.references[0] || valueSummary.text;
+
+    return {
+      text: node.text,
+      references: uniqueStrings([...valueSummary.references, ...keySummary.references]),
+      stringLiterals: uniqueStrings([...valueSummary.stringLiterals, ...keySummary.stringLiterals]),
+      mappingReferences: uniqueMappingReferences([...valueSummary.mappingReferences, ...keySummary.mappingReferences]),
+      subscriptReferences: uniqueSubscriptReferences([
+        ...valueSummary.subscriptReferences,
+        ...keySummary.subscriptReferences,
+        ...(baseReference ? [{
+          base: baseReference,
+          keyReference: keySummary.references[0],
+          keyString: keySummary.stringLiterals[0],
+        }] : []),
+      ]),
+      callCallee: valueSummary.callCallee || keySummary.callCallee,
     };
   }
 
@@ -475,6 +536,7 @@ function summarizeExpression(node: Parser.SyntaxNode): ExpressionSummary {
       references: uniqueStrings(argumentDetails.flatMap((arg) => arg.value.references)),
       stringLiterals: uniqueStrings(argumentDetails.flatMap((arg) => arg.value.stringLiterals)),
       mappingReferences: uniqueMappingReferences(argumentDetails.flatMap((arg) => arg.value.mappingReferences)),
+      subscriptReferences: uniqueSubscriptReferences(argumentDetails.flatMap((arg) => arg.value.subscriptReferences)),
       callCallee: calleeInfo.callee,
     };
   }
@@ -494,6 +556,7 @@ function summarizeExpression(node: Parser.SyntaxNode): ExpressionSummary {
       references: uniqueStrings(childSummaries.flatMap((child) => child.references)),
       stringLiterals: uniqueStrings(childSummaries.flatMap((child) => child.stringLiterals)),
       mappingReferences: uniqueMappingReferences(childSummaries.flatMap((child) => child.mappingReferences)),
+      subscriptReferences: uniqueSubscriptReferences(childSummaries.flatMap((child) => child.subscriptReferences)),
       callCallee: childSummaries.find((child) => child.callCallee)?.callCallee,
     };
   }
@@ -518,6 +581,7 @@ function summarizeExpression(node: Parser.SyntaxNode): ExpressionSummary {
       summary.references.push(...valueSummary.references);
       summary.stringLiterals.push(...valueSummary.stringLiterals);
       summary.mappingReferences.push(...valueSummary.mappingReferences);
+      summary.subscriptReferences.push(...valueSummary.subscriptReferences);
 
       const key = extractStringValue(keyNode);
       if (key && valueSummary.references.length === 1) {
@@ -531,6 +595,7 @@ function summarizeExpression(node: Parser.SyntaxNode): ExpressionSummary {
     summary.references = uniqueStrings(summary.references);
     summary.stringLiterals = uniqueStrings(summary.stringLiterals);
     summary.mappingReferences = uniqueMappingReferences(summary.mappingReferences);
+    summary.subscriptReferences = uniqueSubscriptReferences(summary.subscriptReferences);
     return summary;
   }
 
@@ -544,6 +609,7 @@ function summarizeExpression(node: Parser.SyntaxNode): ExpressionSummary {
       references: uniqueStrings(childSummaries.flatMap((child) => child.references)),
       stringLiterals: uniqueStrings(childSummaries.flatMap((child) => child.stringLiterals)),
       mappingReferences: uniqueMappingReferences(childSummaries.flatMap((child) => child.mappingReferences)),
+      subscriptReferences: uniqueSubscriptReferences(childSummaries.flatMap((child) => child.subscriptReferences)),
       callCallee: childSummaries.find((child) => child.callCallee)?.callCallee,
     };
   }
@@ -559,6 +625,7 @@ function summarizeExpression(node: Parser.SyntaxNode): ExpressionSummary {
     references: uniqueStrings(nestedSummaries.flatMap((child) => child.references)),
     stringLiterals: uniqueStrings(nestedSummaries.flatMap((child) => child.stringLiterals)),
     mappingReferences: uniqueMappingReferences(nestedSummaries.flatMap((child) => child.mappingReferences)),
+    subscriptReferences: uniqueSubscriptReferences(nestedSummaries.flatMap((child) => child.subscriptReferences)),
     callCallee: nestedSummaries.find((child) => child.callCallee)?.callCallee,
   };
 }
@@ -583,6 +650,46 @@ function extractMutationTarget(callNode: Parser.SyntaxNode): string | null {
   }
 
   return calleeInfo.baseExpression;
+}
+
+function extractWithAliasTarget(callNode: Parser.SyntaxNode): string | null {
+  let current: Parser.SyntaxNode | null = callNode.parent;
+  while (current) {
+    if (current.type === 'as_pattern') {
+      const aliasNode = current.children.find((child) => child.type === 'as_pattern_target') || current.childForFieldName('right');
+      if (aliasNode) {
+        const aliasIdentifier = findAllNodes(aliasNode, new Set(['identifier', 'attribute']))[0];
+        if (aliasIdentifier) {
+          return aliasIdentifier.text;
+        }
+      }
+    }
+
+    if (current.type === 'with_item') {
+      for (const child of current.children) {
+        if (child.type === 'as_pattern_target' || child.type === 'identifier' || child.type === 'attribute') {
+          const aliasIdentifier = findAllNodes(child, new Set(['identifier', 'attribute']))[0] || child;
+          if (aliasIdentifier.text) {
+            return aliasIdentifier.text;
+          }
+        }
+      }
+
+      return null;
+    }
+
+    if (
+      current.type === 'function_definition' ||
+      current.type === 'async_function_definition' ||
+      current.type === 'module'
+    ) {
+      break;
+    }
+
+    current = current.parent;
+  }
+
+  return null;
 }
 
 /**
@@ -1122,6 +1229,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       calls: [],
       imports: [],
       assignments: [],
+      returns: [],
       decoratorDefs: [],
       openaiToolSchemas: [],
       dispatchMappings: [],
@@ -1141,6 +1249,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
         calls: [],
         imports: [],
         assignments: [],
+        returns: [],
         decoratorDefs: [],
         openaiToolSchemas: [],
         dispatchMappings: [],
@@ -1156,6 +1265,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
     const calls: CallSite[] = [];
     const imports: ImportInfo[] = [];
     const assignments: AssignmentInfo[] = [];
+    const returns: ReturnInfo[] = [];
     const decoratorDefs: DecoratorDef[] = [];
 
     // Find all decorated definitions, function definitions, and class definitions
@@ -1377,6 +1487,17 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
           enclosingClass: enclosingClass ? extractClassName(enclosingClass) : undefined,
         });
       }
+
+      const withAliasTarget = extractWithAliasTarget(callNode);
+      if (withAliasTarget) {
+        assignments.push({
+          target: withAliasTarget,
+          value: summarizeExpression(callNode),
+          startLine: callNode.startPosition.row + 1,
+          enclosingFunction: enclosingFunc ? extractFunctionName(enclosingFunc) : undefined,
+          enclosingClass: enclosingClass ? extractClassName(enclosingClass) : undefined,
+        });
+      }
     }
 
     for (const assignmentNode of assignmentNodes) {
@@ -1395,6 +1516,24 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
         target,
         value: summarizeExpression(rightNode),
         startLine: assignmentNode.startPosition.row + 1,
+        enclosingFunction: enclosingFunc ? extractFunctionName(enclosingFunc) : undefined,
+        enclosingClass: enclosingClass ? extractClassName(enclosingClass) : undefined,
+      });
+    }
+
+    const returnNodes = findAllNodes(root, new Set(['return_statement']));
+    for (const returnNode of returnNodes) {
+      const valueNode = returnNode.children.find((child) => child.type !== 'return' && child.type !== 'comment');
+      if (!valueNode) {
+        continue;
+      }
+
+      const enclosingFunc = findEnclosingFunction(returnNode);
+      const enclosingClass = findEnclosingClass(returnNode);
+
+      returns.push({
+        value: summarizeExpression(valueNode),
+        startLine: returnNode.startPosition.row + 1,
         enclosingFunction: enclosingFunc ? extractFunctionName(enclosingFunc) : undefined,
         enclosingClass: enclosingClass ? extractClassName(enclosingClass) : undefined,
       });
@@ -1466,6 +1605,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       calls,
       imports,
       assignments,
+      returns,
       decoratorDefs,
       openaiToolSchemas,
       dispatchMappings,
@@ -1478,6 +1618,7 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       calls: [],
       imports: [],
       assignments: [],
+      returns: [],
       decoratorDefs: [],
       openaiToolSchemas: [],
       dispatchMappings: [],
