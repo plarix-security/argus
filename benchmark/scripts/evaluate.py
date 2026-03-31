@@ -13,6 +13,7 @@ import subprocess
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -45,9 +46,18 @@ def load_manifest(system_dir: Path) -> tuple[int | None, list[str]]:
         return None, []
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    expected = len(manifest.get("expected_findings", []))
+    expected_findings = manifest.get("expected_findings")
+    expected = len(expected_findings) if isinstance(expected_findings, list) else None
     languages = manifest.get("metadata", {}).get("languages", [])
     return expected, languages
+
+
+def load_manifest_data(system_dir: Path) -> dict[str, Any] | None:
+    manifest_path = system_dir / "cee_manifest.json"
+    if not manifest_path.exists():
+        return None
+
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
 
 
 def count_code_files(system_dir: Path) -> int:
@@ -82,33 +92,92 @@ def actual_result_text(exit_code: int, report: dict) -> str:
     )
 
 
-def classify_result(system_dir: Path, exit_code: int, report: dict, expected_count: int | None, languages: list[str], code_files: int) -> BenchmarkResult:
+def normalize_relative_path(system_dir: Path, file_path: str | None) -> str | None:
+    if not file_path:
+        return None
+
+    try:
+        return Path(file_path).resolve().relative_to(system_dir.resolve()).as_posix()
+    except ValueError:
+        return Path(file_path).as_posix()
+
+
+def cee_matches(system_dir: Path, actual: dict, expected: dict) -> bool:
+    expected_tool = expected.get("tool_registration")
+    expected_file = expected.get("file")
+    expected_operation = expected.get("operation")
+    expected_afb = expected.get("afb_type")
+
+    actual_file = normalize_relative_path(system_dir, actual.get("file"))
+    actual_operation = actual.get("operation", "")
+    actual_tool = actual.get("tool")
+    actual_afb = actual.get("afb_type")
+
+    if expected_tool and actual_tool != expected_tool:
+        return False
+
+    if expected_file and actual_file != expected_file:
+        return False
+
+    if expected_operation and expected_operation not in actual_operation:
+        return False
+
+    if expected_afb is not None and actual_afb != expected_afb:
+        return False
+
+    return True
+
+
+def validate_expected_cees(system_dir: Path, report: dict, manifest: dict[str, Any]) -> tuple[bool, str]:
+    cees = report.get("cees", [])
+    expected_cees = manifest.get("expected_cees", [])
+    expected_cee_min = manifest.get("expected_cee_min")
+
+    missing = []
+    for expected in expected_cees:
+        if not any(cee_matches(system_dir, actual, expected) for actual in cees):
+            missing.append(f"{expected.get('tool_registration')}->{expected.get('operation')}")
+
+    if missing:
+        return False, f"Missing required CEEs: {', '.join(missing[:5])}"
+
+    if expected_cee_min is not None and len(cees) < expected_cee_min:
+        return False, f"Expected at least {expected_cee_min} CEEs but saw {len(cees)}"
+
+    if expected_cees or expected_cee_min is not None:
+        return True, f"CEE validation passed with {len(cees)} inventoried events"
+
+    return True, ""
+
+
+def classify_result(system_dir: Path, exit_code: int, report: dict, expected_count: int | None, languages: list[str], code_files: int, manifest: dict[str, Any] | None) -> BenchmarkResult:
     language_label = ", ".join(languages) if languages else "unknown"
     coverage = report["coverage"]
     findings = len(report["findings"])
     cees = report.get("cees", [])
     failed_files = len(coverage["failed_files"])
     partial = bool(coverage["partial"])
+    cee_ok, cee_note = validate_expected_cees(system_dir, report, manifest or {})
 
     if expected_count is not None and languages == ["python"] and code_files > 0:
-        status = "PASS" if findings == expected_count and failed_files == 0 and not partial else "FAIL"
-        notes = f"Python manifest count matched exactly. {len(cees)} CEEs were inventoried." if status == "PASS" else "Python manifest count or coverage did not match."
+        status = "PASS" if findings == expected_count and failed_files == 0 and not partial and cee_ok else "FAIL"
+        notes = f"Python manifest count matched exactly. {cee_note or f'{len(cees)} CEEs were inventoried.'}" if status == "PASS" else (cee_note if not cee_ok else "Python manifest count or coverage did not match.")
         return BenchmarkResult(
             name=system_dir.name,
             languages=language_label,
-            expected_result=f"Exact match with {expected_count} expected Python findings",
+            expected_result=f"Exact match with {expected_count} expected Python findings" + (" plus CEE validation" if (manifest or {}).get("expected_cees") or (manifest or {}).get("expected_cee_min") is not None else ""),
             actual_result=actual_result_text(exit_code, report),
             status=status,
             notes=notes,
         )
 
     if expected_count is None and code_files > 0:
-        status = "PASS" if failed_files == 0 and findings > 0 else "FAIL"
-        notes = f"Operational smoke run only; no manifest is available in this snapshot. {len(cees)} CEEs were inventoried." if status == "PASS" else "Smoke run did not produce a usable Python result."
+        status = "PASS" if failed_files == 0 and findings > 0 and cee_ok else "FAIL"
+        notes = cee_note if cee_note else (f"Operational smoke run only; no manifest is available in this snapshot. {len(cees)} CEEs were inventoried." if status == "PASS" else "Smoke run did not produce a usable Python result.")
         return BenchmarkResult(
             name=system_dir.name,
             languages=language_label,
-            expected_result="Operational Python scan with no failed files",
+            expected_result="Operational Python scan with no failed files" + (" plus CEE validation" if (manifest or {}).get("expected_cees") or (manifest or {}).get("expected_cee_min") is not None else ""),
             actual_result=actual_result_text(exit_code, report),
             status=status,
             notes=notes,
@@ -142,6 +211,7 @@ def write_report(results: list[BenchmarkResult]) -> None:
     python_exact_cases = [result for result in results if result.expected_result.startswith("Exact match")]
     passed_python_exact = sum(1 for result in python_exact_cases if result.status == "PASS")
     asset_limited = [result for result in results if "No analyzable source files" in result.expected_result]
+    cee_validated = [result for result in results if "CEE validation" in result.expected_result]
 
     lines: list[str] = []
     lines.append("# WyScan Benchmark Results")
@@ -149,6 +219,7 @@ def write_report(results: list[BenchmarkResult]) -> None:
     lines.append(f"**Run Date:** {date.today().isoformat()}")
     lines.append(f"**Benchmarks Evaluated:** {len(results)}")
     lines.append(f"**Python Exact-Match Cases:** {passed_python_exact}/{len(python_exact_cases)} passed")
+    lines.append(f"**Python CEE-Validated Cases:** {sum(1 for result in cee_validated if result.status == 'PASS')}/{len(cee_validated)} passed")
     lines.append(f"**Asset-Limited Cases:** {len(asset_limited)}")
     lines.append("")
     lines.append("## Summary")
@@ -165,6 +236,7 @@ def write_report(results: list[BenchmarkResult]) -> None:
     lines.append("## Interpretation")
     lines.append("")
     lines.append("- PASS on an exact-match Python case means the current scanner found the same number of findings as the benchmark manifest and reported no failed files.")
+    lines.append("- PASS on a CEE-validated Python case means the current scanner also satisfied the manifest's required CEE identities or minimum CEE coverage.")
     lines.append("- PASS on an asset-limited case means the repository snapshot contained no analyzable source files and the scanner reported no findings and no failed files.")
     lines.append("- These results validate the current Python-first scanner. They do not claim TypeScript, JavaScript, or Rust finding support.")
 
@@ -177,10 +249,11 @@ def main() -> None:
 
     results: list[BenchmarkResult] = []
     for system_dir in benchmark_directories():
+        manifest = load_manifest_data(system_dir)
         expected_count, languages = load_manifest(system_dir)
         code_files = count_code_files(system_dir)
         exit_code, report = run_scan(system_dir)
-        results.append(classify_result(system_dir, exit_code, report, expected_count, languages, code_files))
+        results.append(classify_result(system_dir, exit_code, report, expected_count, languages, code_files, manifest))
 
     write_report(results)
     print(f"Wrote {RESULTS_PATH}")

@@ -1,0 +1,58 @@
+{
+  "system": "00-langgraph-production",
+  "version": "1.1.0",
+  "description": "Operational LangGraph production-style system with a required Python CEE baseline",
+  "expected_cee_min": 79,
+  "expected_cees": [
+    {
+      "tool_registration": "run_etl_pipeline",
+      "file": "tools/shell.py",
+      "operation": "subprocess.run",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "cleanup_temp_files",
+      "file": "tools/shell.py",
+      "operation": "shutil.rmtree",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "call_enrichment_api",
+      "file": "agents/data_pipeline_agent.py",
+      "operation": "requests.post",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "process_data_batch",
+      "file": "agents/data_pipeline_agent.py",
+      "operation": "pathlib.Path.write_text",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "sync_to_crm",
+      "file": "tools/crm.py",
+      "operation": "requests.patch",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "write_customer_document",
+      "file": "tools/files.py",
+      "operation": "pathlib.Path.write_text",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "append_to_log",
+      "file": "tools/files.py",
+      "operation": "builtins.open",
+      "afb_type": "AFB04"
+    }
+  ],
+  "metadata": {
+    "difficulty": "5/5",
+    "frameworks": ["langgraph"],
+    "languages": ["python"],
+    "author": "WyScan Benchmark Team",
+    "created": "2026-03-31",
+    "last_updated": "2026-03-31"
+  }
+}

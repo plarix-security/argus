@@ -3,13 +3,14 @@
 **Run Date:** 2026-03-31
 **Benchmarks Evaluated:** 13
 **Python Exact-Match Cases:** 8/8 passed
+**Python CEE-Validated Cases:** 1/1 passed
 **Asset-Limited Cases:** 4
 
 ## Summary
 
 | System | Languages | Expected result | Actual result | Status | Notes |
 |--------|-----------|-----------------|---------------|--------|-------|
-| 00-langgraph-production | unknown | Operational Python scan with no failed files | 78 cees, 74 afb04 findings (8C/40W/26I), exit 2, analyzed 12, skipped 0, failed 0 | PASS | Operational smoke run only; no manifest is available in this snapshot. 78 CEEs were inventoried. |
+| 00-langgraph-production | python | Operational Python scan with no failed files plus CEE validation | 79 cees, 75 afb04 findings (8C/41W/26I), exit 2, analyzed 12, skipped 0, failed 0 | PASS | CEE validation passed with 79 inventoried events |
 | 01-react-tool-agent | python | Exact match with 7 expected Python findings | 8 cees, 7 afb04 findings (2C/3W/2I), exit 2, analyzed 8, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 8 CEEs were inventoried. |
 | 02-langchain-rag-agent | python | Exact match with 6 expected Python findings | 6 cees, 6 afb04 findings (1C/4W/1I), exit 2, analyzed 6, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 6 CEEs were inventoried. |
 | 03-langgraph-supervisor | python | Exact match with 11 expected Python findings | 11 cees, 11 afb04 findings (2C/6W/3I), exit 2, analyzed 8, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 11 CEEs were inventoried. |
@@ -26,5 +27,6 @@
 ## Interpretation
 
 - PASS on an exact-match Python case means the current scanner found the same number of findings as the benchmark manifest and reported no failed files.
+- PASS on a CEE-validated Python case means the current scanner also satisfied the manifest's required CEE identities or minimum CEE coverage.
 - PASS on an asset-limited case means the repository snapshot contained no analyzable source files and the scanner reported no findings and no failed files.
 - These results validate the current Python-first scanner. They do not claim TypeScript, JavaScript, or Rust finding support.

@@ -5,6 +5,7 @@ This benchmark directory is used to validate the current shipped scanner, which 
 ## Current Validation Scope
 
 - Python fixtures with source code are used for finding-count validation.
+- Selected Python fixtures can also require CEE identities or a minimum CEE inventory.
 - Mixed-language or unsupported-language fixtures are used only when source code is present in the repository snapshot.
 - Fixtures that currently ship without analyzable source code are recorded as asset-limited cases, not as proof of language support.
 
@@ -12,7 +13,7 @@ This benchmark directory is used to validate the current shipped scanner, which 
 
 | # | System | Declared language | Current validation use |
 |---|--------|-------------------|------------------------|
-| 00 | langgraph-production | Python | Operational smoke run; no manifest in repo snapshot |
+| 00 | langgraph-production | Python | CEE baseline validation with minimum inventory |
 | 01 | react-tool-agent | Python | Exact count validation |
 | 02 | langchain-rag-agent | Python | Exact count validation |
 | 03 | langgraph-supervisor | Python | Exact count validation |
