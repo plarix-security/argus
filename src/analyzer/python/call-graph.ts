@@ -25,6 +25,10 @@ import {
   OpenAIToolSchema,
   FunctionDispatchMapping,
 } from './ast-parser';
+import {
+  extractSemanticInvocationRoots,
+  SemanticInvocationRoot,
+} from './semantic-index';
 import { ExecutionCategory, Severity } from '../../types';
 import * as path from 'path';
 
@@ -68,6 +72,10 @@ export interface CallGraphNode {
   isToolRegistration: boolean;
   /** Framework that registered this tool */
   framework?: string;
+  /** How the tool registration was identified */
+  toolDetectionKind?: 'semantic' | 'heuristic';
+  /** Evidence describing the registration source */
+  toolDetectionEvidence?: string;
   /** Dangerous operations directly in this function */
   dangerousOps: DangerousOperation[];
   /** Whether this function is a structural policy gate */
@@ -835,6 +843,7 @@ export function buildCallGraph(
 
   // Get all file paths for cross-file resolution
   const allFilePaths = Array.from(files.keys());
+  const semanticRoots = extractSemanticInvocationRoots(files);
 
   // Build cross-file import map
   const importMap = buildCrossFileImportMap(files, allFilePaths);
@@ -876,11 +885,20 @@ export function buildCallGraph(
         sourceFile: filePath,
       };
 
-      // Check if this is a tool registration
-      const toolInfo = detectToolRegistration(func, parsed.imports, parsed.openaiToolSchemas, parsed.dispatchMappings);
+      // Prefer semantic framework roots; keep pattern-based registration as fallback.
+      const toolInfo = getToolRegistrationInfo(
+        globalId,
+        semanticRoots,
+        func,
+        parsed.imports,
+        parsed.openaiToolSchemas,
+        parsed.dispatchMappings
+      );
       if (toolInfo) {
         node.isToolRegistration = true;
         node.framework = toolInfo.framework;
+        node.toolDetectionKind = toolInfo.kind;
+        node.toolDetectionEvidence = toolInfo.evidence;
         toolRegistrations.push(node);
       }
 
@@ -890,11 +908,20 @@ export function buildCallGraph(
     // Process class definitions
     for (const cls of parsed.classes) {
       // Check if class itself is a tool (e.g., BaseTool subclass)
-      const toolInfo = detectToolClass(cls, parsed.imports);
+      const classToolInfo = detectToolClass(cls, parsed.imports);
 
       for (const method of cls.methods) {
         const localId = `${cls.name}.${method.name}`;
         const globalId = `${filePath}:${localId}`;
+        const toolInfo = getToolRegistrationInfo(
+          globalId,
+          semanticRoots,
+          method,
+          parsed.imports,
+          parsed.openaiToolSchemas,
+          parsed.dispatchMappings,
+          classToolInfo || undefined
+        );
 
         // A method has a policy gate if:
         // 1. Its own control flow is a structural gate, OR
@@ -913,8 +940,10 @@ export function buildCallGraph(
           decorators: method.decorators,
           callees: new Set(),
           callers: new Set(),
-          isToolRegistration: toolInfo !== null && (method.name === '_run' || method.name === 'run' || method.name === 'invoke' || method.name === '_execute' || method.name === 'execute'),
+          isToolRegistration: toolInfo !== null && (toolInfo.kind === 'semantic' || method.name === '_run' || method.name === 'run' || method.name === 'invoke' || method.name === '_execute' || method.name === 'execute'),
           framework: toolInfo?.framework,
+          toolDetectionKind: toolInfo?.kind,
+          toolDetectionEvidence: toolInfo?.evidence,
           dangerousOps: [],
           // Use structural analysis + decorator analysis + known auth patterns to determine if this is a policy gate
           hasPolicyGate: hasStructuralGate || hasDecoratorGate || hasKnownAuthDecorator,
@@ -1152,6 +1181,44 @@ function detectToolRegistration(
   }
 
   return null;
+}
+
+function getToolRegistrationInfo(
+  nodeId: string,
+  semanticRoots: Map<string, SemanticInvocationRoot>,
+  func: FunctionDef,
+  imports: ImportInfo[],
+  openaiToolSchemas: OpenAIToolSchema[] = [],
+  dispatchMappings: FunctionDispatchMapping[] = [],
+  inheritedToolInfo?: { framework: string } | null
+): { framework: string; kind: 'semantic' | 'heuristic'; evidence: string } | null {
+  const semanticRoot = semanticRoots.get(nodeId);
+  if (semanticRoot) {
+    return {
+      framework: semanticRoot.framework,
+      kind: 'semantic',
+      evidence: semanticRoot.evidence,
+    };
+  }
+
+  if (inheritedToolInfo) {
+    return {
+      framework: inheritedToolInfo.framework,
+      kind: 'heuristic',
+      evidence: `tool-class fallback for ${func.className || func.name}`,
+    };
+  }
+
+  const fallback = detectToolRegistration(func, imports, openaiToolSchemas, dispatchMappings);
+  if (!fallback) {
+    return null;
+  }
+
+  return {
+    framework: fallback.framework,
+    kind: 'heuristic',
+    evidence: `pattern fallback for ${func.name}`,
+  };
 }
 
 /**
