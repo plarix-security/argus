@@ -1,99 +1,62 @@
-# What WyScan Detects
+# Detection Model
 
-WyScan detects AFB04 (Unauthorized Action) boundaries in Python agent codebases.
+WyScan currently reports AFB04-style unauthorized action exposure in Python code.
 
-## Overview
+The shipped detector does this:
 
-WyScan traces from tool registration points to dangerous operations. If there is no policy gate in the call path, it reports a finding.
+1. Parse Python source with tree-sitter.
+2. Detect tool registrations using framework and decorator patterns.
+3. Build call paths within the analyzed file.
+4. Match reachable operations against the current operation table.
+5. Credit a policy gate only when the analyzed path contains recognized structural authorization logic.
 
-## CEE Severity Model
+## Severity Model
 
-WyScan uses the **CEE (Comprehensive Exposure Evaluation)** severity model which considers three factors:
+Severity is based on matched operations, then adjusted by limited heuristics already present in the implementation.
 
-1. **Reversibility**: Irreversible operations (delete, rmtree, eval) are always CRITICAL
-2. **Data Sensitivity**: Operations touching passwords, secrets, credentials, tokens, or PII are elevated one level
-3. **Validation Helpers**: Call paths through sanitize*, validate*, check_*, verify* functions are downgraded one level (heuristic-based)
+- Irreversible operations are forced to `CRITICAL`.
+- Sensitive-data naming heuristics can elevate severity by one level.
+- Validation-helper naming heuristics can downgrade severity by one level.
 
-The base severity is determined by operation type, then adjusted based on these factors.
+These adjustments are heuristic only.
 
-## Severity Levels
+## Current Operation Buckets
 
-### CRITICAL
+`CRITICAL`
 
-Irreversible destruction, exfiltration, or arbitrary execution.
+- Shell execution
+- Dynamic code execution and unsafe deserialization
+- File or directory deletion
+- `cursor.executescript()` and Redis flush operations
 
-| Category | Operations |
-|----------|-----------|
-| Shell execution | `subprocess.run`, `subprocess.Popen`, `subprocess.call`, `os.system`, `os.popen`, `os.exec*`, `asyncio.create_subprocess_*` |
-| Code execution | `eval`, `exec` |
-| File deletion | `shutil.rmtree`, `os.remove`, `os.unlink`, `os.rmdir`, `Path.unlink`, `Path.rmdir` |
+`WARNING`
 
-### WARNING
+- File writes and directory creation
+- HTTP mutation calls such as `post`, `put`, `patch`, and `delete`
+- HTTP GET calls currently matched by the shipped detector
+- Common ORM and NoSQL write-style calls
+- Email sends
 
-Recoverable but consequential state modification.
+`INFO`
 
-| Category | Operations |
-|----------|-----------|
-| File writes | `Path.write_text`, `Path.write_bytes`, `file.write`, `Path.mkdir`, `shutil.copy`, `shutil.move`, `os.rename`, `os.makedirs` |
-| HTTP mutations | `requests.post`, `requests.put`, `requests.patch`, `requests.delete`, `httpx.*`, `aiohttp.*` |
-| Database writes | `session.add`, `session.delete`, `session.commit`, `session.flush`, `model.save`, `model.create` |
-| Email | `smtp.send_message`, `smtp.sendmail` |
+- File reads
+- Generic database reads such as `.execute()`, `.fetchone()`, `.fetchall()`, and `.query()`
+- Redis `get` and `keys`
+- Directory listing and glob-like operations
 
-### INFO
+## Framework Labels
 
-Read-only access to sensitive data or external systems.
+Framework labels are pattern-based and Python-only. They indicate that WyScan matched a registration pattern, not that it modeled the full runtime behavior of that framework.
 
-| Category | Operations |
-|----------|-----------|
-| File reads | `open()`, `Path.read_text`, `Path.read_bytes` |
-| HTTP reads | `requests.get`, `httpx.get`, `urllib.request.*` |
-| Database reads | `cursor.execute` (SELECT), `cursor.fetchall`, `cursor.fetchone` |
-| Environment | `os.getenv`, `os.environ` |
+The current detector includes labels for patterns associated with LangChain, CrewAI, AutoGen, OpenAI tool schemas and dispatch maps, LlamaIndex, MCP, and generic Python decorator-style tool registration.
 
-## Supported Frameworks
+## Policy Gates
 
-WyScan detects tool registrations in these frameworks:
+WyScan credits a policy gate when the analyzed path contains code it recognizes as structural authorization logic, such as:
 
-| Framework | Detection Patterns |
-|-----------|-------------------|
-| LangChain | `@tool`, `BaseTool`, `StructuredTool`, `Tool()`, `create_react_agent`, `AgentExecutor` |
-| CrewAI | `@task`, `@agent`, `crewai.tool`, `CrewAITool` |
-| AutoGen | `register_function`, `function_map`, `UserProxyAgent`, `AssistantAgent` |
-| LlamaIndex | `FunctionTool`, `QueryEngineTool`, `ToolOutput` |
-| MCP | `mcp.server`, `@server.tool`, `tool_handler`, `ToolProvider` |
-| OpenAI | `tools=[...]`, `function_call`, `tool_choice` |
+- Conditional checks on parameters
+- Authorization-like exceptions raised on denied paths
+- Decorators that are structurally analyzed as wrappers that can prevent execution
+- Known authorization decorator names
 
-## Policy Gate Detection
-
-WyScan recognizes these as structural policy gates that protect a call path:
-
-**Authorization exceptions:**
-- `PermissionError`
-- `AuthorizationError`
-- `AccessDeniedError`
-- `UnauthorizedError`
-
-**Known decorators:**
-- `@require_permission`
-- `@permission_required`
-- `@login_required`
-- `@authenticated`
-- `@require_role`
-- `@role_required`
-- `@user_passes_test`
-
-**Structural patterns:**
-- Functions with conditional branches that check parameters
-- Functions that raise exceptions when authorization fails
-- Functions with early returns based on authorization checks
-
-If a recognized policy gate exists in the call path between a tool and a dangerous operation, the finding is not reported.
-
-## How Detection Works
-
-1. Parse Python source with tree-sitter to build an AST
-2. Find all tool registrations using framework patterns
-3. Build a call graph from each tool
-4. Trace paths to dangerous operations
-5. Check each path for policy gates
-6. Report unprotected paths with severity based on operation type
+Validation helpers such as `validate_*` or `sanitize_*` are not credited as gates by themselves.

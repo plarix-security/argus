@@ -2,9 +2,9 @@
 
 ## Requirements
 
-- Node.js 18 or higher
+- Node.js 18 or newer
 
-## Install from Source
+## Install From Source
 
 ```bash
 git clone https://github.com/plarix-security/wyscan.git
@@ -14,42 +14,31 @@ npm run build
 npm link
 ```
 
-After linking, the `wyscan` command is available globally.
-
-## Verify Installation
+## Verify
 
 ```bash
 wyscan check
 ```
 
-Expected output:
+Example output shape:
 
-```
-wyscan  v0.7.0-beta  by Plarix
+```text
+wyscan v<package-version>  ·  Plarix
 
 Checking dependencies...
 
-  OK  Node.js                   v18.0.0
-  OK  tree-sitter-python.wasm   found
-  OK  Parser initialization     ok
-
-All checks passed. Ready to scan.
+OK  Node.js
+OK  tree-sitter-python.wasm
+OK  Parser initialization
 ```
 
-## Development Setup
+The printed version comes from `package.json`.
 
-If you want to modify WyScan:
+## Development
 
 ```bash
-git clone https://github.com/plarix-security/wyscan.git
-cd wyscan
 npm install
 npm run build
 npm test
-```
-
-Run without global install:
-
-```bash
 npm run wyscan -- scan ./project
 ```
