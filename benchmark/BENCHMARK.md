@@ -6,8 +6,8 @@ This benchmark directory is used to validate the current shipped scanner, which 
 
 - Python fixtures with source code are used for finding-count validation.
 - Selected Python fixtures can also require CEE identities or a minimum CEE inventory.
-- Mixed-language or unsupported-language fixtures are used only when source code is present in the repository snapshot.
-- Fixtures that currently ship without analyzable source code are recorded as asset-limited cases, not as proof of language support.
+- Mixed-language or unsupported-language fixtures are tracked only as informational fixtures in the current Python-first release.
+- Fixtures that currently ship without analyzable source code are recorded as asset-limited cases, not as proof of language support or skipped-language behavior.
 
 ## Systems In This Snapshot
 
@@ -18,14 +18,14 @@ This benchmark directory is used to validate the current shipped scanner, which 
 | 02 | langchain-rag-agent | Python | Exact count validation |
 | 03 | langgraph-supervisor | Python | Exact count validation |
 | 04 | crewai-research-crew | Python | Exact count validation |
-| 05 | openai-assistants-parallel | TypeScript | Asset-limited; no analyzable source files in repo snapshot |
+| 05 | openai-assistants-parallel | TypeScript | Asset-limited informational fixture |
 | 06 | autogen-code-executor | Python | Exact count validation |
 | 07 | langgraph-memory-agent | Python | Exact count validation |
-| 08 | typescript-browser-agent | TypeScript | Asset-limited; no analyzable source files in repo snapshot |
+| 08 | typescript-browser-agent | TypeScript | Asset-limited informational fixture |
 | 09 | multi-agent-pipeline-fastapi | Python | Exact count validation |
-| 10 | rust-agent-runtime | Rust | Asset-limited; no analyzable source files in repo snapshot |
+| 10 | rust-agent-runtime | Rust | Asset-limited informational fixture |
 | 11 | smolagents-computer-use | Python | Exact count validation |
-| 12 | heterogeneous-multi-framework | Python + TypeScript | Asset-limited; no analyzable source files in repo snapshot |
+| 12 | heterogeneous-multi-framework | Python + TypeScript | Asset-limited informational fixture |
 
 ## Running The Validator
 

@@ -184,8 +184,8 @@ def classify_result(system_dir: Path, exit_code: int, report: dict, expected_cou
         )
 
     if code_files == 0:
-        status = "PASS" if findings == 0 and failed_files == 0 else "FAIL"
-        notes = "This repo snapshot contains no analyzable source files for this fixture. The result does not validate skipped-language handling." if status == "PASS" else "Missing-code fixture produced an unexpected result."
+        status = "NOT VALIDATED" if findings == 0 and failed_files == 0 else "FAIL"
+        notes = "This repo snapshot contains no analyzable source files for this fixture. The result is informational only and does not validate skipped-language handling." if status == "NOT VALIDATED" else "Missing-code fixture produced an unexpected result."
         return BenchmarkResult(
             name=system_dir.name,
             languages=language_label,
@@ -237,7 +237,7 @@ def write_report(results: list[BenchmarkResult]) -> None:
     lines.append("")
     lines.append("- PASS on an exact-match Python case means the current scanner found the same number of findings as the benchmark manifest and reported no failed files.")
     lines.append("- PASS on a CEE-validated Python case means the current scanner also satisfied the manifest's required CEE identities or minimum CEE coverage.")
-    lines.append("- PASS on an asset-limited case means the repository snapshot contained no analyzable source files and the scanner reported no findings and no failed files.")
+    lines.append("- NOT VALIDATED on an asset-limited case means the repository snapshot contained no analyzable source files. The result is informational only and does not validate language support or skipped-language handling.")
     lines.append("- These results validate the current Python-first scanner. They do not claim TypeScript, JavaScript, or Rust finding support.")
 
     RESULTS_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")

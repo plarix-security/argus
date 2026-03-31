@@ -13,11 +13,11 @@ The shipped detector does this:
 
 ## Severity Model
 
-Severity is based on matched operations, then adjusted by limited heuristics already present in the implementation.
+Severity is based on matched operations. Limited heuristics still exist, but they only adjust fallback-classified paths where structural or semantic proof was incomplete.
 
 - Irreversible operations are forced to `CRITICAL`.
-- Sensitive-data naming heuristics can elevate severity by one level.
-- Validation-helper naming heuristics can downgrade severity by one level.
+- Sensitive-data naming heuristics can elevate fallback-classified paths by one level.
+- Validation-helper naming heuristics can downgrade fallback-classified paths by one level.
 
 These adjustments are heuristic only.
 
@@ -47,9 +47,9 @@ These adjustments are heuristic only.
 
 ## Framework Labels
 
-Framework labels are Python-only. They prefer semantic extraction from code structure, then fall back to matched registration patterns when semantic resolution is incomplete.
+Framework labels are Python-only. They prefer semantic extraction from code structure, helper-returned bundles, and dispatch maps, then fall back to matched registration patterns when semantic resolution is incomplete.
 
-The current detector includes semantic handling for LangGraph/LangChain tool lists, CrewAI agent tool lists, AutoGen `function_map` registrations, imported tool decorators, OpenAI tool schemas and dispatch maps, plus fallback labels for generic Python decorator-style tool registration.
+The current detector includes semantic handling for LangGraph/LangChain tool lists, helper-returned tool bundles, CrewAI agent tool lists, AutoGen `function_map` registrations, imported tool decorators, OpenAI tool schemas and dispatch maps, plus fallback labels for generic Python decorator-style tool registration.
 
 ## Policy Gates
 

@@ -95,13 +95,13 @@ Exit codes follow the filtered report level. For example, `--level critical` ign
 
 WyScan reports matched operations reachable from detected tool registrations.
 
-Severity is based on the matched operation category, then adjusted by limited heuristics already present in the implementation:
+Severity is based on the matched operation category. Limited naming heuristics still exist, but they only adjust fallback-classified paths where structural or semantic proof was incomplete:
 
 - Irreversible operations such as `subprocess.run`, `eval`, `exec`, and file deletion are forced to `CRITICAL`.
-- Names and snippets that suggest sensitive data can elevate severity by one level.
-- Validation-helper names in the analyzed path can downgrade severity by one level.
+- Names and snippets that suggest sensitive data can elevate fallback-classified paths by one level.
+- Validation-helper names in the analyzed path can downgrade fallback-classified paths by one level.
 
-These severity adjustments are heuristic. They are not proof of attacker intent, exploitability, or data flow.
+These severity adjustments are heuristic only. They are not proof of attacker intent, exploitability, or data flow.
 
 ### Operation Categories
 
@@ -126,7 +126,7 @@ These severity adjustments are heuristic. They are not proof of attacker intent,
 
 ## Framework Labels
 
-Framework detection is Python-only. WyScan now prefers semantic extraction from framework code structure such as decorator imports, tool lists, `create_react_agent(...)`, `bind_tools(...)`, and `function_map` style registrations. Pattern matching remains as fallback when structural resolution is incomplete.
+Framework detection is Python-only. WyScan prefers semantic extraction from framework code structure such as decorator imports, tool lists, helper-returned tool bundles, `create_react_agent(...)`, `bind_tools(...)`, and `function_map` style registrations. Pattern matching remains as fallback when structural resolution is incomplete.
 
 The shipped detector currently labels patterns for frameworks such as:
 
@@ -138,7 +138,7 @@ The shipped detector currently labels patterns for frameworks such as:
 - MCP
 - Generic Python decorator-style tool registrations
 
-Some additional framework names exist in pattern tables, but coverage is partial and depends on simple registration-pattern matches rather than framework-specific semantic understanding.
+Some additional framework names still exist in fallback pattern tables, but Python semantic coverage is the primary path and the only supported finding scope for now.
 
 ## Policy Gate Detection
 
