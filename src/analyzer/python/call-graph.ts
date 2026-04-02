@@ -447,31 +447,16 @@ const AUTHORIZATION_EXCEPTION_TYPES = [
 // parameter checks, and authorization exception raises. Decorator naming
 // alone does not credit a gate.
 
-/**
- * Patterns for helper functions that likely perform validation.
- * If a call path passes through a function matching these patterns,
- * we downgrade severity by one level (not suppress) because we cannot
- * confirm it is a real gate, but it suggests validation may occur.
- */
-const VALIDATION_HELPER_PATTERNS = [
-  /^sanitize/i,
-  /^validate/i,
-  /^check_/i,
-  /^verify/i,
-  /^is_valid/i,
-  /^is_allowed/i,
-  /^can_/i,
-  /^has_access/i,
-  /^ensure_/i,
-  /^assert_/i,
-];
+// NOTE: VALIDATION_HELPER_PATTERNS removed in v1.2.2.
+// Severity is now determined solely by operation category.
+// Naming heuristics do not adjust severity.
 
 /**
  * Check if a function name suggests it performs validation.
- * Used to downgrade severity when a call path includes probable validation.
+ * NOTE: Always returns false in v1.2.2. Kept for interface compatibility.
  */
 export function isLikelyValidationHelper(functionName: string): boolean {
-  return VALIDATION_HELPER_PATTERNS.some(pattern => pattern.test(functionName));
+  return false;
 }
 
 /**
