@@ -2,9 +2,9 @@
  * Call Graph Builder
  *
  * Builds a call graph from parsed Python files to trace:
- * 1. Tool registration points (LangChain, CrewAI, AutoGen, LlamaIndex, MCP, OpenAI)
+ * 1. Tool registration points via semantic root extraction
  * 2. Execution paths from tools to dangerous operations
- * 3. Presence or absence of policy gates in call paths
+ * 3. Presence or absence of structural policy gates in call paths
  *
  * This is the core of AFB04 detection: we need to know if a tool
  * can reach a dangerous operation without passing through authorization.
@@ -12,6 +12,9 @@
  * IMPORTANT: Policy gate detection is STRUCTURAL, not nominal.
  * A function named "check_permission" that always returns True is NOT a gate.
  * A function named "process_data" that raises PermissionError conditionally IS.
+ *
+ * v1.2.2: Removed framework-specific pattern tables. Tool detection now
+ * relies entirely on semantic root extraction via PythonSemanticIndex.
  */
 
 import {
@@ -209,107 +212,14 @@ function extractFileFromNodeId(nodeId: string): string | null {
   return nodeId.slice(0, separatorIndex);
 }
 
-/**
- * Framework detection patterns for tool registration
- *
- * These patterns identify functions that can be invoked by an LLM/agent.
- * Detection uses both explicit framework patterns and generic heuristics.
- */
-const TOOL_REGISTRATION_PATTERNS: {
-  pattern: RegExp;
-  framework: string;
-  decoratorCheck?: (decorator: string) => boolean;
-}[] = [
-  // ================== KNOWN FRAMEWORKS ==================
-
-  // LangChain
-  { pattern: /^@tool$/i, framework: 'langchain', decoratorCheck: (d) => d === 'tool' || d.startsWith('tool(') },
-  { pattern: /BaseTool/i, framework: 'langchain' },
-  { pattern: /StructuredTool/i, framework: 'langchain' },
-  { pattern: /Tool\s*\(/i, framework: 'langchain' },
-  { pattern: /create_react_agent/i, framework: 'langchain' },
-  { pattern: /AgentExecutor/i, framework: 'langchain' },
-
-  // CrewAI
-  { pattern: /^@task$/i, framework: 'crewai', decoratorCheck: (d) => d === 'task' || d.startsWith('task(') },
-  { pattern: /^@agent$/i, framework: 'crewai', decoratorCheck: (d) => d === 'agent' || d.startsWith('agent(') },
-  { pattern: /crewai\.tool/i, framework: 'crewai' },
-  { pattern: /CrewAITool/i, framework: 'crewai' },
-
-  // AutoGen
-  { pattern: /register_function/i, framework: 'autogen' },
-  { pattern: /function_map/i, framework: 'autogen' },
-  { pattern: /UserProxyAgent/i, framework: 'autogen' },
-  { pattern: /AssistantAgent/i, framework: 'autogen' },
-
-  // LlamaIndex
-  { pattern: /FunctionTool/i, framework: 'llamaindex' },
-  { pattern: /QueryEngineTool/i, framework: 'llamaindex' },
-  { pattern: /ToolOutput/i, framework: 'llamaindex' },
-
-  // MCP (Model Context Protocol)
-  { pattern: /mcp\.server/i, framework: 'mcp' },
-  { pattern: /@server\.tool/i, framework: 'mcp', decoratorCheck: (d) => d.includes('server.tool') },
-  { pattern: /tool_handler/i, framework: 'mcp' },
-  { pattern: /ToolProvider/i, framework: 'mcp' },
-
-  // Raw OpenAI function calling
-  { pattern: /tools\s*=\s*\[/i, framework: 'openai' },
-  { pattern: /function_call/i, framework: 'openai' },
-  { pattern: /tool_choice/i, framework: 'openai' },
-  { pattern: /"type"\s*:\s*"function"/i, framework: 'openai' },
-
-  // Anthropic Claude tool use
-  { pattern: /tool_use/i, framework: 'anthropic' },
-  { pattern: /anthropic.*tools/i, framework: 'anthropic' },
-
-  // Google Gemini function calling
-  { pattern: /FunctionDeclaration/i, framework: 'gemini' },
-  { pattern: /genai.*tools/i, framework: 'gemini' },
-
-  // Hugging Face Transformers Agents
-  { pattern: /transformers.*Tool/i, framework: 'transformers' },
-  { pattern: /HfAgent/i, framework: 'transformers' },
-
-  // Smolagents
-  { pattern: /smolagents/i, framework: 'smolagents' },
-  { pattern: /CodeAgent/i, framework: 'smolagents' },
-  { pattern: /ToolCallingAgent/i, framework: 'smolagents' },
-
-  // DSPy
-  { pattern: /dspy\.Signature/i, framework: 'dspy' },
-  { pattern: /dspy\.Module/i, framework: 'dspy' },
-
-  // ================== GENERIC PATTERNS ==================
-  // These catch custom agentic frameworks that don't use known decorators
-
-  // Generic tool decorator patterns
-  { pattern: /^@.*tool$/i, framework: 'custom', decoratorCheck: (d) => d.endsWith('tool') || d.endsWith('Tool') },
-  { pattern: /^@.*_tool$/i, framework: 'custom', decoratorCheck: (d) => d.endsWith('_tool') },
-  { pattern: /^@tool_/i, framework: 'custom', decoratorCheck: (d) => d.startsWith('tool_') || d.startsWith('tool(') },
-
-  // Action/capability patterns
-  { pattern: /^@action$/i, framework: 'custom', decoratorCheck: (d) => d === 'action' || d.startsWith('action(') },
-  { pattern: /^@capability$/i, framework: 'custom', decoratorCheck: (d) => d === 'capability' || d.startsWith('capability(') },
-  { pattern: /^@skill$/i, framework: 'custom', decoratorCheck: (d) => d === 'skill' || d.startsWith('skill(') },
-  { pattern: /^@command$/i, framework: 'custom', decoratorCheck: (d) => d === 'command' || d.startsWith('command(') },
-  { pattern: /^@handler$/i, framework: 'custom', decoratorCheck: (d) => d === 'handler' || d.startsWith('handler(') },
-
-  // Registration patterns
-  { pattern: /^@register$/i, framework: 'custom', decoratorCheck: (d) => d === 'register' || d.startsWith('register(') },
-  { pattern: /^@expose$/i, framework: 'custom', decoratorCheck: (d) => d === 'expose' || d.startsWith('expose(') },
-  { pattern: /^@callable$/i, framework: 'custom', decoratorCheck: (d) => d === 'callable' || d.startsWith('callable(') },
-
-  // Agent/AI prefixed patterns
-  { pattern: /^@agent_/i, framework: 'custom', decoratorCheck: (d) => d.startsWith('agent_') },
-  { pattern: /^@ai_/i, framework: 'custom', decoratorCheck: (d) => d.startsWith('ai_') },
-  { pattern: /^@llm_/i, framework: 'custom', decoratorCheck: (d) => d.startsWith('llm_') },
-
-  // Class inheritance patterns
-  { pattern: /AgentTool/i, framework: 'custom' },
-  { pattern: /BaseAction/i, framework: 'custom' },
-  { pattern: /CustomTool/i, framework: 'custom' },
-];
+// NOTE: Framework-specific TOOL_REGISTRATION_PATTERNS removed in v1.2.2.
+// Tool detection now relies entirely on semantic root extraction via
+// PythonSemanticIndex which performs structural analysis of:
+// - tool= parameters passed to agent constructors
+// - bind_tools() method calls
+// - function_map assignments
+// - OpenAI-style tool schema dictionaries
+// - Decorator-based registration (via import resolution)
 
 /**
  * Patterns that indicate dangerous operations
@@ -988,8 +898,8 @@ export function buildCallGraph(
 
     // Process class definitions
     for (const cls of parsed.classes) {
-      // Check if class itself is a tool (e.g., BaseTool subclass)
-      const classToolInfo = detectToolClass(cls, parsed.imports);
+      // NOTE: detectToolClass removed in v1.2.2. Class-based tool detection
+      // now goes through semantic root extraction only.
 
       for (const method of cls.methods) {
         const localId = `${cls.name}.${method.name}`;
@@ -1000,8 +910,7 @@ export function buildCallGraph(
           method,
           parsed.imports,
           parsed.openaiToolSchemas,
-          parsed.dispatchMappings,
-          classToolInfo || undefined
+          parsed.dispatchMappings
         );
 
         // A method has a policy gate if:
@@ -1203,70 +1112,8 @@ function hasAutoGenImport(imports: ImportInfo[]): boolean {
   );
 }
 
-/**
- * Detect if a function is a tool registration.
- *
- * Supports:
- * 1. Decorator-based detection (LangChain @tool, CrewAI @task, etc.)
- * 2. OpenAI SDK dictionary-based schemas
- * 3. AutoGen function_map patterns
- *
- * Note: For OpenAI schemas, the presence of the schema pattern itself
- * ({"type": "function", "function": {"name": "..."}}) is strong enough
- * evidence that we don't require the openai import in the same file.
- */
-function detectToolRegistration(
-  func: FunctionDef,
-  imports: ImportInfo[],
-  openaiToolSchemas: OpenAIToolSchema[] = [],
-  dispatchMappings: FunctionDispatchMapping[] = []
-): { framework: string } | null {
-  // Check decorators
-  for (const decorator of func.decorators) {
-    for (const pattern of TOOL_REGISTRATION_PATTERNS) {
-      if (pattern.decoratorCheck) {
-        if (pattern.decoratorCheck(decorator)) {
-          return { framework: pattern.framework };
-        }
-      } else if (pattern.pattern.test(decorator)) {
-        return { framework: pattern.framework };
-      }
-    }
-  }
-
-  // Check if function appears in OpenAI tool schemas
-  // The schema pattern {"type": "function", "function": {"name": "..."}} is unique enough
-  // that we trust it even without requiring openai import in the same file
-  for (const schema of openaiToolSchemas) {
-    if (schema.toolNames.includes(func.name)) {
-      return { framework: 'openai' };
-    }
-  }
-
-  // Check if function appears in dispatch mappings
-  for (const mapping of dispatchMappings) {
-    for (const [toolName, funcRef] of mapping.mappings) {
-      if (funcRef === func.name) {
-        // If the tool name appears in an OpenAI schema, it's an OpenAI tool
-        const inSchema = openaiToolSchemas.some(s => s.toolNames.includes(toolName));
-        if (inSchema) {
-          return { framework: 'openai' };
-        }
-        // If we have openai imports, trust the dispatch mapping as OpenAI
-        if (hasOpenAIImport(imports)) {
-          return { framework: 'openai' };
-        }
-        // If we have autogen imports, trust the dispatch mapping as AutoGen
-        // This handles the function_map pattern used by AutoGen
-        if (hasAutoGenImport(imports)) {
-          return { framework: 'autogen' };
-        }
-      }
-    }
-  }
-
-  return null;
-}
+// NOTE: detectToolRegistration removed in v1.2.2.
+// Tool detection relies on semantic root extraction only.
 
 function getToolRegistrationInfo(
   nodeId: string,
@@ -1274,8 +1121,7 @@ function getToolRegistrationInfo(
   func: FunctionDef,
   imports: ImportInfo[],
   openaiToolSchemas: OpenAIToolSchema[] = [],
-  dispatchMappings: FunctionDispatchMapping[] = [],
-  inheritedToolInfo?: { framework: string } | null
+  dispatchMappings: FunctionDispatchMapping[] = []
 ): { framework: string; kind: 'semantic' | 'heuristic'; evidence: string } | null {
   const semanticRoot = semanticRoots.get(nodeId);
   if (semanticRoot) {
@@ -1286,43 +1132,15 @@ function getToolRegistrationInfo(
     };
   }
 
-  if (inheritedToolInfo) {
-    return {
-      framework: inheritedToolInfo.framework,
-      kind: 'heuristic',
-      evidence: `tool-class fallback for ${func.className || func.name}`,
-    };
-  }
-
-  const fallback = detectToolRegistration(func, imports, openaiToolSchemas, dispatchMappings);
-  if (!fallback) {
-    return null;
-  }
-
-  return {
-    framework: fallback.framework,
-    kind: 'heuristic',
-    evidence: `pattern fallback for ${func.name}`,
-  };
-}
-
-/**
- * Detect if a class is a tool class (e.g., BaseTool subclass)
- */
-function detectToolClass(
-  cls: ClassDef,
-  imports: ImportInfo[]
-): { framework: string } | null {
-  for (const base of cls.bases) {
-    for (const pattern of TOOL_REGISTRATION_PATTERNS) {
-      if (pattern.pattern.test(base)) {
-        return { framework: pattern.framework };
-      }
-    }
-  }
-
+  // NOTE: Pattern-based fallback removed in v1.2.2.
+  // If semantic resolution fails, we do not detect the tool.
+  // A missed finding is acceptable; a false finding is not.
   return null;
 }
+
+// NOTE: detectToolClass removed in v1.2.2.
+// Class inheritance detection relied on TOOL_REGISTRATION_PATTERNS.
+// Tool detection now goes through semantic root extraction only.
 
 /**
  * Detect if a call is a dangerous operation
