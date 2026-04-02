@@ -442,67 +442,10 @@ const AUTHORIZATION_EXCEPTION_TYPES = [
   'SecurityError',
 ];
 
-/**
- * Known authorization decorator patterns.
- * These decorators are commonly used access control gates that should be
- * recognized even when their source code is in a different file.
- */
-const KNOWN_AUTHORIZATION_DECORATORS = [
-  // Permission/authorization decorators
-  /^require_permission$/i,
-  /^require_permissions$/i,
-  /^permission_required$/i,
-  /^permissions_required$/i,
-  /^require_admin$/i,
-  /^admin_required$/i,
-  /^login_required$/i,
-  /^authenticated$/i,
-  /^auth_required$/i,
-  /^authorization_required$/i,
-  /^requires_auth$/i,
-  /^requires_permission$/i,
-  /^check_permission$/i,
-  /^check_permissions$/i,
-  /^has_permission$/i,
-  /^has_permissions$/i,
-  // Role-based access control
-  /^require_role$/i,
-  /^role_required$/i,
-  /^roles_required$/i,
-  /^has_role$/i,
-  /^user_passes_test$/i,
-  // Django-style decorators
-  /^permission_classes$/i,
-  /^api_view$/i,
-  // Flask-style decorators
-  /^login_manager\.user_loader$/i,
-  // Generic access control
-  /^access_control$/i,
-  /^authorize$/i,
-  /^protected$/i,
-  // Additional patterns (Task 4)
-  /^guard$/i,
-  /^policy$/i,
-  /^secure$/i,
-  /^restricted$/i,
-  /^verified$/i,
-  /^requires$/i,
-  /^require$/i,
-  // Wildcard patterns - match anything containing these terms
-  /permission/i,
-  /auth(?:orize|enticate)?/i,
-  /require[sd]?_/i,
-];
-
-/**
- * Check if a decorator name matches a known authorization pattern.
- * This handles imported decorators that can't be structurally analyzed.
- */
-function isKnownAuthorizationDecorator(decoratorName: string): boolean {
-  // Extract the base name without arguments
-  const baseName = decoratorName.split('(')[0].trim();
-  return KNOWN_AUTHORIZATION_DECORATORS.some(pattern => pattern.test(baseName));
-}
+// NOTE: KNOWN_AUTHORIZATION_DECORATORS removed in v1.2.2.
+// Gate detection is now purely structural - requires conditional branches,
+// parameter checks, and authorization exception raises. Decorator naming
+// alone does not credit a gate.
 
 /**
  * Patterns for helper functions that likely perform validation.
@@ -848,11 +791,11 @@ export function buildCallGraph(
 
       // A function has a policy gate if:
       // 1. Its own control flow is a structural gate, OR
-      // 2. It has a decorator that acts as a structural gate (from same file), OR
-      // 3. It has a decorator matching known authorization patterns (from any file)
+      // 2. It has a decorator that acts as a structural gate (from same file)
+      // NOTE: Decorator naming heuristics removed in v1.2.2. Gate credit requires
+      // structural proof only.
       const hasStructuralGate = isStructuralPolicyGate(func.controlFlow);
       const hasDecoratorGate = (func.hasDecoratorGate || false) || hasImportedStructuralDecoratorGate(func.decorators, filePath, importMap, files);
-      const hasKnownAuthDecorator = func.decorators.some(d => isKnownAuthorizationDecorator(d));
 
       const node: CallGraphNode = {
         id: globalId,
@@ -867,7 +810,7 @@ export function buildCallGraph(
         dangerousOps: [],
         // Full gate credit requires structural proof in the analyzed code path.
         hasPolicyGate: hasStructuralGate || hasDecoratorGate,
-        hasHeuristicGateIndicator: hasKnownAuthDecorator && !(hasStructuralGate || hasDecoratorGate),
+        hasHeuristicGateIndicator: false, // Removed in v1.2.2
         // Check if this function name suggests it's a validation helper
         isValidationHelper: isLikelyValidationHelper(func.name),
         controlFlow: func.controlFlow,
@@ -915,11 +858,10 @@ export function buildCallGraph(
 
         // A method has a policy gate if:
         // 1. Its own control flow is a structural gate, OR
-        // 2. It has a decorator that acts as a structural gate (from same file), OR
-        // 3. It has a decorator matching known authorization patterns (from any file)
+        // 2. It has a decorator that acts as a structural gate (from same file)
+        // NOTE: Decorator naming heuristics removed in v1.2.2.
         const hasStructuralGate = isStructuralPolicyGate(method.controlFlow);
         const hasDecoratorGate = (method.hasDecoratorGate || false) || hasImportedStructuralDecoratorGate(method.decorators, filePath, importMap, files);
-        const hasKnownAuthDecorator = method.decorators.some(d => isKnownAuthorizationDecorator(d));
 
         const node: CallGraphNode = {
           id: globalId,
@@ -937,7 +879,7 @@ export function buildCallGraph(
           dangerousOps: [],
           // Full gate credit requires structural proof in the analyzed code path.
           hasPolicyGate: hasStructuralGate || hasDecoratorGate,
-          hasHeuristicGateIndicator: hasKnownAuthDecorator && !(hasStructuralGate || hasDecoratorGate),
+          hasHeuristicGateIndicator: false, // Removed in v1.2.2
           // Check if this method name suggests it's a validation helper
           isValidationHelper: isLikelyValidationHelper(method.name),
           controlFlow: method.controlFlow,
