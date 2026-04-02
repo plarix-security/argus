@@ -25,8 +25,8 @@
 - Authorization-like decorator names are heuristic only unless structural gate behavior is proven.
 - Generic exceptions, logging, and `try/except` do not count as gates by themselves.
 
-## Product Scope
+## Product Scope (v1.2.2)
 
-- AFB04 only
-- No TypeScript or JavaScript scanner implementation
-- No AFB01, AFB02, or AFB03 detection
+- Python-only static analysis
+- AFB04 (Unauthorized Action) detection only
+- No TypeScript or JavaScript support

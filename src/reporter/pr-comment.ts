@@ -168,7 +168,7 @@ ${getCoverageLines(report).join('\n')}`);
 
 ${getCoverageNotes(report).join('\n')}
 
-AFB01, AFB02, and AFB03 are out of scope for this scanner.`);
+WyScan detects AFB04 (Unauthorized Action) boundaries only.`);
 
   return sections.join('\n');
 }

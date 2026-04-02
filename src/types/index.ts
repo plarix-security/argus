@@ -1,26 +1,23 @@
 /**
  * AFB Scanner Type Definitions
- * 
+ *
  * Core types for Agent Failure Boundary detection through static analysis.
  * Based on the AFB Taxonomy v2.0 specification.
+ *
+ * v1.2.2: WyScan is Python-only and detects AFB04 only.
  */
 
 /**
  * Supported programming languages for analysis.
+ * v1.2.2: Python only. TypeScript/JavaScript not supported.
  */
 export type SupportedLanguage = 'python' | 'typescript' | 'javascript';
 
 /**
  * AFB boundary types as defined in the AFB Taxonomy.
- * MVP focuses on AFB04 only.
+ * v1.2.2: Only AFB04 is implemented. AFB01/02/03 are not detected.
  */
 export enum AFBType {
-  /** AFB01: Instruction Boundary - delineates system instructions from user input */
-  INSTRUCTION = 'AFB01',
-  /** AFB02: Context Boundary - separates trustworthy vs untrusted retrieved context */
-  CONTEXT = 'AFB02',
-  /** AFB03: Constraint Boundary - enforces operational limits and guardrails */
-  CONSTRAINT = 'AFB03',
   /** AFB04: Unauthorized Action - controls what operations the agent can perform */
   UNAUTHORIZED_ACTION = 'AFB04',
 }
