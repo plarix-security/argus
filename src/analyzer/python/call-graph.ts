@@ -305,14 +305,12 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /^httpx\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP write request' },
   { pattern: /^aiohttp\.ClientSession\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Async HTTP write' },
   { pattern: /^urllib\.request\.(urlopen|Request|urlretrieve)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'URL request' },
-  { pattern: /\.session\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Session HTTP write' },
-  // Match any .post(), .put(), .patch(), .delete() method calls (common API client patterns)
-  { pattern: /\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP write request' },
+  // NOTE: Generic .post()/.put()/.patch()/.delete() removed in v1.2.2 - too broad.
+  // Match only explicit HTTP client methods (requests, httpx, aiohttp, urllib).
 
-  // ORM write operations
+  // ORM write operations - use explicit patterns, not generic .save()/.create()
   { pattern: /\.session\.(add|add_all|delete|merge|commit|flush)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM write operation' },
-  { pattern: /\.save$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM save' },
-  { pattern: /\.create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM create' },
+  // NOTE: Generic .save()/.create() removed in v1.2.2 - too broad. Use qualified patterns.
   { pattern: /\.objects\.update$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM queryset update' },
   { pattern: /\.objects\.create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM queryset create' },
   { pattern: /\.objects\.delete$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM queryset delete' },
@@ -327,18 +325,10 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.update_many$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'MongoDB bulk update' },
   { pattern: /\.delete_one$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'MongoDB delete' },
   { pattern: /\.delete_many$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'MongoDB bulk delete' },
-  // SQL script execution is critical
+  // SQL operations
   { pattern: /\.executescript$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.CRITICAL, description: 'SQL script execution' },
   { pattern: /\.executemany$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Batch SQL execution' },
-
-  // Redis/cache operations - can read/write/delete persistent data
-  { pattern: /redis.*\.set$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Redis write' },
-  { pattern: /cache.*\.set$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Cache write' },
-  { pattern: /redis.*\.delete$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Redis delete' },
-  { pattern: /cache.*\.delete$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Cache delete' },
-  { pattern: /redis.*\.(flushdb|flushall)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.CRITICAL, description: 'Redis flush' },
-  { pattern: /redis.*\.get$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Redis read' },
-  { pattern: /redis.*\.keys$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Redis key enumeration' },
+  // NOTE: Redis/cache wildcard patterns removed in v1.2.2 - use SEMANTIC patterns instead.
 
   // Email sending
   { pattern: /^smtplib\.SMTP$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'SMTP connection' },
@@ -363,13 +353,11 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /^aiohttp\.ClientSession\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Async HTTP GET' },
   // Generic .get() is too common (dict.get, etc.) - don't match it
 
-  // Database reads
-  { pattern: /\.execute$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database query execution' },
+  // Database reads - use specific patterns; generic .execute/.query removed as too broad
+  // Semantic patterns provide coverage for sqlite3, psycopg2, etc.
   { pattern: /\.fetchall$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database fetch' },
   { pattern: /\.fetchone$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database fetch' },
   { pattern: /\.fetchmany$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database fetch' },
-  { pattern: /\.query$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database query' },
-  { pattern: /\.select$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database select' },
   // MongoDB read
   { pattern: /\.find_one$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'MongoDB find' },
   { pattern: /\.aggregate$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'MongoDB aggregate' },
