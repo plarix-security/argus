@@ -45,26 +45,27 @@ interface PythonSourceInput {
 }
 
 /**
- * SEVERITY MODEL (CEE - Comprehensive Exposure Evaluation)
+ * SEVERITY MODEL (v1.2.2 - Simplified)
  *
- * Severity is determined by three factors:
+ * Severity is determined by operation class only:
  *
- * 1. REVERSIBILITY
- *    - Irreversible operations (delete, rmtree, DROP TABLE, unlink) are always CRITICAL
- *    - Reversible mutations (write, POST, INSERT) stay WARNING unless other factors apply
+ * CRITICAL: Irreversible operations
+ *   - File deletion (rmtree, remove, unlink)
+ *   - Code execution (eval, exec)
+ *   - Shell execution (subprocess, os.system)
  *
- * 2. DATA SENSITIVITY CONTEXT
- *    - If the dangerous operation is inside a function whose name or parameters
- *      suggest PII, auth tokens, credentials, secrets, or keys:
- *      elevate severity by one level
+ * WARNING: State modification
+ *   - File writes
+ *   - HTTP POST/PUT/PATCH/DELETE
+ *   - Database writes
  *
- * 3. VALIDATION HELPER HEURISTIC
- *    - If a call path passes through a function named sanitize*, validate*,
- *      check*, verify*, etc.: downgrade severity by one level
- *    - This is a heuristic, not confirmation of a gate
+ * INFO: Read-only operations
+ *   - File reads
+ *   - Database reads
  *
- * Severity cap: CRITICAL (cannot elevate beyond CRITICAL)
- * Severity floor: SUPPRESSED (cannot downgrade beyond SUPPRESSED)
+ * NOTE: Naming heuristics removed in v1.2.2 (SENSITIVE_DATA_PATTERNS,
+ * VALIDATION_HELPER_PATTERNS). Severity is now deterministic from
+ * operation taxonomy only.
  */
 
 /** Irreversible operations that are always CRITICAL severity */
@@ -88,54 +89,25 @@ const IRREVERSIBLE_OPS = new Set([
   'asyncio.create_subprocess_shell',
 ]);
 
-/** Patterns that suggest sensitive data is involved */
-const SENSITIVE_DATA_PATTERNS = [
-  /password/i,
-  /secret/i,
-  /credential/i,
-  /api[_-]?key/i,
-  /token/i,
-  /private[_-]?key/i,
-  /pii/i,
-  /ssn/i,
-  /credit[_-]?card/i,
-  /auth/i,
-];
-
 /**
  * Calculate the final severity for an exposed path.
  *
- * Applies the CEE (Comprehensive Exposure Evaluation) model:
- * 1. Start with operation's base severity
- * 2. Elevate to CRITICAL if operation is irreversible
- * 3. Elevate one level if sensitive data context detected
- * 4. Downgrade one level if validation helper in path
+ * v1.2.2: Simplified to deterministic model based on operation class only.
+ * 1. If operation is irreversible, return CRITICAL
+ * 2. Otherwise, return base severity from operation category
  */
 function calculateSeverity(
   baseSeverity: Severity,
   operation: DangerousOperation,
   exposed: ExposedPath
 ): Severity {
-  let severity = baseSeverity;
-  const heuristicFallbackInPath = exposed.tool.toolDetectionKind === 'heuristic' || operation.detectionKind === 'heuristic';
-
-  // 1. Irreversibility: always CRITICAL
+  // Irreversible operations are always CRITICAL
   if (isIrreversibleOperation(operation.callee)) {
     return Severity.CRITICAL;
   }
 
-  // 2. Data sensitivity heuristics only affect fallback-classified paths.
-  const enclosingFunc = exposed.tool.name;
-  if (heuristicFallbackInPath && touchesSensitiveData(operation.codeSnippet, enclosingFunc)) {
-    severity = elevateSeverity(severity);
-  }
-
-  // 3. Validation-helper names only affect fallback-classified paths.
-  if (heuristicFallbackInPath && exposed.hasValidationHelperInPath) {
-    severity = downgradeSeverity(severity);
-  }
-
-  return severity;
+  // Return base severity from operation category
+  return baseSeverity;
 }
 
 /** Check if an operation is irreversible */
@@ -151,44 +123,6 @@ function isIrreversibleOperation(callee: string): boolean {
     }
   }
   return false;
-}
-
-/** Check if code or function name suggests sensitive data */
-function touchesSensitiveData(codeSnippet: string, functionName: string): boolean {
-  const combined = `${codeSnippet} ${functionName}`;
-  return SENSITIVE_DATA_PATTERNS.some(pattern => pattern.test(combined));
-}
-
-/** Elevate severity by one level (cap at CRITICAL) */
-function elevateSeverity(severity: Severity): Severity {
-  switch (severity) {
-    case Severity.SUPPRESSED:
-      return Severity.INFO;
-    case Severity.INFO:
-      return Severity.WARNING;
-    case Severity.WARNING:
-      return Severity.CRITICAL;
-    case Severity.CRITICAL:
-      return Severity.CRITICAL;
-    default:
-      return severity;
-  }
-}
-
-/** Downgrade severity by one level (floor at SUPPRESSED) */
-function downgradeSeverity(severity: Severity): Severity {
-  switch (severity) {
-    case Severity.CRITICAL:
-      return Severity.WARNING;
-    case Severity.WARNING:
-      return Severity.INFO;
-    case Severity.INFO:
-      return Severity.SUPPRESSED;
-    case Severity.SUPPRESSED:
-      return Severity.SUPPRESSED;
-    default:
-      return severity;
-  }
 }
 
 let parserInitialized = false;
