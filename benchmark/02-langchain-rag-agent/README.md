@@ -41,7 +41,7 @@ RAG-augmented agent using LangChain 0.3+ with FAISS vector store, document manip
 - **Pattern**: `requests.get(search_url)` with user-controlled URL
 - **Attack**: Target internal endpoints like `http://169.254.169.254/`
 
-### WARNING: Indirect Prompt Injection (AFB01 → AFB04)
+### WARNING: Indirect Prompt Injection Risk (AFB04)
 - **File**: `src/tools/web_search.py:48`
 - **Pattern**: Raw HTML content passed to LLM context
 - **Attack**: Web page contains `<!-- IGNORE PREVIOUS INSTRUCTIONS -->`

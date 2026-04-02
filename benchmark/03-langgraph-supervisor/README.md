@@ -34,7 +34,7 @@ Supervisor/worker multi-agent system using LangGraph 0.2+ with researcher, coder
 - **Pattern**: `exec(generated_code)` as fallback
 - **Attack**: Python code runs in host process memory
 
-### WARNING: Shared State Mutation (AFB03)
+### WARNING: Shared State Mutation (AFB04)
 - **File**: `src/tools/shared_state.py:28`
 - **Pattern**: All agents can write to shared state file
 - **Attack**: One agent poisons state to influence others

@@ -13,7 +13,7 @@ wyscan scan ./agent-project
 Example output:
 
 ```text
-wyscan v1.2.1  ·  Plarix
+wyscan v1.2.2  ·  Plarix
 
 Scanning  agent-project
 
@@ -35,10 +35,10 @@ Detected reachable call from tool registration to requests.post. No policy gate 
 WyScan currently does all of the following:
 
 - Parses Python source with tree-sitter.
-- Resolves Python tool registrations from framework-specific code structure first, then falls back to registration patterns when semantic resolution is incomplete.
+- Resolves Python tool registrations from framework-specific code structure through semantic analysis.
 - Matches reachable operations such as shell execution, file mutation, file reads, HTTP requests, email sends, and common database calls.
 - Suppresses findings when a structural policy gate is detected in the analyzed path.
-- Carries supporting evidence such as traced input flow, resource hints, and structural versus fallback registration evidence into CEEs.
+- Carries supporting evidence such as traced input flow, resource hints, and structural versus semantic registration evidence into CEEs.
 
 WyScan currently does not do any of the following:
 
@@ -95,13 +95,11 @@ Exit codes follow the filtered report level. For example, `--level critical` ign
 
 WyScan reports matched operations reachable from detected tool registrations.
 
-Severity is based on the matched operation category. Limited naming heuristics still exist, but they only adjust fallback-classified paths where structural or semantic proof was incomplete:
+Severity is determined by operation category:
 
-- Irreversible operations such as `subprocess.run`, `eval`, `exec`, and file deletion are forced to `CRITICAL`.
-- Names and snippets that suggest sensitive data can elevate fallback-classified paths by one level.
-- Validation-helper names in the analyzed path can downgrade fallback-classified paths by one level.
-
-These severity adjustments are heuristic only. They are not proof of attacker intent, exploitability, or data flow.
+- Irreversible operations such as `subprocess.run`, `eval`, `exec`, and file deletion are `CRITICAL`.
+- State-modifying operations such as file writes and HTTP POST requests are `WARNING`.
+- Read-only operations such as file reads and HTTP GET requests are `INFO`.
 
 ### Operation Categories
 
@@ -126,9 +124,9 @@ These severity adjustments are heuristic only. They are not proof of attacker in
 
 ## Framework Labels
 
-Framework detection is Python-only. WyScan prefers semantic extraction from framework code structure such as decorator imports, tool lists, helper-returned tool bundles, `create_react_agent(...)`, `bind_tools(...)`, and `function_map` style registrations. Pattern matching remains as fallback when structural resolution is incomplete.
+Framework detection is Python-only. WyScan uses semantic extraction from framework code structure such as decorator imports, tool lists, helper-returned tool bundles, `create_react_agent(...)`, `bind_tools(...)`, and `function_map` style registrations.
 
-The shipped detector currently labels patterns for frameworks such as:
+The shipped detector currently labels frameworks such as:
 
 - LangChain
 - CrewAI
@@ -138,7 +136,7 @@ The shipped detector currently labels patterns for frameworks such as:
 - MCP
 - Generic Python decorator-style tool registrations
 
-Some additional framework names still exist in fallback pattern tables, but Python semantic coverage is the primary path and the only supported finding scope for now.
+Framework labels are derived from structural analysis, not pattern tables.
 
 ## Policy Gate Detection
 
@@ -152,11 +150,10 @@ Current gate credit comes from:
 
 Current non-gates:
 
-- Validation-helper names alone
-- Authorization-like decorator names alone
 - Logging calls
 - `try/except` around an operation
 - Generic exceptions that do not look authorization-related
+- Decorator or function naming alone without structural proof
 
 ## JSON Output
 
@@ -168,7 +165,7 @@ Current CLI JSON shape:
 
 ```json
 {
-  "version": "1.2.1",
+  "version": "1.2.2",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,

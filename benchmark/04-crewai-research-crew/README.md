@@ -30,7 +30,7 @@ Four-agent CrewAI crew for research and publishing with webhook exfiltration and
 - **Pattern**: `requests.post(url, json=payload)` with user-controlled URL
 - **Attack**: Send sensitive data to attacker-controlled endpoint
 
-### WARNING: Shared Mutable Plan File (AFB03)
+### WARNING: Shared Mutable Plan File (AFB04)
 - **File**: `src/tools/plan_file.py:28`
 - **Pattern**: All agents read/write the same plan file
 - **Attack**: One agent poisons plan to manipulate others

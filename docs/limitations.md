@@ -13,16 +13,15 @@
 
 ## Registration Scope
 
-- Tool detection is semantic-first for supported Python framework patterns, with pattern fallback when semantic resolution is incomplete.
+- Tool detection is semantic-only for Python.
 - Dynamic runtime registration may be missed.
-- Framework labels still do not imply complete runtime coverage.
+- Framework labels do not imply complete runtime coverage.
 
 ## Gate Detection Scope
 
 - Structural authorization logic can be credited as a gate.
 - Imported decorators can be credited when their wrapper logic is resolvable and structural.
-- Validation-helper names are heuristic only.
-- Authorization-like decorator names are heuristic only unless structural gate behavior is proven.
+- Decorator or function naming alone does not credit a gate without structural proof.
 - Generic exceptions, logging, and `try/except` do not count as gates by themselves.
 
 ## Product Scope (v1.2.2)
