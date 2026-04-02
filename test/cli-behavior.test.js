@@ -131,7 +131,9 @@ describe('CLI behavior honesty', () => {
     expect(report.findings[0].call_path).toHaveLength(2);
   });
 
-  test('authorization-like decorator names without structure do not suppress findings', () => {
+  test('non-structural decorators do not credit a gate (v1.2.2)', () => {
+    // v1.2.2: Authorization-like decorator naming heuristic removed.
+    // Gate credit requires structural proof only.
     const projectDir = makeTempProject({
       'auth.py': [
         'def login_required(fn):',
@@ -158,12 +160,15 @@ describe('CLI behavior honesty', () => {
     expect(report.total_cees).toBe(1);
     expect(report.cees).toHaveLength(1);
     expect(report.findings).toHaveLength(1);
+    // Gate status is absent because login_required doesn't have structural gate behavior
     expect(report.cees[0].gate_status).toBe('absent');
     expect(report.cees[0].afb_type).toBe('AFB04');
-    expect(report.findings[0].description).toContain('Authorization-like decorator names were present');
+    // v1.2.2: No authorization-like decorator naming mention - removed heuristic
+    expect(report.findings[0].description).toContain('No policy gate detected');
   });
 
-  test('full terminal output reports name-only auth decorators honestly', () => {
+  test('terminal output for non-structural gate decorators (v1.2.2)', () => {
+    // v1.2.2: Authorization-like decorator naming heuristic removed.
     const projectDir = makeTempProject({
       'auth.py': [
         'def login_required(fn):',
@@ -187,7 +192,8 @@ describe('CLI behavior honesty', () => {
 
     expect(result.status).toBe(2);
     expect(result.stdout).toContain('1 critical');
-    expect(result.stdout).toContain('Authorization-like decorator names were present');
+    // v1.2.2: No authorization-like decorator naming mention - removed heuristic
+    expect(result.stdout).toContain('No policy gate detected');
   });
 
   test('structural decorator gates keep CEEs but suppress AFB04 findings', () => {

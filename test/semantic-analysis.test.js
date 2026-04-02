@@ -510,7 +510,9 @@ describe('semantic-first python analysis', () => {
     expect(report.findings[0].confidence).toBeGreaterThan(0.85);
   });
 
-  test('pattern fallback remains available when semantic roots are absent', async () => {
+  test('pattern fallback is removed - no detection without semantic roots (v1.2.2)', async () => {
+    // v1.2.2: Pattern fallback removed. If semantic resolution fails, we do not
+    // detect the tool. A missed finding is acceptable; a false finding is not.
     const projectDir = makeTempProject({
       'tools.py': [
         'import shutil',
@@ -529,9 +531,9 @@ describe('semantic-first python analysis', () => {
     await analyzer.ensureInitialized();
     const report = analyzer.analyzeDirectory(projectDir);
 
-    expect(report.totalCEEs).toBe(1);
-    expect(report.cees[0].framework).toBe('custom');
-    expect(report.cees[0].evidenceKind).toBe('heuristic');
-    expect(report.findings[0].confidence).toBeLessThan(0.8);
+    // With pattern fallback removed, custom @action decorator is not detected
+    // because semantic analysis can't resolve it to a known invocation root
+    expect(report.totalCEEs).toBe(0);
+    expect(report.findings.length).toBe(0);
   });
 });
