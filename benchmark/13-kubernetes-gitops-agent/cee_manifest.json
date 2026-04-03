@@ -6,73 +6,73 @@
   "expected_cees": [
     {
       "tool_registration": "get_pods",
-      "file": "tools/kubectl.py",
+      "file": "src/tools/kubectl.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "scale_deployment",
-      "file": "tools/kubectl.py",
+      "file": "src/tools/kubectl.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "apply_manifest",
-      "file": "tools/kubectl.py",
+      "file": "src/tools/kubectl.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "delete_resource",
-      "file": "tools/kubectl.py",
+      "file": "src/tools/kubectl.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "exec_in_pod",
-      "file": "tools/kubectl.py",
+      "file": "src/tools/kubectl.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "run_helm_command",
-      "file": "tools/kubectl.py",
+      "file": "src/tools/kubectl.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "write_manifest",
-      "file": "tools/gitops.py",
+      "file": "src/tools/gitops.py",
       "operation": "pathlib.Path.write_text",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "clone_gitops_repo",
-      "file": "tools/gitops.py",
+      "file": "src/tools/gitops.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "sync_gitops_repo",
-      "file": "tools/gitops.py",
+      "file": "src/tools/gitops.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "update_kubeconfig",
-      "file": "tools/gitops.py",
+      "file": "src/tools/gitops.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "clean_old_repos",
-      "file": "tools/gitops.py",
+      "file": "src/tools/gitops.py",
       "operation": "shutil.rmtree",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "delete_manifest",
-      "file": "tools/gitops.py",
+      "file": "src/tools/gitops.py",
       "operation": "pathlib.Path.unlink",
       "afb_type": "AFB04"
     }

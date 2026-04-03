@@ -6,91 +6,91 @@
   "expected_cees": [
     {
       "tool_registration": "query_sqlite",
-      "file": "connectors/database.py",
+      "file": "src/connectors/database.py",
       "operation": "sqlite3.Cursor.execute",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "execute_sqlite_script",
-      "file": "connectors/database.py",
+      "file": "src/connectors/database.py",
       "operation": "sqlite3.Connection.executescript",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "insert_data",
-      "file": "connectors/database.py",
+      "file": "src/connectors/database.py",
       "operation": "sqlite3.Cursor.executemany",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "delete_data",
-      "file": "connectors/database.py",
+      "file": "src/connectors/database.py",
       "operation": "sqlite3.Cursor.execute",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "drop_table",
-      "file": "connectors/database.py",
+      "file": "src/connectors/database.py",
       "operation": "sqlite3.Connection.execute",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "load_cached_result",
-      "file": "connectors/database.py",
+      "file": "src/connectors/database.py",
       "operation": "pickle.load",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "clear_query_cache",
-      "file": "connectors/database.py",
+      "file": "src/connectors/database.py",
       "operation": "shutil.rmtree",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "export_to_csv",
-      "file": "tools/export.py",
+      "file": "src/tools/export.py",
       "operation": "builtins.open",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "export_to_json",
-      "file": "tools/export.py",
+      "file": "src/tools/export.py",
       "operation": "builtins.open",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "delete_export",
-      "file": "tools/export.py",
+      "file": "src/tools/export.py",
       "operation": "pathlib.Path.unlink",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "enrich_record",
-      "file": "tools/enrichment.py",
+      "file": "src/tools/enrichment.py",
       "operation": "requests.post",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "batch_enrich",
-      "file": "tools/enrichment.py",
+      "file": "src/tools/enrichment.py",
       "operation": "requests.post",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "validate_email_domain",
-      "file": "tools/enrichment.py",
+      "file": "src/tools/enrichment.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "fetch_external_data",
-      "file": "tools/enrichment.py",
+      "file": "src/tools/enrichment.py",
       "operation": "requests.post",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "send_webhook",
-      "file": "tools/enrichment.py",
+      "file": "src/tools/enrichment.py",
       "operation": "requests.post",
       "afb_type": "AFB04"
     }

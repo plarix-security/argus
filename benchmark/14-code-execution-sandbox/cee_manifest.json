@@ -6,73 +6,73 @@
   "expected_cees": [
     {
       "tool_registration": "execute_python_code",
-      "file": "tools/executor.py",
+      "file": "src/tools/executor.py",
       "operation": "builtins.exec",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "execute_python_expression",
-      "file": "tools/executor.py",
+      "file": "src/tools/executor.py",
       "operation": "builtins.eval",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "execute_javascript_code",
-      "file": "tools/executor.py",
+      "file": "src/tools/executor.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "execute_bash_script",
-      "file": "tools/executor.py",
+      "file": "src/tools/executor.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "run_code_file",
-      "file": "tools/executor.py",
+      "file": "src/tools/executor.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "install_python_package",
-      "file": "tools/executor.py",
+      "file": "src/tools/executor.py",
       "operation": "subprocess.run",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "compile_and_run",
-      "file": "tools/executor.py",
+      "file": "src/tools/executor.py",
       "operation": "builtins.exec",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "write_file",
-      "file": "tools/files.py",
+      "file": "src/tools/files.py",
       "operation": "pathlib.Path.write_text",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "append_file",
-      "file": "tools/files.py",
+      "file": "src/tools/files.py",
       "operation": "builtins.open",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "delete_file",
-      "file": "tools/files.py",
+      "file": "src/tools/files.py",
       "operation": "pathlib.Path.unlink",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "delete_directory",
-      "file": "tools/files.py",
+      "file": "src/tools/files.py",
       "operation": "shutil.rmtree",
       "afb_type": "AFB04"
     },
     {
       "tool_registration": "clean_workspace",
-      "file": "tools/files.py",
+      "file": "src/tools/files.py",
       "operation": "shutil.rmtree",
       "afb_type": "AFB04"
     }
