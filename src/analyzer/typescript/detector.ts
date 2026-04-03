@@ -6,7 +6,6 @@
  * fetch() or query() is NOT an AFB04 issue.
  *
  * Current status: TypeScript/JavaScript support is in progress.
- * This detector returns empty findings and logs an INFO message.
  *
  * The principle we follow:
  * "A missed finding is acceptable. A false finding from pattern matching is not."
@@ -25,15 +24,11 @@ import { FileAnalysisResult } from '../../types';
  * support is in progress. This avoids false positives from pattern matching
  * that cannot trace from tool registrations to dangerous operations.
  */
-export function analyzeTypeScriptFile(filePath: string, sourceCode: string): FileAnalysisResult {
+export function analyzeTypeScriptFile(filePath: string, _sourceCode: string): FileAnalysisResult {
   const startTime = Date.now();
   const ext = path.extname(filePath).toLowerCase();
   const language = ext === '.js' || ext === '.jsx' ? 'javascript' : 'typescript';
   const displayLanguage = language === 'javascript' ? 'JavaScript' : 'TypeScript';
-
-  if (sourceCode.trim().length > 0) {
-    console.error(`INFO: Skipping unsupported ${displayLanguage} file: ${filePath}`);
-  }
 
   return {
     file: filePath,
