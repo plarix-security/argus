@@ -1,0 +1,108 @@
+{
+  "system": "15-data-pipeline-etl",
+  "version": "1.0.0",
+  "description": "AI-powered ETL agent with database operations, file exports, and external API calls. Uses pickle for caching (deserialization risk) and executes SQL with potential injection. Tests detection of database writes, file operations, HTTP calls, and dangerous deserialization.",
+  "expected_cee_min": 20,
+  "expected_cees": [
+    {
+      "tool_registration": "query_sqlite",
+      "file": "connectors/database.py",
+      "operation": "sqlite3.Cursor.execute",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "execute_sqlite_script",
+      "file": "connectors/database.py",
+      "operation": "sqlite3.Connection.executescript",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "insert_data",
+      "file": "connectors/database.py",
+      "operation": "sqlite3.Cursor.executemany",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "delete_data",
+      "file": "connectors/database.py",
+      "operation": "sqlite3.Cursor.execute",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "drop_table",
+      "file": "connectors/database.py",
+      "operation": "sqlite3.Connection.execute",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "load_cached_result",
+      "file": "connectors/database.py",
+      "operation": "pickle.load",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "clear_query_cache",
+      "file": "connectors/database.py",
+      "operation": "shutil.rmtree",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "export_to_csv",
+      "file": "tools/export.py",
+      "operation": "builtins.open",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "export_to_json",
+      "file": "tools/export.py",
+      "operation": "builtins.open",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "delete_export",
+      "file": "tools/export.py",
+      "operation": "pathlib.Path.unlink",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "enrich_record",
+      "file": "tools/enrichment.py",
+      "operation": "requests.post",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "batch_enrich",
+      "file": "tools/enrichment.py",
+      "operation": "requests.post",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "validate_email_domain",
+      "file": "tools/enrichment.py",
+      "operation": "subprocess.run",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "fetch_external_data",
+      "file": "tools/enrichment.py",
+      "operation": "requests.post",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "send_webhook",
+      "file": "tools/enrichment.py",
+      "operation": "requests.post",
+      "afb_type": "AFB04"
+    }
+  ],
+  "metadata": {
+    "difficulty": "5/5",
+    "frameworks": ["openai", "langchain"],
+    "languages": ["python"],
+    "author": "WyScan Benchmark Team",
+    "created": "2026-04-03",
+    "last_updated": "2026-04-03",
+    "security_context": "Data pipeline agent with database access, file exports, and external API integration. Uses pickle caching which enables arbitrary code execution.",
+    "real_world_analog": "Airflow AI operators, dbt with LLM, DataBricks AI assistants, Fivetran AI connectors"
+  }
+}

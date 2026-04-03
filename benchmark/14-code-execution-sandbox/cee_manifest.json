@@ -1,0 +1,90 @@
+{
+  "system": "14-code-execution-sandbox",
+  "version": "1.0.0",
+  "description": "AI code execution sandbox with Python exec/eval, subprocess execution, and file operations. Tests detection of code execution, shell access, and file system modification capabilities within a claimed 'sandboxed' environment.",
+  "expected_cee_min": 18,
+  "expected_cees": [
+    {
+      "tool_registration": "execute_python_code",
+      "file": "tools/executor.py",
+      "operation": "builtins.exec",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "execute_python_expression",
+      "file": "tools/executor.py",
+      "operation": "builtins.eval",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "execute_javascript_code",
+      "file": "tools/executor.py",
+      "operation": "subprocess.run",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "execute_bash_script",
+      "file": "tools/executor.py",
+      "operation": "subprocess.run",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "run_code_file",
+      "file": "tools/executor.py",
+      "operation": "subprocess.run",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "install_python_package",
+      "file": "tools/executor.py",
+      "operation": "subprocess.run",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "compile_and_run",
+      "file": "tools/executor.py",
+      "operation": "builtins.exec",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "write_file",
+      "file": "tools/files.py",
+      "operation": "pathlib.Path.write_text",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "append_file",
+      "file": "tools/files.py",
+      "operation": "builtins.open",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "delete_file",
+      "file": "tools/files.py",
+      "operation": "pathlib.Path.unlink",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "delete_directory",
+      "file": "tools/files.py",
+      "operation": "shutil.rmtree",
+      "afb_type": "AFB04"
+    },
+    {
+      "tool_registration": "clean_workspace",
+      "file": "tools/files.py",
+      "operation": "shutil.rmtree",
+      "afb_type": "AFB04"
+    }
+  ],
+  "metadata": {
+    "difficulty": "5/5",
+    "frameworks": ["crewai", "langchain"],
+    "languages": ["python"],
+    "author": "WyScan Benchmark Team",
+    "created": "2026-04-03",
+    "last_updated": "2026-04-03",
+    "security_context": "Code execution environment with stated but incomplete security restrictions",
+    "real_world_analog": "Replit, CodeSandbox, Jupyter AI assistants, GitHub Copilot Workspace"
+  }
+}
