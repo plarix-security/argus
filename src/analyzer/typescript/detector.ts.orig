@@ -236,6 +236,7 @@ function createCEEFromPath(
   const finalSeverity = calculateSeverity(op.severity, op);
 
   return {
+    id: buildCEEKey(filePath, exposed),
     file: op.sourceFile || filePath,
     line: op.line,
     column: op.column,
@@ -267,7 +268,7 @@ function createCEEFromPath(
 function createFindingFromCEE(cee: CEERecord, parsed: ParsedTypeScriptFile): AFBFinding {
   return {
     severity: cee.severity,
-    type: cee.afbType || AFBType.UNAUTHORIZED_ACTION,
+    afbType: cee.afbType || AFBType.UNAUTHORIZED_ACTION,
     file: cee.file,
     line: cee.line,
     column: cee.column,
@@ -282,6 +283,7 @@ function createFindingFromCEE(cee: CEERecord, parsed: ParsedTypeScriptFile): AFB
       toolFile: cee.toolFile,
       toolLine: cee.toolLine,
       callPath: cee.callPath,
+      gateStatus: cee.gateStatus,
       involvesCrossFile: cee.involvesCrossFile,
       unresolvedCalls: cee.unresolvedCalls,
       depthLimitHit: cee.depthLimitHit,
@@ -361,7 +363,7 @@ function getCategoryDescription(category: ExecutionCategory): string {
       return 'Code execution';
     case ExecutionCategory.FILE_OPERATION:
       return 'File system operation';
-    case ExecutionCategory.API_CALL:
+    case ExecutionCategory.HTTP_OPERATION:
       return 'HTTP operation';
     case ExecutionCategory.DATABASE_OPERATION:
       return 'Database operation';
