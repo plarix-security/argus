@@ -26,6 +26,23 @@ This benchmark directory is used to validate the current shipped scanner, which 
 | 10 | rust-agent-runtime | Rust | Asset-limited informational fixture |
 | 11 | smolagents-computer-use | Python | Exact count validation |
 | 12 | heterogeneous-multi-framework | Python + TypeScript | Asset-limited informational fixture |
+| 13 | kubernetes-gitops-agent | Python | CEE identity validation |
+| 14 | code-execution-sandbox | Python | CEE identity validation |
+| 15 | data-pipeline-etl | Python | CEE identity validation (partial - see limitations) |
+
+## Known Limitations
+
+### Benchmark 15: SQLite Cursor Detection
+
+Benchmark 15 expects detection of `sqlite3.Cursor.execute()` and `sqlite3.Connection.executescript()` operations. The scanner currently has a limitation in tracking method calls on objects returned from context managers:
+
+```python
+with sqlite_connection() as conn:  # Context manager
+    cursor = conn.cursor()          # Get cursor object
+    cursor.execute(query, params)   # Not currently detected
+```
+
+The scanner correctly detects direct sqlite3 API calls but does not yet perform interprocedural type tracking through context managers. This is a known limitation that will be addressed in a future release.
 
 ## Running The Validator
 
