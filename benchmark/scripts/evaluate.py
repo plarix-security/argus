@@ -65,18 +65,29 @@ def count_code_files(system_dir: Path) -> int:
 
 
 def run_scan(system_dir: Path) -> tuple[int, dict]:
-    process = subprocess.run(
-        ["node", str(CLI_PATH), "scan", str(system_dir), "--json"],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    import tempfile
 
-    if not process.stdout.strip():
-        raise RuntimeError(f"No JSON output for {system_dir.name}: {process.stderr.strip()}")
+    # Use a temp file to avoid subprocess buffer limits on large outputs
+    with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as tmp:
+        tmp_path = tmp.name
 
-    return process.returncode, json.loads(process.stdout)
+    try:
+        process = subprocess.run(
+            f"node {CLI_PATH} scan {system_dir} --json > {tmp_path}",
+            cwd=ROOT,
+            shell=True,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        json_output = Path(tmp_path).read_text(encoding="utf-8")
+        if not json_output.strip():
+            raise RuntimeError(f"No JSON output for {system_dir.name}: {process.stderr.strip()}")
+
+        return process.returncode, json.loads(json_output)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
 
 
 def actual_result_text(exit_code: int, report: dict) -> str:
