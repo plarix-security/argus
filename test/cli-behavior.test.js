@@ -77,7 +77,7 @@ describe('CLI behavior honesty', () => {
     expect(fs.readFileSync(outputPath, 'utf8')).toContain('1 warning');
   });
 
-  test('JSON output reports skipped-language coverage explicitly', () => {
+  test('TypeScript files are analyzed in v1.3.0', () => {
     const projectDir = makeTempProject({
       'agent.ts': 'export function tool() { return 1; }\n',
     });
@@ -87,10 +87,8 @@ describe('CLI behavior honesty', () => {
 
     expect(result.status).toBe(0);
     expect(report.findings).toEqual([]);
-    expect(report.coverage.partial).toBe(true);
-    expect(report.coverage.languages_skipped).toContain('typescript');
-    expect(report.coverage.files_skipped).toBe(1);
-    expect(report.coverage.skipped_files[0].reason).toContain('not implemented');
+    // TypeScript files are now analyzed, not skipped
+    expect(report.coverage.files_analyzed).toBe(1);
     expect(report.total_cees).toBe(0);
     expect(report.cees).toEqual([]);
   });

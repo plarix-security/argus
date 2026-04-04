@@ -443,6 +443,21 @@ function calculateConfidenceForCEE(cee: CEERecord): number {
 }
 
 /**
+ * Create a finding from an exposed path
+ *
+ * Applies the CEE (Comprehensive Exposure Evaluation) severity model:
+ * - Starts with operation's base severity
+ * - Adjusts based on reversibility, data sensitivity, and validation helpers
+ */
+function createFindingFromExposedPath(
+  filePath: string,
+  exposed: ExposedPath,
+  parsed: ParsedPythonFile
+): AFBFinding {
+  return createFindingFromCEE(createCEEFromPath(filePath, exposed, parsed), parsed);
+}
+
+/**
  * Build explanation text for a finding
  */
 function buildExplanation(exposed: ExposedPath, op: DangerousOperation): string {

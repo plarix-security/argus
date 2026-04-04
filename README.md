@@ -1,10 +1,8 @@
 # WyScan
 
-Static scanner for Python agent code that reports reachable operations from detected tool registrations.
+Static scanner for Python and TypeScript/JavaScript agent code that reports reachable operations from detected tool registrations.
 
-WyScan is currently a Python-first AFB04 scanner. It parses Python with tree-sitter, resolves tool registrations semantically when the code structure allows it, traces reachable calls across the analyzed Python file set, and reports matched operations when no credited structural policy gate is detected in that analyzed path.
-
-TypeScript and JavaScript scanning are intentionally deferred. `.ts`, `.tsx`, `.js`, and `.jsx` files are skipped explicitly and produce no findings.
+WyScan is an AFB04 scanner that parses Python and TypeScript/JavaScript with tree-sitter, resolves tool registrations semantically when the code structure allows it, traces reachable calls across the analyzed file set, and reports matched operations when no credited structural policy gate is detected in that analyzed path.
 
 ```bash
 wyscan scan ./agent-project
@@ -34,8 +32,8 @@ Detected reachable call from tool registration to requests.post. No policy gate 
 
 WyScan currently does all of the following:
 
-- Parses Python source with tree-sitter.
-- Resolves Python tool registrations from framework-specific code structure through semantic analysis.
+- Parses Python and TypeScript/JavaScript source with tree-sitter.
+- Resolves tool registrations from framework-specific code structure through semantic analysis.
 - Matches reachable operations such as shell execution, file mutation, file reads, HTTP requests, email sends, and common database calls.
 - Suppresses findings when a structural policy gate is detected in the analyzed path.
 - Carries supporting evidence such as traced input flow, resource hints, and structural versus semantic registration evidence into CEEs.
@@ -43,8 +41,6 @@ WyScan currently does all of the following:
 WyScan currently does not do any of the following:
 
 - Execute your code.
-- Scan TypeScript or JavaScript for findings.
-- Guarantee full-repository coverage in changed-file GitHub App scans.
 - Trace into third-party package internals.
 - Detect AFB01, AFB02, or AFB03.
 

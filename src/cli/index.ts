@@ -153,6 +153,7 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
  */
 function generateJSON(report: AnalysisReport, scannedPath: string): string {
   const pythonFiles = report.filesAnalyzed.filter(f => f.endsWith('.py')).length;
+  const tsJsFiles = report.filesAnalyzed.filter(f => f.endsWith('.ts') || f.endsWith('.tsx') || f.endsWith('.js') || f.endsWith('.jsx')).length;
   const skippedFiles = report.metadata.skippedFiles;
   const skippedLanguages = Array.from(new Set(skippedFiles.map((file) => file.language))).sort();
 
@@ -223,10 +224,10 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
       suppressed: report.findingsBySeverity.suppressed,
     },
     coverage: {
-      languages_scanned: pythonFiles > 0 ? ['python'] : [],
+      languages_scanned: [...(pythonFiles > 0 ? ['python'] : []), ...(tsJsFiles > 0 ? ['typescript', 'javascript'] : [])].sort(),
       languages_skipped: skippedLanguages,
       frameworks_detected: Array.from(frameworks).sort(),
-      files_analyzed: pythonFiles,
+      files_analyzed: report.filesAnalyzed.length,
       files_skipped: skippedFiles.length,
       failed_files: report.metadata.failedFiles,
       skipped_files: skippedFiles,
@@ -235,7 +236,7 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
       file_limit: report.metadata.fileLimit || null,
       file_limit_hit: report.metadata.fileLimitHit || false,
       limitations: [
-        'The analyzed Python file set is graphed together. Changed-file scans do not guarantee full repository coverage.',
+        'The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage.',
       ],
     },
   };
