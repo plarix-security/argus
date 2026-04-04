@@ -121,18 +121,66 @@ export async function initParser(): Promise<void> {
   try {
     await Parser.init();
 
+    // TypeScript WASM candidates
+    const tsCandidates = [
+      path.join(__dirname, '../../../wasm/tree-sitter-typescript.wasm'),     // from dist/analyzer/typescript
+      path.join(__dirname, '../../wasm/tree-sitter-typescript.wasm'),        // from src/analyzer/typescript (dev)
+      path.join(process.cwd(), 'wasm/tree-sitter-typescript.wasm'),
+      path.join(process.cwd(), 'node_modules/tree-sitter-wasms/out/tree-sitter-typescript.wasm'),
+    ];
+
+    // TSX WASM candidates
+    const tsxCandidates = [
+      path.join(__dirname, '../../../wasm/tree-sitter-tsx.wasm'),
+      path.join(__dirname, '../../wasm/tree-sitter-tsx.wasm'),
+      path.join(process.cwd(), 'wasm/tree-sitter-tsx.wasm'),
+      path.join(process.cwd(), 'node_modules/tree-sitter-wasms/out/tree-sitter-tsx.wasm'),
+    ];
+
+    // Find TypeScript WASM
+    let tsWasmPath: string | null = null;
+    for (const candidate of tsCandidates) {
+      try {
+        const fs = await import('fs');
+        if (fs.existsSync(candidate)) {
+          tsWasmPath = candidate;
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    if (!tsWasmPath) {
+      throw new Error('Could not find tree-sitter-typescript.wasm');
+    }
+
+    // Find TSX WASM
+    let tsxWasmPath: string | null = null;
+    for (const candidate of tsxCandidates) {
+      try {
+        const fs = await import('fs');
+        if (fs.existsSync(candidate)) {
+          tsxWasmPath = candidate;
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    if (!tsxWasmPath) {
+      throw new Error('Could not find tree-sitter-tsx.wasm');
+    }
+
     // Initialize TypeScript parser
     tsParser = new Parser();
-    const tsLang = await Parser.Language.load(
-      path.join(__dirname, '../../wasm/tree-sitter-typescript.wasm')
-    );
+    const tsLang = await Parser.Language.load(tsWasmPath);
     tsParser.setLanguage(tsLang);
 
     // Initialize TSX parser
     tsxParser = new Parser();
-    const tsxLang = await Parser.Language.load(
-      path.join(__dirname, '../../wasm/tree-sitter-tsx.wasm')
-    );
+    const tsxLang = await Parser.Language.load(tsxWasmPath);
     tsxParser.setLanguage(tsxLang);
 
     parser = tsParser; // Default to TS parser
