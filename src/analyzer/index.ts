@@ -117,7 +117,18 @@ export class AFBAnalyzer {
         continue;
       }
 
-      nonPythonResults.push(analyzeTypeScriptFile(file, sourceCode));
+      // v1.2.2: TypeScript/JavaScript files are explicitly skipped.
+      // WyScan is Python-only.
+      nonPythonResults.push({
+        file,
+        language,
+        findings: [],
+        cees: [],
+        success: true,
+        skipped: true,
+        skipReason: 'TypeScript/JavaScript analysis is not implemented. WyScan is Python-only.',
+        analysisTimeMs: 0,
+      });
     }
 
     const pythonResults = pythonInputs.length > 0 ? analyzePythonFiles(pythonInputs) : [];
@@ -175,7 +186,7 @@ export class AFBAnalyzer {
     });
     return {
       repository: path.basename(repository),
-      filesAnalyzed: results.filter(r => r.success).map(r => r.file),
+      filesAnalyzed: results.filter(r => r.success && !r.skipped).map(r => r.file),
       totalFindings: allFindings.length,
       totalCEEs: allCEEs.length,
       findingsBySeverity: {
