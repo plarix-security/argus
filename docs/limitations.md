@@ -24,7 +24,7 @@
 - Decorator or function naming alone does not credit a gate without structural proof.
 - Generic exceptions, logging, and `try/except` do not count as gates by themselves.
 
-## Product Scope (v1.2.2)
+## Product Scope (v1.3.0)
 
 - Python-only static analysis
 - AFB04 (Unauthorized Action) detection only
