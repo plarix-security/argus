@@ -7,6 +7,8 @@ import {
   OpenAIToolSchema,
   ParsedPythonFile,
   ReturnInfo,
+  YieldInfo,
+  WithBindingInfo,
 } from './ast-parser';
 
 export interface SemanticInvocationRoot {
@@ -40,6 +42,31 @@ interface ConstructorBinding {
   matchedReference?: string;
   identity?: string;
 }
+
+/**
+ * Factory function return type mappings.
+ * When a factory function is called, the result is an instance of the mapped type.
+ * e.g., sqlite3.connect() returns sqlite3.Connection, not sqlite3.connect
+ */
+const FACTORY_RETURN_TYPES: Record<string, string> = {
+  'sqlite3.connect': 'sqlite3.Connection',
+  'psycopg2.connect': 'psycopg2.connection',
+  'asyncpg.connect': 'asyncpg.Connection',
+  'aiomysql.connect': 'aiomysql.Connection',
+  'mysql.connector.connect': 'mysql.connector.connection',
+  'pymysql.connect': 'pymysql.connections.Connection',
+  'aiosqlite.connect': 'aiosqlite.Connection',
+  'databases.Database': 'databases.Database',
+  'redis.Redis': 'redis.Redis',
+  'redis.StrictRedis': 'redis.StrictRedis',
+  'aioredis.create_redis': 'aioredis.Redis',
+  'boto3.client': 'boto3.client',
+  'boto3.resource': 'boto3.resource',
+  'httpx.Client': 'httpx.Client',
+  'httpx.AsyncClient': 'httpx.AsyncClient',
+  'requests.Session': 'requests.Session',
+  'aiohttp.ClientSession': 'aiohttp.ClientSession',
+};
 
 function makeNodeId(filePath: string, localName: string): string {
   return `${filePath}:${localName}`;
@@ -117,8 +144,12 @@ export class PythonSemanticIndex {
   private readonly functionsByFile = new Map<string, Map<string, string>>();
   private readonly assignmentsByFile = new Map<string, AssignmentInfo[]>();
   private readonly returnsByFile = new Map<string, ReturnInfo[]>();
+  private readonly yieldsByFile = new Map<string, YieldInfo[]>();
+  private readonly withBindingsByFile = new Map<string, WithBindingInfo[]>();
   private readonly openAIToolSchemasByFile = new Map<string, OpenAIToolSchema[]>();
   private readonly dispatchMappingsByFile = new Map<string, FunctionDispatchMapping[]>();
+  /** Maps function name -> whether it has @contextmanager decorator */
+  private readonly contextManagerFunctions = new Map<string, Set<string>>();
 
   constructor(private readonly files: Map<string, ParsedPythonFile>) {
     this.allFilePaths = Array.from(files.keys());
@@ -229,14 +260,34 @@ export class PythonSemanticIndex {
   private buildIndex(): void {
     for (const [filePath, parsed] of this.files) {
       const localFunctions = new Map<string, string>();
+      const contextManagers = new Set<string>();
+
       for (const func of parsed.functions) {
         const localId = func.className ? `${func.className}.${func.name}` : func.name;
         localFunctions.set(func.name, makeNodeId(filePath, localId));
+
+        // Track context manager functions (decorated with @contextmanager)
+        for (const decorator of func.decorators) {
+          const baseName = decorator.split('(')[0].trim();
+          if (baseName === 'contextmanager') {
+            contextManagers.add(func.name);
+          } else {
+            // Check if contextmanager was imported with alias
+            const imported = this.resolveImportedSymbol(baseName, filePath);
+            if (imported?.importedName === 'contextmanager' &&
+                imported.modulePath === 'contextlib') {
+              contextManagers.add(func.name);
+            }
+          }
+        }
       }
 
       this.functionsByFile.set(filePath, localFunctions);
       this.assignmentsByFile.set(filePath, parsed.assignments);
       this.returnsByFile.set(filePath, parsed.returns);
+      this.yieldsByFile.set(filePath, parsed.yields || []);
+      this.withBindingsByFile.set(filePath, parsed.withBindings || []);
+      this.contextManagerFunctions.set(filePath, contextManagers);
       this.openAIToolSchemasByFile.set(filePath, parsed.openaiToolSchemas);
       this.dispatchMappingsByFile.set(filePath, parsed.dispatchMappings);
 
@@ -783,6 +834,12 @@ export class PythonSemanticIndex {
       return {};
     }
 
+    // First check if this is a with-bound variable (e.g., `with foo() as x`)
+    const withBinding = this.resolveWithBoundVariable(baseExpression, context, visited);
+    if (withBinding?.identity) {
+      return withBinding;
+    }
+
     for (const candidateReference of iterateReferenceCandidates(baseExpression)) {
       const visitKey = `${context.filePath}:${context.className || ''}:${context.functionName || ''}:ctor:${candidateReference}`;
       if (visited.has(visitKey)) {
@@ -864,6 +921,161 @@ export class PythonSemanticIndex {
     });
   }
 
+  /**
+   * Check if a reference is a with-bound variable and resolve its identity
+   * from the context manager's yield type.
+   *
+   * Example: `with sqlite_connection() as conn:` -> conn has type sqlite3.Connection
+   */
+  private resolveWithBoundVariable(
+    reference: string,
+    context: ResolutionContext,
+    visited: Set<string>
+  ): ConstructorBinding | undefined {
+    const withBindings = this.withBindingsByFile.get(context.filePath) || [];
+
+    for (const binding of withBindings) {
+      // Must match target, enclosing function and class
+      if (binding.target !== reference) continue;
+      if ((binding.enclosingFunction || undefined) !== (context.functionName || undefined)) continue;
+      if ((binding.enclosingClass || undefined) !== (context.className || undefined)) continue;
+
+      // Found a with binding for this reference
+      // Now resolve what the context manager yields
+      const contextManagerExpr = binding.contextManager;
+
+      // The context manager is typically a call like sqlite_connection()
+      if (contextManagerExpr.callCallee) {
+        const cmIdentity = this.resolveContextManagerYieldType(
+          contextManagerExpr.callCallee,
+          context,
+          visited
+        );
+        if (cmIdentity) {
+          return {
+            identity: cmIdentity,
+            matchedReference: reference,
+          };
+        }
+      }
+
+      // Handle reference to a context manager variable
+      for (const ref of contextManagerExpr.references) {
+        const cmIdentity = this.resolveContextManagerYieldType(ref, context, visited);
+        if (cmIdentity) {
+          return {
+            identity: cmIdentity,
+            matchedReference: reference,
+          };
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Resolve what type a context manager function yields.
+   *
+   * For known stdlib context managers, return hardcoded types.
+   * For @contextmanager decorated functions, trace the yield statement.
+   */
+  private resolveContextManagerYieldType(
+    calleeReference: string,
+    context: ResolutionContext,
+    visited: Set<string>
+  ): string | undefined {
+    const visitKey = `${context.filePath}:cm:${calleeReference}`;
+    if (visited.has(visitKey)) return undefined;
+    visited.add(visitKey);
+
+    // Check if it's a local function with @contextmanager decorator
+    const localFunctions = this.functionsByFile.get(context.filePath);
+    const contextManagers = this.contextManagerFunctions.get(context.filePath) || new Set();
+
+    if (localFunctions?.has(calleeReference) && contextManagers.has(calleeReference)) {
+      // Find the yield statement in this function
+      const yields = this.yieldsByFile.get(context.filePath) || [];
+      for (const yieldInfo of yields) {
+        if (yieldInfo.enclosingFunction === calleeReference) {
+          // The yield value tells us what type is produced
+          // Check if it's a call result
+          if (yieldInfo.value.callCallee) {
+            const binding = this.resolveCallResultBinding(yieldInfo.value.callCallee, {
+              filePath: context.filePath,
+              functionName: calleeReference,
+            }, visited);
+            if (binding.identity) {
+              return binding.identity;
+            }
+          }
+
+          // Check if it's a reference to a variable
+          for (const ref of yieldInfo.value.references) {
+            // Try to resolve the reference
+            const binding = this.resolveAssignedConstructor(ref, {
+              filePath: context.filePath,
+              functionName: calleeReference,
+            }, visited);
+            if (binding.identity) {
+              return binding.identity;
+            }
+          }
+        }
+      }
+    }
+
+    // Check imported context managers
+    const imported = this.resolveImportedSymbol(calleeReference, context.filePath);
+    if (imported?.resolvedFile && imported.importedName) {
+      const targetContextManagers = this.contextManagerFunctions.get(imported.resolvedFile) || new Set();
+      if (targetContextManagers.has(imported.importedName)) {
+        const yields = this.yieldsByFile.get(imported.resolvedFile) || [];
+        for (const yieldInfo of yields) {
+          if (yieldInfo.enclosingFunction === imported.importedName) {
+            if (yieldInfo.value.callCallee) {
+              const binding = this.resolveCallResultBinding(yieldInfo.value.callCallee, {
+                filePath: imported.resolvedFile,
+                functionName: imported.importedName,
+              }, visited);
+              if (binding.identity) {
+                return binding.identity;
+              }
+            }
+
+            for (const ref of yieldInfo.value.references) {
+              const binding = this.resolveAssignedConstructor(ref, {
+                filePath: imported.resolvedFile,
+                functionName: imported.importedName,
+              }, visited);
+              if (binding.identity) {
+                return binding.identity;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Known stdlib context managers with their yield types
+    // These are hardcoded because we can't trace into stdlib
+    const knownContextManagers: Record<string, string> = {
+      'sqlite3.connect': 'sqlite3.Connection',
+      'psycopg2.connect': 'psycopg2.connection',
+      'asyncpg.connect': 'asyncpg.Connection',
+      'aiomysql.connect': 'aiomysql.Connection',
+      'motor.motor_asyncio.AsyncIOMotorClient': 'motor.motor_asyncio.AsyncIOMotorDatabase',
+    };
+
+    for (const [pattern, yieldType] of Object.entries(knownContextManagers)) {
+      if (calleeReference === pattern || calleeReference.endsWith('.' + pattern.split('.').pop())) {
+        return yieldType;
+      }
+    }
+
+    return undefined;
+  }
+
   private resolveImportedSymbol(reference: string, filePath: string): ImportBinding | undefined {
     const baseName = reference.split('.')[0];
     return this.importBindings.get(filePath)?.get(baseName);
@@ -885,11 +1097,14 @@ export class PythonSemanticIndex {
 
     const imported = this.resolveImportedSymbol(callCallee, context.filePath);
     if (imported?.modulePath) {
+      const rawIdentity = imported.importedName ? `${imported.modulePath}.${imported.importedName}` : callCallee;
+      // Apply factory return type mapping: sqlite3.connect() returns sqlite3.Connection
+      const mappedIdentity = FACTORY_RETURN_TYPES[rawIdentity] || rawIdentity;
       return {
         modulePath: imported.modulePath,
         importedName: imported.importedName,
         matchedReference: callCallee,
-        identity: imported.importedName ? `${imported.modulePath}.${imported.importedName}` : callCallee,
+        identity: mappedIdentity,
       };
     }
 
@@ -900,16 +1115,26 @@ export class PythonSemanticIndex {
       const receiverBinding = this.resolveAssignedConstructor(receiverReference, context, visited);
       if (receiverBinding.identity) {
         const resolvedIdentity = this.resolveMethodResultIdentity(receiverBinding.identity, lastMember);
+        // Apply factory return type mapping
+        const mappedIdentity = FACTORY_RETURN_TYPES[resolvedIdentity] || resolvedIdentity;
         return {
           ...receiverBinding,
           matchedReference: receiverReference,
           importedName: lastMember,
-          identity: resolvedIdentity,
+          identity: mappedIdentity,
         };
       }
     }
 
-    return this.resolveFunctionReturnBinding(callCallee, context, visited);
+    const functionBinding = this.resolveFunctionReturnBinding(callCallee, context, visited);
+    // Apply factory return type mapping to function return results
+    if (functionBinding.identity && FACTORY_RETURN_TYPES[functionBinding.identity]) {
+      return {
+        ...functionBinding,
+        identity: FACTORY_RETURN_TYPES[functionBinding.identity],
+      };
+    }
+    return functionBinding;
   }
 
   private resolveFunctionReturnBinding(
@@ -1014,8 +1239,46 @@ export class PythonSemanticIndex {
   }
 
   private resolveMethodResultIdentity(receiverIdentity: string, methodName: string): string {
-    if (/^(sqlite3|psycopg2)(\.|$)/i.test(receiverIdentity) && methodName === 'cursor') {
-      return `${receiverIdentity}.cursor`;
+    // Database connection type mappings
+    // When calling .cursor() on a connection, return the Cursor type
+    const cursorMappings: Record<string, string> = {
+      'sqlite3.connect': 'sqlite3.Cursor',
+      'sqlite3.Connection': 'sqlite3.Cursor',
+      'psycopg2.connect': 'psycopg2.cursor',
+      'psycopg2.connection': 'psycopg2.cursor',
+      'asyncpg.connect': 'asyncpg.Cursor',
+      'asyncpg.Connection': 'asyncpg.Cursor',
+      'aiomysql.connect': 'aiomysql.Cursor',
+      'aiomysql.Connection': 'aiomysql.Cursor',
+      'mysql.connector.connect': 'mysql.connector.cursor',
+      'pymysql.connect': 'pymysql.cursors.Cursor',
+    };
+
+    if (methodName === 'cursor') {
+      // Check for exact or prefix match in cursor mappings
+      for (const [connType, cursorType] of Object.entries(cursorMappings)) {
+        if (receiverIdentity === connType || receiverIdentity.startsWith(connType + '.')) {
+          return cursorType;
+        }
+      }
+    }
+
+    // Connection factory mappings - when calling connect(), return Connection type
+    const connectMappings: Record<string, string> = {
+      'sqlite3': 'sqlite3.Connection',
+      'psycopg2': 'psycopg2.connection',
+      'asyncpg': 'asyncpg.Connection',
+      'aiomysql': 'aiomysql.Connection',
+      'mysql.connector': 'mysql.connector.connection',
+      'pymysql': 'pymysql.connections.Connection',
+    };
+
+    if (methodName === 'connect') {
+      for (const [module, connType] of Object.entries(connectMappings)) {
+        if (receiverIdentity === module) {
+          return connType;
+        }
+      }
     }
 
     return `${receiverIdentity}.${methodName}`;

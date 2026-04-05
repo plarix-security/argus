@@ -175,6 +175,36 @@ export interface ReturnInfo {
 }
 
 /**
+ * Yield statement - used to track context manager yields
+ */
+export interface YieldInfo {
+  /** The yielded expression */
+  value: ExpressionSummary;
+  /** Line number */
+  startLine: number;
+  /** Enclosing function name */
+  enclosingFunction?: string;
+  /** Enclosing class name */
+  enclosingClass?: string;
+}
+
+/**
+ * With statement binding - tracks `with expr as name`
+ */
+export interface WithBindingInfo {
+  /** The target variable (e.g., `conn` in `with foo() as conn`) */
+  target: string;
+  /** The context manager expression (e.g., `sqlite_connection()`) */
+  contextManager: ExpressionSummary;
+  /** Line number */
+  startLine: number;
+  /** Enclosing function name */
+  enclosingFunction?: string;
+  /** Enclosing class name */
+  enclosingClass?: string;
+}
+
+/**
  * Import statement
  */
 export interface ImportInfo {
@@ -193,6 +223,10 @@ export interface ParsedPythonFile {
   imports: ImportInfo[];
   assignments: AssignmentInfo[];
   returns: ReturnInfo[];
+  /** Yield statements - particularly useful for context managers */
+  yields: YieldInfo[];
+  /** With statement bindings - tracks `with expr as x` */
+  withBindings: WithBindingInfo[];
   /** Decorator functions defined in this file (for cross-file resolution) */
   decoratorDefs: DecoratorDef[];
   /** OpenAI tool schemas extracted from list/dict literals */
@@ -1308,6 +1342,8 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       imports: [],
       assignments: [],
       returns: [],
+      yields: [],
+      withBindings: [],
       decoratorDefs: [],
       openaiToolSchemas: [],
       dispatchMappings: [],
@@ -1328,6 +1364,8 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
         imports: [],
         assignments: [],
         returns: [],
+        yields: [],
+        withBindings: [],
         decoratorDefs: [],
         openaiToolSchemas: [],
         dispatchMappings: [],
@@ -1617,6 +1655,90 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       });
     }
 
+    // Extract yield statements (for context managers)
+    const yields: YieldInfo[] = [];
+    const yieldNodes = findAllNodes(root, new Set(['yield', 'yield_expression']));
+    for (const yieldNode of yieldNodes) {
+      // Find the yielded value - skip 'yield' keyword
+      const valueNode = yieldNode.children.find((child) =>
+        child.type !== 'yield' && child.type !== 'comment'
+      );
+
+      const enclosingFunc = findEnclosingFunction(yieldNode);
+      const enclosingClass = findEnclosingClass(yieldNode);
+
+      yields.push({
+        value: valueNode ? summarizeExpression(valueNode) : { text: '', references: [], stringLiterals: [], mappingReferences: [], subscriptReferences: [] },
+        startLine: yieldNode.startPosition.row + 1,
+        enclosingFunction: enclosingFunc ? extractFunctionName(enclosingFunc) : undefined,
+        enclosingClass: enclosingClass ? extractClassName(enclosingClass) : undefined,
+      });
+    }
+
+    // Extract with statement bindings (for context manager tracking)
+    const withBindings: WithBindingInfo[] = [];
+    const withStatements = findAllNodes(root, new Set(['with_statement']));
+    for (const withStmt of withStatements) {
+      // with_statement has structure: 'with' with_clause ':' block
+      // with_clause contains: with_item (',' with_item)*
+      // with_item: expression ['as' identifier]
+      const withClause = withStmt.children.find((c) => c.type === 'with_clause');
+      if (!withClause) continue;
+
+      for (const withItem of withClause.children) {
+        if (withItem.type !== 'with_item') continue;
+
+        // Find the context manager expression and the target
+        let contextManagerNode: Parser.SyntaxNode | null = null;
+        let targetNode: Parser.SyntaxNode | null = null;
+
+        for (const child of withItem.children) {
+          if (child.type === 'as_pattern') {
+            // as_pattern contains: expression 'as' identifier
+            for (const asChild of child.children) {
+              if (asChild.type === 'as_pattern_target' || asChild.type === 'identifier') {
+                targetNode = asChild;
+              } else if (asChild.type !== 'as' && !targetNode) {
+                contextManagerNode = asChild;
+              }
+            }
+          } else if (child.type === 'call' || child.type === 'identifier' || child.type === 'attribute') {
+            contextManagerNode = child;
+          } else if (child.type === 'identifier' && !contextManagerNode) {
+            targetNode = child;
+          }
+        }
+
+        // Also check for simple form: with expr as name
+        if (!targetNode) {
+          const asIndex = withItem.children.findIndex((c) => c.type === 'as');
+          if (asIndex !== -1 && asIndex + 1 < withItem.children.length) {
+            const afterAs = withItem.children[asIndex + 1];
+            if (afterAs.type === 'identifier') {
+              targetNode = afterAs;
+            }
+          }
+          // Context manager is before 'as'
+          if (!contextManagerNode && asIndex > 0) {
+            contextManagerNode = withItem.children[asIndex - 1];
+          }
+        }
+
+        if (targetNode && contextManagerNode) {
+          const enclosingFunc = findEnclosingFunction(withStmt);
+          const enclosingClass = findEnclosingClass(withStmt);
+
+          withBindings.push({
+            target: targetNode.text,
+            contextManager: summarizeExpression(contextManagerNode),
+            startLine: withStmt.startPosition.row + 1,
+            enclosingFunction: enclosingFunc ? extractFunctionName(enclosingFunc) : undefined,
+            enclosingClass: enclosingClass ? extractClassName(enclosingClass) : undefined,
+          });
+        }
+      }
+    }
+
     // Process imports
     for (const importNode of importNodes) {
       if (importNode.type === 'import_statement') {
@@ -1684,6 +1806,8 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       imports,
       assignments,
       returns,
+      yields,
+      withBindings,
       decoratorDefs,
       openaiToolSchemas,
       dispatchMappings,
@@ -1697,6 +1821,8 @@ export function parsePythonSource(sourceCode: string): ParsedPythonFile {
       imports: [],
       assignments: [],
       returns: [],
+      yields: [],
+      withBindings: [],
       decoratorDefs: [],
       openaiToolSchemas: [],
       dispatchMappings: [],

@@ -413,6 +413,83 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: {
   { identity: /^redis\.Redis(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.(set|expire|delete)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Redis write or delete' },
   { identity: /^redis\.Redis(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.(flushdb|flushall)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.CRITICAL, description: 'Redis flush' },
   { identity: /^redis\.Redis(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.(get|keys)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Redis read or enumeration' },
+
+  // ==================== ADDITIONAL HTTP CLIENTS ====================
+  // urllib3 - low-level HTTP client
+  { identity: /^urllib3\.HTTPConnectionPool\.(urlopen|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'urllib3 HTTP request' },
+  { identity: /^urllib3\.PoolManager\.(urlopen|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'urllib3 HTTP request' },
+  // http.client - standard library
+  { identity: /^http\.client\.HTTPConnection\.(request|putrequest|endheaders)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'http.client request' },
+  { identity: /^http\.client\.HTTPSConnection\.(request|putrequest|endheaders)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'https request' },
+  // httpcore - async HTTP
+  { identity: /^httpcore\.(Request|AsyncRequest)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'httpcore request' },
+  // treq - Twisted HTTP
+  { identity: /^treq\.(get|post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Twisted HTTP request' },
+  // asks - curio/trio HTTP
+  { identity: /^asks\.(get|post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'asks async HTTP request' },
+  // niquests - modern requests fork
+  { identity: /^niquests\.(get|post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'niquests HTTP request' },
+  { identity: /^niquests\.Session\.(get|post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'niquests session request' },
+
+  // ==================== ADDITIONAL DATABASE CLIENTS ====================
+  // asyncpg - async PostgreSQL
+  { identity: /^asyncpg\.Connection\.(execute|executemany|fetch|fetchrow|fetchval)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'asyncpg database operation' },
+  { identity: /^asyncpg\.Pool\.(execute|executemany|fetch|fetchrow|fetchval)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'asyncpg pool operation' },
+  // aiomysql - async MySQL
+  { identity: /^aiomysql\.Connection\.(execute|cursor)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'aiomysql database operation' },
+  { identity: /^aiomysql\.Cursor\.(execute|executemany|fetchone|fetchall|fetchmany)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'aiomysql cursor operation' },
+  // databases - async database interface
+  { identity: /^databases\.Database\.(execute|fetch_one|fetch_all|fetch_val|iterate)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'databases async operation' },
+  // peewee - lightweight ORM
+  { identity: /^peewee\.Model\.(create|save|delete_instance|get_or_create)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Peewee model operation' },
+  { identity: /^peewee\.\w+\.(insert|update|delete)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Peewee query operation' },
+  // tortoise-orm - async ORM
+  { identity: /^tortoise\.Model\.(save|delete|create|update|bulk_create|bulk_update)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Tortoise ORM operation' },
+  { identity: /^tortoise\.queryset\.QuerySet\.(update|delete|create)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Tortoise queryset operation' },
+  // SQLModel - FastAPI/Pydantic ORM
+  { identity: /^sqlmodel\.Session\.(add|add_all|delete|commit|exec)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'SQLModel session operation' },
+  // motor - async MongoDB
+  { identity: /^motor\.motor_asyncio\.\w+\.(insert_one|insert_many|update_one|update_many|delete_one|delete_many|replace_one)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Motor async MongoDB operation' },
+  // pymongo additional
+  { identity: /^pymongo\.collection\.Collection\.(insert_one|insert_many|update_one|update_many|delete_one|delete_many|replace_one|bulk_write)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'PyMongo collection operation' },
+
+  // ==================== MESSAGE QUEUES ====================
+  // Celery
+  { identity: /^celery\.Celery\.(send_task|signature)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Celery task dispatch' },
+  { identity: /^celery\.Task\.(apply_async|delay|s|si)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Celery task invocation' },
+  // RQ (Redis Queue)
+  { identity: /^rq\.Queue\.(enqueue|enqueue_call|enqueue_at|enqueue_in)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'RQ task enqueue' },
+  // Pika (RabbitMQ)
+  { identity: /^pika\.channel\.Channel\.(basic_publish|publish)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'RabbitMQ message publish' },
+  // Kafka
+  { identity: /^kafka\.KafkaProducer\.(send|send_and_wait)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Kafka message send' },
+  { identity: /^confluent_kafka\.Producer\.(produce|poll|flush)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Confluent Kafka produce' },
+
+  // ==================== CLOUD SERVICES ====================
+  // AWS boto3
+  { identity: /^boto3\.client\.(put_object|delete_object|upload_file|upload_fileobj)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'AWS S3 write operation' },
+  { identity: /^boto3\.resource\..*\.(put|delete|upload_file|upload_fileobj)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'AWS resource write' },
+  // Google Cloud
+  { identity: /^google\.cloud\.storage\.Blob\.(upload_from_string|upload_from_filename|upload_from_file|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'GCS blob write/delete' },
+  // Azure
+  { identity: /^azure\.storage\.blob\.BlobClient\.(upload_blob|delete_blob)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Azure blob write/delete' },
+
+  // ==================== ADDITIONAL SHELL/PROCESS ====================
+  // sh library
+  { identity: /^sh\.\w+$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'sh library command execution' },
+  // plumbum
+  { identity: /^plumbum\.local\.\w+$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Plumbum local command' },
+  { identity: /^plumbum\.machines\..*\.session\.run$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Plumbum remote execution' },
+  // invoke
+  { identity: /^invoke\.run$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Invoke task runner command' },
+  { identity: /^invoke\.context\.Context\.run$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Invoke context command' },
+
+  // ==================== NETWORK ====================
+  // socket - raw network access
+  { identity: /^socket\.socket\.(connect|send|sendall|sendto)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Raw socket operation' },
+  // paramiko - SSH
+  { identity: /^paramiko\.SSHClient\.(exec_command|invoke_shell)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'SSH command execution' },
+  { identity: /^paramiko\.SFTPClient\.(put|putfo|remove|rmdir|rename)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'SFTP write operation' },
 ];
 
 /**
@@ -428,7 +505,52 @@ const AUTHORIZATION_EXCEPTION_TYPES = [
   'PermissionDenied',
   'NotAuthorized',
   'SecurityError',
+  // Additional common patterns
+  'AuthError',
+  'AuthenticationError',
+  'AccessError',
+  'CredentialsError',
+  'TokenError',
+  'InvalidTokenError',
+  'ExpiredTokenError',
+  'InsufficientPermissions',
+  'AccessDeniedException',
+  'NotAuthorizedException',
+  'UnauthorizedException',
+  'ForbiddenError',
+  'ForbiddenException',
+  'PermissionException',
+  'AuthorizationException',
+  'SecurityException',
+  'PolicyViolation',
+  'PolicyError',
 ];
+
+/**
+ * Pattern-based authorization exception detection.
+ * Matches exception names that contain auth/permission/access keywords.
+ */
+const AUTHORIZATION_EXCEPTION_PATTERNS = [
+  /\b(auth|permission|access|forbidden|unauthorized|denied|security|credential|token|policy)\b/i,
+  /\b(not_?allowed|no_?access|invalid_?auth|require_?auth|check_?auth)\b/i,
+];
+
+/**
+ * Check if an exception type indicates authorization denial.
+ * Uses both explicit list and pattern matching for flexibility.
+ */
+function isAuthorizationException(exceptionType: string): boolean {
+  // Normalize the exception type
+  const normalized = exceptionType.toLowerCase().replace(/[_-]/g, '');
+
+  // Check explicit list (case-insensitive)
+  if (AUTHORIZATION_EXCEPTION_TYPES.some(t => normalized.includes(t.toLowerCase().replace(/[_-]/g, '')))) {
+    return true;
+  }
+
+  // Check patterns for custom exception names
+  return AUTHORIZATION_EXCEPTION_PATTERNS.some(pattern => pattern.test(exceptionType));
+}
 
 // NOTE: KNOWN_AUTHORIZATION_DECORATORS removed in v1.2.2.
 // Gate detection is now purely structural - requires conditional branches,
@@ -495,10 +617,9 @@ function isStructuralPolicyGate(controlFlow: ControlFlowInfo | undefined): boole
 
   // STRICT: Require authorization-related exception types
   // A generic ValueError or TypeError is not sufficient for gate detection
+  // Uses pattern-based matching to catch custom auth exceptions
   const raisesAuthException = controlFlow.raiseTypes.some((type) =>
-    AUTHORIZATION_EXCEPTION_TYPES.some((authType) =>
-      type.toLowerCase().includes(authType.toLowerCase())
-    )
+    isAuthorizationException(type)
   );
 
   // Gate detection is ALL THREE properties:
