@@ -1,5 +1,4 @@
-# WyScan
-
+# [WyScan](https://plarix.dev)
 Static scanner for Python and TypeScript/JavaScript agent code that reports reachable operations from detected tool registrations.
 
 WyScan is an AFB04 scanner that parses Python and TypeScript/JavaScript with tree-sitter, resolves tool registrations semantically when the code structure allows it, traces reachable calls across the analyzed file set, and reports matched operations when no credited structural policy gate is detected in that analyzed path.
