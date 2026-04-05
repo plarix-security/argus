@@ -72,6 +72,37 @@ function makeNodeId(filePath: string, localName: string): string {
   return `${filePath}:${localName}`;
 }
 
+/**
+ * Flexible module matching for framework detection.
+ * Handles wrapped/re-exported imports like my_utils.langgraph.prebuilt.
+ *
+ * @param modulePath The imported module path
+ * @param targetModule The framework module to match
+ * @returns true if the module matches (exact or suffix)
+ */
+function matchesFrameworkModule(modulePath: string, targetModule: string): boolean {
+  // Exact match
+  if (modulePath === targetModule) return true;
+
+  // Suffix match for wrappers: my_utils.langgraph.prebuilt matches langgraph.prebuilt
+  if (modulePath.endsWith('.' + targetModule)) return true;
+
+  // Handle re-exports where final segments match
+  // e.g., company.agents.create_react_agent for langgraph.prebuilt
+  const modParts = modulePath.split('.');
+  const targetParts = targetModule.split('.');
+
+  // Check if module ends with target segments
+  if (modParts.length >= targetParts.length) {
+    const modSuffix = modParts.slice(-targetParts.length);
+    if (modSuffix.every((part, i) => part === targetParts[i])) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function resolveModulePath(modulePath: string, currentFilePath: string, allFilePaths: string[]): string | undefined {
   const currentDir = path.dirname(currentFilePath);
 
@@ -319,61 +350,71 @@ export class PythonSemanticIndex {
 
   private extractFrameworkCallRoots(call: CallSite, context: ResolutionContext, roots: Map<string, SemanticInvocationRoot>): void {
     const directImport = this.resolveImportedSymbol(call.callee, context.filePath);
+    const modulePath = directImport?.modulePath || '';
 
-    if (directImport?.modulePath === 'langgraph.prebuilt' && directImport.importedName === 'create_react_agent') {
+    // LangGraph create_react_agent
+    if (matchesFrameworkModule(modulePath, 'langgraph.prebuilt') && directImport?.importedName === 'create_react_agent') {
       const toolArg = getCallArgument(call, 'tools', 1);
       this.addRootsFromArgument(toolArg, context, 'langgraph', `create_react_agent at line ${call.startLine}`, roots);
       return;
     }
 
-    if (directImport?.modulePath === 'langchain.agents' && directImport.importedName === 'create_tool_calling_agent') {
+    // LangChain create_tool_calling_agent
+    if (matchesFrameworkModule(modulePath, 'langchain.agents') && directImport?.importedName === 'create_tool_calling_agent') {
       const toolArg = getCallArgument(call, 'tools', 1);
       this.addRootsFromArgument(toolArg, context, 'langchain', `create_tool_calling_agent at line ${call.startLine}`, roots);
       return;
     }
 
-    if (directImport?.modulePath === 'langchain.agents' && directImport.importedName === 'AgentExecutor') {
+    // LangChain AgentExecutor
+    if (matchesFrameworkModule(modulePath, 'langchain.agents') && directImport?.importedName === 'AgentExecutor') {
       const toolArg = getCallArgument(call, 'tools', 1);
       this.addRootsFromArgument(toolArg, context, 'langchain', `AgentExecutor tools at line ${call.startLine}`, roots);
       return;
     }
 
-    if (directImport?.modulePath === 'smolagents' && ['CodeAgent', 'ToolCallingAgent'].includes(directImport.importedName || '')) {
+    // SmolagentsCodeAgent/ToolCallingAgent
+    if (matchesFrameworkModule(modulePath, 'smolagents') && ['CodeAgent', 'ToolCallingAgent'].includes(directImport?.importedName || '')) {
       const toolArg = getCallArgument(call, 'tools', 0);
-      this.addRootsFromArgument(toolArg, context, 'smolagents', `${directImport.importedName} tools at line ${call.startLine}`, roots);
+      this.addRootsFromArgument(toolArg, context, 'smolagents', `${directImport?.importedName} tools at line ${call.startLine}`, roots);
       return;
     }
 
-    if (directImport?.modulePath === 'crewai' && directImport.importedName === 'Agent') {
+    // CrewAI Agent
+    if (matchesFrameworkModule(modulePath, 'crewai') && directImport?.importedName === 'Agent') {
       const toolArg = getCallArgument(call, 'tools');
       this.addRootsFromArgument(toolArg, context, 'crewai', `CrewAI Agent tools at line ${call.startLine}`, roots);
       return;
     }
 
-    if (directImport?.modulePath === 'autogen' && directImport.importedName === 'UserProxyAgent') {
+    // AutoGen UserProxyAgent
+    if (matchesFrameworkModule(modulePath, 'autogen') && directImport?.importedName === 'UserProxyAgent') {
       const toolArg = getCallArgument(call, 'function_map');
       this.addRootsFromMappingArgument(toolArg, context, 'autogen', `UserProxyAgent function_map at line ${call.startLine}`, roots);
       return;
     }
 
+    // AutoGen register_function
     if (call.memberChain?.[call.memberChain.length - 1] === 'register_function') {
       const receiver = this.resolveAssignedConstructor(this.buildReceiverReference(call, 1), context);
-      if (receiver.modulePath === 'autogen' && receiver.importedName === 'UserProxyAgent') {
+      if (matchesFrameworkModule(receiver.modulePath || '', 'autogen') && receiver.importedName === 'UserProxyAgent') {
         const toolArg = getCallArgument(call, 'function_map');
         this.addRootsFromMappingArgument(toolArg, context, 'autogen', `register_function at line ${call.startLine}`, roots);
       }
       return;
     }
 
+    // LangChain bind_tools
     if (call.memberChain?.[call.memberChain.length - 1] === 'bind_tools') {
       const receiver = this.resolveAssignedConstructor(this.buildReceiverReference(call, 1), context);
-      if (receiver.modulePath === 'langchain_openai') {
+      if (matchesFrameworkModule(receiver.modulePath || '', 'langchain_openai')) {
         const toolArg = getCallArgument(call, 'tools', 0);
         this.addRootsFromArgument(toolArg, context, 'langgraph', `bind_tools at line ${call.startLine}`, roots);
       }
       return;
     }
 
+    // OpenAI chat.completions.create
     if (this.isOpenAIChatCompletionCreate(call, context)) {
       const toolArg = getCallArgument(call, 'tools');
       this.addRootsFromOpenAITools(toolArg, context, `chat.completions.create at line ${call.startLine}`, roots);
