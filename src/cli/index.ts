@@ -318,17 +318,20 @@ function printHelp(command?: string): void {
   console.log(`
   ${NAME} v${VERSION}
 
-  Python-first AFB04 scanner for agent code.
-  TypeScript and JavaScript files are skipped explicitly.
+  Static analyzer for AFB04 (Unauthorized Action) vulnerabilities
+  in agentic AI systems. Detects dangerous operations reachable
+  from tool registration points through multi-file call graphs.
+
+  Languages: Python (comprehensive), TypeScript/JavaScript (basic)
 
   Usage:
     ${NAME} scan <path>     Scan a file or directory
     ${NAME} check           Verify scanner dependencies
     ${NAME} help [command]  Show help
 
-  Registration patterns:
-    Python: LangChain, CrewAI, AutoGen, OpenAI tool schemas,
-            and generic decorator-style tool registrations
+  Supported frameworks:
+    Python: LangChain, LangGraph, CrewAI, AutoGen, Smolagents,
+            OpenAI Assistants, and decorator-based tool registrations
 
   Options:
     -l, --level <level>   Filter by severity (critical|warning|info)
