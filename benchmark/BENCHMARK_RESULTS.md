@@ -1,9 +1,9 @@
 # WyScan Benchmark Results
 
-**Run Date:** 2026-04-03
+**Run Date:** 2026-04-05
 **Benchmarks Evaluated:** 16
 **Python Exact-Match Cases:** 8/8 passed
-**Python CEE-Validated Cases:** 3/4 passed
+**Python CEE-Validated Cases:** 4/4 passed
 **Asset-Limited Cases:** 4
 
 ## Summary
@@ -25,7 +25,7 @@
 | 12-heterogeneous-multi-framework | python, typescript | No analyzable source files in current snapshot | 0 cees, 0 afb04 findings (0C/0W/0I), exit 0, analyzed 0, skipped 0, failed 0 | NOT VALIDATED | This repo snapshot contains no analyzable source files for this fixture. The result is informational only and does not validate skipped-language handling. |
 | 13-kubernetes-gitops-agent | python | Operational Python scan with no failed files plus CEE validation | 36 cees, 36 afb04 findings (19C/14W/3I), exit 2, analyzed 7, skipped 0, failed 0 | PASS | CEE validation passed with 36 inventoried events |
 | 14-code-execution-sandbox | python | Operational Python scan with no failed files plus CEE validation | 52 cees, 52 afb04 findings (17C/27W/8I), exit 2, analyzed 8, skipped 0, failed 0 | PASS | CEE validation passed with 52 inventoried events |
-| 15-data-pipeline-etl | python | Operational Python scan with no failed files plus CEE validation | 51 cees, 51 afb04 findings (6C/29W/16I), exit 2, analyzed 9, skipped 0, failed 0 | FAIL | Missing required CEEs: query_sqlite->sqlite3.Cursor.execute, execute_sqlite_script->sqlite3.Connection.executescript, insert_data->sqlite3.Cursor.executemany, delete_data->sqlite3.Cursor.execute, drop_table->sqlite3.Connection.execute |
+| 15-data-pipeline-etl | python | Operational Python scan with no failed files plus CEE validation | 55 cees, 55 afb04 findings (6C/31W/18I), exit 2, analyzed 9, skipped 0, failed 0 | PASS | CEE validation passed with 55 inventoried events |
 
 ## Interpretation
 
