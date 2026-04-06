@@ -1,15 +1,21 @@
 # Detection Model
 
-WyScan currently reports AFB04-style unauthorized action exposure in Python code.
+WyScan reports AFB04-style unauthorized action exposure in Python, TypeScript, and JavaScript code.
 
 The shipped detector does this:
 
-1. Parse Python source with tree-sitter.
+1. Parse source with tree-sitter (Python, TypeScript, and JavaScript).
 2. Resolve tool registrations from framework-specific code structure when available.
 3. Fall back to framework or decorator patterns only when semantic resolution is incomplete.
-4. Build call paths across the analyzed Python file set.
+4. Build call paths across the analyzed file set (batched by language for cross-file analysis).
 5. Match reachable operations against the current operation table.
 6. Credit a policy gate only when the analyzed path contains structural authorization logic.
+
+## Supported Languages
+
+- **Python**: Full support with comprehensive framework detection
+- **TypeScript**: Full support with Node.js ecosystem patterns
+- **JavaScript**: Full support (same analysis as TypeScript)
 
 ## Severity Model
 
@@ -25,39 +31,59 @@ These adjustments are heuristic only.
 
 `CRITICAL`
 
-- Shell execution
-- Dynamic code execution and unsafe deserialization
-- File or directory deletion
-- `cursor.executescript()` and Redis flush operations
+- Shell execution (subprocess, child_process, execa, shelljs)
+- Dynamic code execution (eval, exec, vm.runInContext, page.evaluate)
+- File or directory deletion (unlink, rm, rimraf, fs-extra remove)
+- Raw SQL execution and Redis flush operations
 
 `WARNING`
 
 - File writes and directory creation
 - HTTP mutation calls such as `post`, `put`, `patch`, and `delete`
-- HTTP GET calls currently matched by the shipped detector
-- Common ORM and NoSQL write-style calls
-- Email sends
+- ORM operations (Prisma, TypeORM, Sequelize, Knex, Drizzle)
+- Email sends (nodemailer, SendGrid)
+- Browser automation (Playwright page.goto, page.fill)
 
 `INFO`
 
 - File reads
-- Generic database reads such as `.execute()`, `.fetchone()`, `.fetchall()`, and `.query()`
-- Redis `get` and `keys`
+- Generic database reads
+- HTTP GET calls
 - Directory listing and glob-like operations
 
 ## Framework Labels
 
-Framework labels are Python-only. They prefer semantic extraction from code structure, helper-returned bundles, and dispatch maps, then fall back to matched registration patterns when semantic resolution is incomplete.
+### Python Frameworks
 
-The current detector includes semantic handling for LangGraph/LangChain tool lists, helper-returned tool bundles, CrewAI agent tool lists, AutoGen `function_map` registrations, imported tool decorators, OpenAI tool schemas and dispatch maps, plus fallback labels for generic Python decorator-style tool registration.
+The current detector includes semantic handling for:
+- LangGraph/LangChain tool lists and decorators
+- Helper-returned tool bundles
+- CrewAI agent tool lists
+- AutoGen `function_map` registrations
+- OpenAI tool schemas and dispatch maps
+- Generic Python decorator-style tool registration
+
+### TypeScript/JavaScript Frameworks
+
+The current detector includes semantic handling for:
+- OpenAI SDK (chat.completions.create with tools)
+- LangChain.js (DynamicStructuredTool, @tool decorator)
+- LangGraph.js (createReactAgent, StateGraph)
+- Vercel AI SDK (tool() definitions, streamText/generateText)
+- MCP SDK (server.tool() registrations)
+- Mastra (createTool definitions)
+- Playwright/Puppeteer browser automation
+- Generic tools arrays and tool registration patterns
 
 ## Policy Gates
 
 WyScan credits a policy gate when the analyzed path contains code it recognizes as structural authorization logic, such as:
 
 - Conditional checks on parameters
-- Authorization-like exceptions raised on denied paths
+- Authorization-like exceptions raised on denied paths (PermissionError, UnauthorizedError, ForbiddenException, etc.)
 - Decorators that are structurally analyzed as wrappers that can prevent execution
 - Imported decorators whose wrapper logic is structurally analyzed as gates
 
 Validation helpers such as `validate_*` or `sanitize_*` are not credited as gates by themselves. Authorization-like decorator names are treated as heuristic evidence, not full gate proof, when no structural gate is found.
+
+Note: Generic `Error` exceptions are not treated as authorization gates to avoid false negatives.
