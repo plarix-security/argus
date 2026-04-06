@@ -7,19 +7,11 @@ import * as os from 'os';
 import { AFBAnalyzer } from '../analyzer';
 import { generatePRComment } from '../reporter/pr-comment';
 import { generateIssueTitle, generateIssueBody, generateNoFindingsIssue } from '../reporter/issue-formatter';
-import { AnalysisReport, WebhookContext } from '../types';
+import { AnalysisReport, WebhookContext, InstallationContext } from '../types';
 
 export interface GitHubAppConfig {
   appId: string;
   privateKey: string;
-}
-
-interface InstallationContext {
-  owner: string;
-  repo: string;
-  defaultBranch: string;
-  installationId: number;
-  commitSha: string;
 }
 
 type CheckConclusion = 'success' | 'neutral' | 'failure';

@@ -278,6 +278,22 @@ export interface WebhookContext {
 }
 
 /**
+ * Installation event context for new GitHub App installations.
+ */
+export interface InstallationContext {
+  /** Repository owner */
+  owner: string;
+  /** Repository name */
+  repo: string;
+  /** Default branch of the repository */
+  defaultBranch: string;
+  /** Installation ID for GitHub App */
+  installationId: number;
+  /** Commit SHA (HEAD for installations, specific SHA for pushes) */
+  commitSha: string;
+}
+
+/**
  * AST node location information.
  */
 export interface NodeLocation {
