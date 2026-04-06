@@ -296,6 +296,79 @@ Current behavior:
 
 Failure and partial-coverage reporting are being tightened further in the implementation. For current details, see `docs/github-app.md` and the CLI output itself.
 
+## GitHub App Deployment
+
+### Quick Start
+
+1. **Build Docker Image**
+```bash
+docker build -t wyscan-github-app .
+```
+
+2. **Run Container**
+```bash
+docker run -d \
+  --name wyscan-app \
+  -p 3000:3000 \
+  -e GITHUB_APP_ID=your-app-id \
+  -e GITHUB_PRIVATE_KEY="$(cat private-key.pem)" \
+  -e GITHUB_WEBHOOK_SECRET=your-webhook-secret \
+  wyscan-github-app
+```
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GITHUB_APP_ID` | Yes | GitHub App ID from app settings page |
+| `GITHUB_PRIVATE_KEY` | Yes | Private key PEM content (use newlines as `\n` in env) |
+| `GITHUB_WEBHOOK_SECRET` | Yes | Secret for webhook signature verification |
+| `PORT` | No | Server port (default: 3000) |
+
+### How It Works
+
+When the Wyscan GitHub App is installed on a repository:
+
+1. **Installation Event** (`installation.created`)
+   - Automatically scans all repositories in the installation
+   - Posts a security issue to each repo with AFB04 scan results
+   - Creates and applies "security" label
+
+2. **Push Events** (default branch only)
+   - Scans the entire repository at the new commit
+   - Creates a GitHub Check run
+   - Posts a new security issue with findings
+
+3. **Pull Request Events** (`opened`, `synchronize`)
+   - Scans only changed files
+   - Creates a GitHub Check run
+   - Posts/updates PR comment with findings
+
+### Issue Format
+
+Security issues are titled: `[Wyscan] Security Scan Report — <commit_sha>`
+
+Each issue contains:
+- **Summary table** with files analyzed, CEEs detected, findings by severity
+- **Detailed findings** organized by severity (Critical, Warning, Info)
+- **Coverage notes** explaining analysis scope and limitations
+- **Terminal-style formatting** with dividers and emoji severity indicators
+
+### Health Check
+
+```bash
+curl http://localhost:3000/health
+# Response: {"status":"ok"}
+```
+
+### Logs
+
+```bash
+docker logs -f wyscan-app
+```
+
+For complete setup instructions including GitHub App registration, see `docs/GITHUB_APP_SETUP.md`.
+
 ## Current Limitations
 
 - Directory scans graph the analyzed file set together per language. Changed-file scans still do not guarantee full repository coverage.
