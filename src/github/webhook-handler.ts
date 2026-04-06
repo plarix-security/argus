@@ -321,7 +321,19 @@ export async function handlePushEvent(payload: EmitterWebhookEvent<'push'>['payl
     installationId: installation.id,
   };
 
+  // Existing: run analysis for check run
   await runAnalysis(context, config);
+
+  // NEW: Also post issue for push to default branch
+  const installContext: InstallationContext = {
+    owner: repository.owner.login,
+    repo: repository.name,
+    defaultBranch: repository.default_branch,
+    installationId: installation.id,
+    commitSha: after,
+  };
+
+  await runFullRepoScan(installContext, config);
 }
 
 export async function handlePullRequestEvent(payload: EmitterWebhookEvent<'pull_request'>['payload'], config: GitHubAppConfig): Promise<void> {
