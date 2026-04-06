@@ -560,14 +560,7 @@ function isAuthorizationException(exceptionType: string): boolean {
 // NOTE: VALIDATION_HELPER_PATTERNS removed in v1.2.2.
 // Severity is now determined solely by operation category.
 // Naming heuristics do not adjust severity.
-
-/**
- * Check if a function name suggests it performs validation.
- * NOTE: Always returns false in v1.2.2. Kept for interface compatibility.
- */
-export function isLikelyValidationHelper(functionName: string): boolean {
-  return false;
-}
+// isLikelyValidationHelper() function removed in v1.4.0.
 
 /**
  * Determine if a function is a structural policy gate.
@@ -906,7 +899,7 @@ export function buildCallGraph(
         hasPolicyGate: hasStructuralGate || hasDecoratorGate,
         hasHeuristicGateIndicator: false, // Removed in v1.2.2
         // Check if this function name suggests it's a validation helper
-        isValidationHelper: isLikelyValidationHelper(func.name),
+        isValidationHelper: false, // v1.2.2: Always false, naming heuristics removed
         controlFlow: func.controlFlow,
         sourceFile: filePath,
         parameters: func.parameters,
@@ -975,7 +968,7 @@ export function buildCallGraph(
           hasPolicyGate: hasStructuralGate || hasDecoratorGate,
           hasHeuristicGateIndicator: false, // Removed in v1.2.2
           // Check if this method name suggests it's a validation helper
-          isValidationHelper: isLikelyValidationHelper(method.name),
+          isValidationHelper: false, // v1.2.2: Always false, naming heuristics removed
           controlFlow: method.controlFlow,
           sourceFile: filePath,
           parameters: method.parameters,
