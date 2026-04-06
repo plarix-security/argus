@@ -1,4 +1,4 @@
-# WyScan
+# [WyScan](https://plarix.dev)
 
 Static scanner for Python, TypeScript, and JavaScript agent code that reports reachable operations from detected tool registrations.
 
