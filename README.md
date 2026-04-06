@@ -11,7 +11,7 @@ wyscan scan ./agent-project
 Example output:
 
 ```text
-wyscan v1.3.5  ·  Plarix
+wyscan v1.4.0  ·  Plarix
 
 Scanning  agent-project
 
@@ -171,7 +171,7 @@ Current CLI JSON shape:
 
 ```json
 {
-  "version": "1.3.5",
+  "version": "1.4.0",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,
