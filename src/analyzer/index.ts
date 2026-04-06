@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { FileLanguageRouter, fileLanguageRouter } from './file-language-router';
 import { analyzePythonFile, analyzePythonFiles, ensureParserInitialized } from './python/detector';
-import { analyzeTypeScriptFile, ensureTypeScriptParserInitialized } from './typescript/detector';
+import { analyzeTypeScriptFile, analyzeTypeScriptFiles, ensureTypeScriptParserInitialized } from './typescript/detector';
 import { AFBFinding, AnalysisReport, AnalyzerConfig, FileAnalysisResult, SupportedLanguage, Severity } from '../types';
 import { VERSION } from '../cli/version';
 
@@ -94,13 +94,14 @@ export class AFBAnalyzer {
   }
 
   private analyzeResolvedFiles(files: string[]): FileAnalysisResult[] {
-    const nonPythonResults: FileAnalysisResult[] = [];
+    const unsupportedResults: FileAnalysisResult[] = [];
     const pythonInputs: Array<{ filePath: string; sourceCode: string }> = [];
+    const typescriptInputs: Array<{ filePath: string; sourceCode: string }> = [];
 
     for (const file of files) {
       const language = this.walker.getLanguage(file);
       if (!language) {
-        nonPythonResults.push({
+        unsupportedResults.push({
           file,
           language: 'python',
           findings: [],
@@ -114,14 +115,15 @@ export class AFBAnalyzer {
       const sourceCode = fs.readFileSync(file, 'utf-8');
       if (language === 'python') {
         pythonInputs.push({ filePath: file, sourceCode });
-        continue;
+      } else {
+        // typescript or javascript - batch together for cross-file analysis
+        typescriptInputs.push({ filePath: file, sourceCode });
       }
-
-      nonPythonResults.push(analyzeTypeScriptFile(file, sourceCode));
     }
 
     const pythonResults = pythonInputs.length > 0 ? analyzePythonFiles(pythonInputs) : [];
-    return [...pythonResults, ...nonPythonResults];
+    const typescriptResults = typescriptInputs.length > 0 ? analyzeTypeScriptFiles(typescriptInputs) : [];
+    return [...pythonResults, ...typescriptResults, ...unsupportedResults];
   }
 
   private discoverFiles(dirPath: string): string[] {

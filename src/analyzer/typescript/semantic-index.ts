@@ -7,7 +7,11 @@
  * Supported frameworks:
  * - OpenAI SDK (tools parameter in chat.completions.create)
  * - LangChain.js (DynamicStructuredTool, @tool decorator)
+ * - LangGraph.js (createReactAgent, StateGraph)
  * - Vercel AI SDK (tool() definitions)
+ * - MCP SDK (server.tool() registrations)
+ * - Mastra (tool definitions)
+ * - Playwright (browser automation tools)
  * - Generic patterns (tools arrays passed to agent constructors)
  */
 
@@ -64,7 +68,7 @@ export function extractSemanticInvocationRoots(
       roots.set(root.nodeId, root);
     }
 
-    // Check for LangChain.js usage
+    // Check for LangChain.js/LangGraph.js usage
     const langchainRoots = extractLangChainTools(filePath, parsed);
     for (const root of langchainRoots) {
       roots.set(root.nodeId, root);
@@ -73,6 +77,24 @@ export function extractSemanticInvocationRoots(
     // Check for Vercel AI SDK usage
     const vercelRoots = extractVercelAITools(filePath, parsed);
     for (const root of vercelRoots) {
+      roots.set(root.nodeId, root);
+    }
+
+    // Check for MCP SDK usage
+    const mcpRoots = extractMCPTools(filePath, parsed);
+    for (const root of mcpRoots) {
+      roots.set(root.nodeId, root);
+    }
+
+    // Check for Mastra usage
+    const mastraRoots = extractMastraTools(filePath, parsed);
+    for (const root of mastraRoots) {
+      roots.set(root.nodeId, root);
+    }
+
+    // Check for Playwright browser automation
+    const playwrightRoots = extractPlaywrightTools(filePath, parsed);
+    for (const root of playwrightRoots) {
       roots.set(root.nodeId, root);
     }
 
@@ -108,10 +130,14 @@ function extractOpenAITools(
   if (!hasOpenAI) return roots;
 
   // Look for chat.completions.create calls with tools parameter
+  // Must match full chain, not just 'create' to avoid false positives
   for (const call of parsed.calls) {
-    if (call.memberChain.join('.').includes('chat.completions.create') ||
-        call.callee.includes('create')) {
+    const chainStr = call.memberChain.join('.');
+    const isOpenAICompletions = chainStr.includes('chat.completions.create') ||
+                                 chainStr.includes('completions.create') ||
+                                 (chainStr.endsWith('.create') && chainStr.includes('chat'));
 
+    if (isOpenAICompletions) {
       // Check if arguments contain 'tools'
       const hasTools = call.arguments.some(arg => arg.includes('tools:') || arg.includes('tools'));
 
@@ -133,11 +159,13 @@ function extractOpenAITools(
 }
 
 /**
- * Extract LangChain.js tool registrations
+ * Extract LangChain.js and LangGraph.js tool registrations
  *
  * Patterns:
  * - new DynamicStructuredTool({ func: myFunc, ... })
  * - @tool decorator on functions
+ * - createReactAgent from @langchain/langgraph/prebuilt
+ * - tools passed to agent constructors
  */
 function extractLangChainTools(
   filePath: string,
@@ -145,12 +173,15 @@ function extractLangChainTools(
 ): SemanticInvocationRoot[] {
   const roots: SemanticInvocationRoot[] = [];
 
-  // Check for langchain imports
+  // Check for langchain/langgraph imports
   const hasLangChain = parsed.imports.some(imp =>
     imp.module.includes('langchain') || imp.module.includes('@langchain/')
   );
+  const hasLangGraph = parsed.imports.some(imp =>
+    imp.module.includes('langgraph') || imp.module.includes('@langchain/langgraph')
+  );
 
-  if (!hasLangChain) return roots;
+  if (!hasLangChain && !hasLangGraph) return roots;
 
   // Look for DynamicStructuredTool constructor
   for (const call of parsed.calls) {
@@ -171,6 +202,37 @@ function extractLangChainTools(
           toolName,
           framework: 'langchain',
           evidence: 'LangChain DynamicStructuredTool constructor',
+          sourceFile: filePath,
+          line: call.line,
+        });
+      }
+    }
+
+    // LangGraph createReactAgent pattern
+    if (call.callee === 'createReactAgent' || call.callee.endsWith('.createReactAgent')) {
+      const toolsArg = call.arguments.find(arg => arg.includes('tools'));
+      if (toolsArg && call.enclosingFunction) {
+        const nodeId = `${filePath}:${call.enclosingFunction}`;
+        roots.push({
+          nodeId,
+          toolName: call.enclosingFunction,
+          framework: 'langgraph',
+          evidence: 'LangGraph createReactAgent with tools',
+          sourceFile: filePath,
+          line: call.line,
+        });
+      }
+    }
+
+    // LangGraph StateGraph with tools
+    if (call.callee === 'StateGraph' || call.callee.includes('StateGraph')) {
+      if (call.enclosingFunction) {
+        const nodeId = `${filePath}:${call.enclosingFunction}`;
+        roots.push({
+          nodeId,
+          toolName: call.enclosingFunction,
+          framework: 'langgraph',
+          evidence: 'LangGraph StateGraph agent definition',
           sourceFile: filePath,
           line: call.line,
         });
@@ -294,6 +356,225 @@ function extractGenericTools(
           });
         }
       }
+    }
+  }
+
+  return roots;
+}
+
+/**
+ * Extract MCP SDK tool registrations
+ *
+ * Pattern:
+ * server.tool('toolName', schema, async (params) => { ... })
+ * or
+ * server.setRequestHandler(ListToolsRequestSchema, ...)
+ */
+function extractMCPTools(
+  filePath: string,
+  parsed: ParsedTypeScriptFile
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+
+  // Check for MCP SDK import
+  const hasMCP = parsed.imports.some(imp =>
+    imp.module === '@modelcontextprotocol/sdk' ||
+    imp.module.startsWith('@modelcontextprotocol/sdk/') ||
+    imp.module.includes('mcp-server') ||
+    imp.module.includes('@modelcontextprotocol')
+  );
+
+  if (!hasMCP) return roots;
+
+  // Look for server.tool() calls
+  for (const call of parsed.calls) {
+    const chainStr = call.memberChain.join('.');
+
+    // Match server.tool() pattern
+    if (chainStr.endsWith('.tool') || call.callee === 'tool') {
+      // First argument is typically the tool name
+      const toolName = call.arguments[0]?.replace(/['"]/g, '') || call.enclosingFunction || 'mcpTool';
+
+      const nodeId = call.enclosingFunction
+        ? `${filePath}:${call.enclosingFunction}`
+        : `${filePath}:${toolName}`;
+
+      roots.push({
+        nodeId,
+        toolName,
+        framework: 'mcp',
+        evidence: 'MCP SDK server.tool() registration',
+        sourceFile: filePath,
+        line: call.line,
+      });
+    }
+
+    // Match setRequestHandler for tools
+    if (chainStr.includes('setRequestHandler') || call.callee === 'setRequestHandler') {
+      if (call.arguments.some(arg => arg.includes('Tool') || arg.includes('tool'))) {
+        const nodeId = call.enclosingFunction
+          ? `${filePath}:${call.enclosingFunction}`
+          : `${filePath}:mcpHandler`;
+
+        roots.push({
+          nodeId,
+          toolName: call.enclosingFunction || 'mcpHandler',
+          framework: 'mcp',
+          evidence: 'MCP SDK setRequestHandler for tools',
+          sourceFile: filePath,
+          line: call.line,
+        });
+      }
+    }
+  }
+
+  return roots;
+}
+
+/**
+ * Extract Mastra tool registrations
+ *
+ * Pattern:
+ * createTool({ ... })
+ * or tool definitions in agents
+ */
+function extractMastraTools(
+  filePath: string,
+  parsed: ParsedTypeScriptFile
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+
+  // Check for Mastra import
+  const hasMastra = parsed.imports.some(imp =>
+    imp.module === 'mastra' ||
+    imp.module.startsWith('@mastra/') ||
+    imp.module.includes('mastra')
+  );
+
+  if (!hasMastra) return roots;
+
+  // Look for createTool calls
+  for (const call of parsed.calls) {
+    if (call.callee === 'createTool' || call.callee.includes('createTool')) {
+      const nameArg = call.arguments.find(arg => arg.includes('name:'));
+      const toolName = nameArg
+        ? nameArg.match(/name:\s*['"]([^'"]+)['"]/)?.[1] || call.enclosingFunction || 'mastraTool'
+        : call.enclosingFunction || 'mastraTool';
+
+      const nodeId = call.enclosingFunction
+        ? `${filePath}:${call.enclosingFunction}`
+        : `${filePath}:${toolName}`;
+
+      roots.push({
+        nodeId,
+        toolName,
+        framework: 'mastra',
+        evidence: 'Mastra createTool() definition',
+        sourceFile: filePath,
+        line: call.line,
+      });
+    }
+
+    // Look for Agent constructor with tools
+    if (call.callee === 'Agent' || call.callee.includes('Agent')) {
+      const hasTools = call.arguments.some(arg => arg.includes('tools'));
+      if (hasTools && call.enclosingFunction) {
+        const nodeId = `${filePath}:${call.enclosingFunction}`;
+        roots.push({
+          nodeId,
+          toolName: call.enclosingFunction,
+          framework: 'mastra',
+          evidence: 'Mastra Agent with tools',
+          sourceFile: filePath,
+          line: call.line,
+        });
+      }
+    }
+  }
+
+  // Look for tool assignments
+  for (const assignment of parsed.assignments) {
+    if (assignment.value.includes('createTool(')) {
+      const nodeId = assignment.enclosingFunction
+        ? `${filePath}:${assignment.enclosingFunction}`
+        : `${filePath}:${assignment.target}`;
+
+      roots.push({
+        nodeId,
+        toolName: assignment.target,
+        framework: 'mastra',
+        evidence: 'Mastra tool assignment',
+        sourceFile: filePath,
+        line: assignment.line,
+      });
+    }
+  }
+
+  return roots;
+}
+
+/**
+ * Extract Playwright browser automation tool patterns
+ *
+ * Pattern:
+ * Functions that use page.evaluate, page.goto, etc.
+ * Often used as tools in browser automation agents
+ */
+function extractPlaywrightTools(
+  filePath: string,
+  parsed: ParsedTypeScriptFile
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+
+  // Check for Playwright import
+  const hasPlaywright = parsed.imports.some(imp =>
+    imp.module === 'playwright' ||
+    imp.module === '@playwright/test' ||
+    imp.module.startsWith('playwright-') ||
+    imp.module === 'puppeteer' ||
+    imp.module === 'puppeteer-core'
+  );
+
+  if (!hasPlaywright) return roots;
+
+  // Track functions that contain dangerous browser operations
+  const browserOpFunctions = new Set<string>();
+
+  for (const call of parsed.calls) {
+    const chainStr = call.memberChain.join('.');
+
+    // Match page.evaluate, page.goto, etc.
+    if (chainStr.includes('page.evaluate') ||
+        chainStr.includes('page.evaluateHandle') ||
+        chainStr.includes('page.goto') ||
+        chainStr.includes('page.fill') ||
+        chainStr.includes('page.type') ||
+        chainStr.includes('page.click') ||
+        chainStr.includes('page.addScriptTag') ||
+        chainStr.includes('page.setContent')) {
+
+      if (call.enclosingFunction) {
+        browserOpFunctions.add(call.enclosingFunction);
+      }
+    }
+  }
+
+  // Create roots for functions containing browser operations
+  for (const funcName of browserOpFunctions) {
+    const func = parsed.functions.find(f => f.name === funcName);
+    if (func) {
+      const nodeId = func.className
+        ? `${filePath}:${func.className}.${func.name}`
+        : `${filePath}:${func.name}`;
+
+      roots.push({
+        nodeId,
+        toolName: func.name,
+        framework: 'playwright',
+        evidence: 'Playwright browser automation function',
+        sourceFile: filePath,
+        line: func.startLine,
+      });
     }
   }
 

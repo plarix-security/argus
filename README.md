@@ -1,7 +1,8 @@
-# [WyScan](https://plarix.dev)
-Static scanner for Python and TypeScript/JavaScript agent code that reports reachable operations from detected tool registrations.
+# <a href="https://plarix.dev">WyScan</a>
 
-WyScan is an AFB04 scanner that parses Python and TypeScript/JavaScript with tree-sitter, resolves tool registrations semantically when the code structure allows it, traces reachable calls across the analyzed file set, and reports matched operations when no credited structural policy gate is detected in that analyzed path.
+Static scanner for Python, TypeScript, and JavaScript agent code that reports reachable operations from detected tool registrations.
+
+WyScan is an AFB04 scanner that parses Python, TypeScript, and JavaScript with tree-sitter, resolves tool registrations semantically when the code structure allows it, traces reachable calls across the analyzed file set, and reports matched operations when no credited structural policy gate is detected in that analyzed path.
 
 ```bash
 wyscan scan ./agent-project
@@ -119,17 +120,27 @@ Severity is determined by operation category:
 
 ## Framework Labels
 
-Framework detection is Python-only. WyScan uses semantic extraction from framework code structure such as decorator imports, tool lists, helper-returned tool bundles, `create_react_agent(...)`, `bind_tools(...)`, and `function_map` style registrations.
+Framework detection supports both Python and TypeScript/JavaScript. WyScan uses semantic extraction from framework code structure such as decorator imports, tool lists, helper-returned tool bundles, `create_react_agent(...)`, `bind_tools(...)`, and `function_map` style registrations.
 
-The shipped detector currently labels frameworks such as:
+### Python Frameworks
 
-- LangChain
+- LangChain/LangGraph
 - CrewAI
 - AutoGen
 - OpenAI tool schemas and dispatch maps
 - LlamaIndex
 - MCP
 - Generic Python decorator-style tool registrations
+
+### TypeScript/JavaScript Frameworks
+
+- OpenAI SDK
+- LangChain.js/LangGraph.js
+- Vercel AI SDK
+- MCP SDK
+- Mastra
+- Playwright/Puppeteer browser automation
+- Generic tool registration patterns
 
 Framework labels are derived from structural analysis, not pattern tables.
 
@@ -287,14 +298,13 @@ Failure and partial-coverage reporting are being tightened further in the implem
 
 ## Current Limitations
 
-- Python is the only supported finding language.
-- TypeScript and JavaScript files are skipped explicitly and produce no findings.
-- Directory scans graph the analyzed Python file set together. Changed-file scans still do not guarantee full repository coverage.
+- Directory scans graph the analyzed file set together per language. Changed-file scans still do not guarantee full repository coverage.
 - External packages are not traced.
 - Dynamic runtime tool registration is not guaranteed to be detected.
 - Framework labels are pattern matches, not complete framework models.
 - Validation-helper severity downgrades are heuristic only.
 - AFB01, AFB02, and AFB03 are not implemented.
+- Rust support is not yet implemented.
 
 ## Development
 
