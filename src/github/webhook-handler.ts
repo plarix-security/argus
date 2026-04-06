@@ -14,6 +14,14 @@ export interface GitHubAppConfig {
   privateKey: string;
 }
 
+interface InstallationContext {
+  owner: string;
+  repo: string;
+  defaultBranch: string;
+  installationId: number;
+  commitSha: string;
+}
+
 type CheckConclusion = 'success' | 'neutral' | 'failure';
 
 interface CheckOutput {
@@ -168,6 +176,133 @@ async function postSecurityIssue(
     console.error(`Failed to post issue to ${owner}/${repo}:`, error);
     // Don't throw - we don't want one repo failure to block others
   }
+}
+
+/**
+ * Clone a repository for installation scan
+ * Clones the default branch at HEAD
+ */
+async function cloneRepoForInstallation(
+  context: InstallationContext,
+  config: GitHubAppConfig
+): Promise<string> {
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wyscan-install-'));
+  const { createAppAuth } = await import('@octokit/auth-app');
+  const auth = createAppAuth({
+    appId: config.appId,
+    privateKey: config.privateKey,
+    installationId: context.installationId
+  });
+  const { token } = await auth({ type: 'installation' });
+
+  const git: SimpleGit = simpleGit();
+  await git.clone(
+    `https://x-access-token:${token}@github.com/${context.owner}/${context.repo}.git`,
+    workDir,
+    ['--depth', '1', '--branch', context.defaultBranch]
+  );
+
+  return workDir;
+}
+
+/**
+ * Run a full repository scan and post issue with results
+ */
+async function runFullRepoScan(
+  context: InstallationContext,
+  config: GitHubAppConfig
+): Promise<void> {
+  const octokit = await createOctokit(config, context.installationId);
+  let workDir: string | null = null;
+
+  try {
+    console.log(`Scanning ${context.owner}/${context.repo} at ${context.commitSha.slice(0, 7)}...`);
+
+    // Clone repo
+    workDir = await cloneRepoForInstallation(context, config);
+
+    // Get actual commit SHA after clone
+    const git: SimpleGit = simpleGit(workDir);
+    const log = await git.log(['-1']);
+    const actualSha = log.latest?.hash || context.commitSha;
+
+    // Run analysis
+    const analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+    const report = analyzer.analyzeDirectory(workDir);
+
+    // Format issue
+    const repoFullName = `${context.owner}/${context.repo}`;
+    const title = generateIssueTitle(actualSha);
+    const body = report.totalFindings > 0
+      ? generateIssueBody(report, repoFullName, actualSha)
+      : generateNoFindingsIssue(report, repoFullName, actualSha);
+
+    // Post issue
+    await postSecurityIssue(octokit, context.owner, context.repo, title, body);
+
+  } catch (error) {
+    console.error(`Scan failed for ${context.owner}/${context.repo}:`, error);
+    // Post error issue
+    try {
+      const errorBody = `# ❌ WyScan Scan Failed\n\n` +
+        `**Repository:** \`${context.owner}/${context.repo}\`\n` +
+        `**Commit:** \`${context.commitSha.slice(0, 7)}\`\n\n` +
+        `The security scan could not complete.\n\n` +
+        `**Error:** ${error instanceof Error ? error.message : String(error)}\n\n` +
+        `Please check repository access and file formats.`;
+
+      await postSecurityIssue(
+        octokit,
+        context.owner,
+        context.repo,
+        '[Wyscan] Scan Failed',
+        errorBody
+      );
+    } catch (postError) {
+      console.error('Failed to post error issue:', postError);
+    }
+  } finally {
+    if (workDir) {
+      fs.rmSync(workDir, { recursive: true, force: true });
+    }
+  }
+}
+
+/**
+ * Handle installation.created event
+ * Scans all repositories in the installation and posts issues
+ */
+export async function handleInstallationEvent(
+  payload: EmitterWebhookEvent<'installation'>['payload'],
+  config: GitHubAppConfig
+): Promise<void> {
+  const { installation, repositories, action } = payload;
+
+  if (action !== 'created' || !repositories || repositories.length === 0) {
+    console.log('Installation event skipped: no repositories or not created action');
+    return;
+  }
+
+  console.log(`Installation created for ${repositories.length} repositories`);
+
+  // Scan each repository
+  for (const repo of repositories) {
+    const context: InstallationContext = {
+      owner: repo.full_name.split('/')[0],
+      repo: repo.name,
+      defaultBranch: repo.default_branch || 'main',
+      installationId: installation.id,
+      commitSha: 'HEAD', // Will resolve to actual SHA during clone
+    };
+
+    // Run scan (don't await - process repos in parallel)
+    runFullRepoScan(context, config).catch(err => {
+      console.error(`Failed to scan ${repo.full_name}:`, err);
+    });
+  }
+
+  console.log('All installation scans initiated');
 }
 
 export async function handlePushEvent(payload: EmitterWebhookEvent<'push'>['payload'], config: GitHubAppConfig): Promise<void> {
