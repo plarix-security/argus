@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { AFBAnalyzer } from '../analyzer';
 import { generatePRComment } from '../reporter/pr-comment';
+import { generateIssueTitle, generateIssueBody, generateNoFindingsIssue } from '../reporter/issue-formatter';
 import { AnalysisReport, WebhookContext } from '../types';
 
 export interface GitHubAppConfig {
@@ -108,6 +109,65 @@ Failure: ${detail}
 
 No clean-scan conclusion can be drawn from this run.`,
   };
+}
+
+/**
+ * Ensure the "security" label exists in the repository
+ * Creates it if it doesn't exist, with GitHub's red color
+ */
+async function ensureSecurityLabel(
+  octokit: Octokit,
+  owner: string,
+  repo: string
+): Promise<void> {
+  try {
+    await octokit.issues.getLabel({ owner, repo, name: 'security' });
+  } catch (error: any) {
+    if (error.status === 404) {
+      try {
+        await octokit.issues.createLabel({
+          owner,
+          repo,
+          name: 'security',
+          color: 'd73a4a',  // GitHub red
+          description: 'Security vulnerability or analysis report'
+        });
+        console.log(`Created "security" label in ${owner}/${repo}`);
+      } catch (createError) {
+        console.error(`Failed to create security label: ${createError}`);
+        // Continue anyway - we'll post issue without label
+      }
+    }
+  }
+}
+
+/**
+ * Post a security issue to the repository
+ * Ensures the security label exists and applies it
+ */
+async function postSecurityIssue(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  title: string,
+  body: string
+): Promise<void> {
+  try {
+    await ensureSecurityLabel(octokit, owner, repo);
+
+    const { data: issue } = await octokit.issues.create({
+      owner,
+      repo,
+      title,
+      body,
+      labels: ['security']
+    });
+
+    console.log(`Posted security issue to ${owner}/${repo}: ${issue.html_url}`);
+  } catch (error) {
+    console.error(`Failed to post issue to ${owner}/${repo}:`, error);
+    // Don't throw - we don't want one repo failure to block others
+  }
 }
 
 export async function handlePushEvent(payload: EmitterWebhookEvent<'push'>['payload'], config: GitHubAppConfig): Promise<void> {
