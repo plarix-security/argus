@@ -1,7 +1,7 @@
 import express from 'express';
 import { Webhooks, createNodeMiddleware } from '@octokit/webhooks';
 import * as dotenv from 'dotenv';
-import { handlePushEvent, handlePullRequestEvent, GitHubAppConfig } from './github/webhook-handler';
+import { handlePushEvent, handlePullRequestEvent, handleInstallationEvent, GitHubAppConfig } from './github/webhook-handler';
 import { NAME, VERSION } from './cli/version';
 
 dotenv.config();
@@ -22,6 +22,7 @@ function createApp(): express.Application {
   const webhooks = new Webhooks({ secret: process.env.GITHUB_WEBHOOK_SECRET! });
   webhooks.on('push', async ({ payload }) => { try { await handlePushEvent(payload as any, config); } catch (e) { console.error('Push error:', e); } });
   webhooks.on('pull_request', async ({ payload }) => { try { await handlePullRequestEvent(payload as any, config); } catch (e) { console.error('PR error:', e); } });
+  webhooks.on('installation', async ({ payload }) => { try { await handleInstallationEvent(payload as any, config); } catch (e) { console.error('Installation event error:', e); } });
   app.use(createNodeMiddleware(webhooks, { path: '/webhook' }));
   return app;
 }
