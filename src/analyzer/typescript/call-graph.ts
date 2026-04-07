@@ -427,6 +427,7 @@ function isStructuralPolicyGate(func: FunctionDef): boolean {
 
 /**
  * Build a map of variable names to their inferred types from constructor calls
+ * Uses AST call data instead of regex pattern matching
  * e.g., const db = new Database(...) => { db: 'better-sqlite3.Database' }
  */
 function buildVariableTypeMap(
@@ -435,51 +436,70 @@ function buildVariableTypeMap(
 ): Map<string, string> {
   const typeMap = new Map<string, string>();
 
+  // Build a map of call sites by their line number and position
+  // This helps us match calls to assignments
+  const callsByLine = new Map<number, CallSite[]>();
+  for (const call of parsed.calls) {
+    if (!callsByLine.has(call.line)) {
+      callsByLine.set(call.line, []);
+    }
+    callsByLine.get(call.line)!.push(call);
+  }
+
   for (const assignment of parsed.assignments) {
-    // Check for new Constructor(...) pattern
-    const newMatch = assignment.value.match(/^new\s+(\w+)\s*\(/);
-    if (newMatch) {
-      const constructorName = newMatch[1];
+    // Get calls on the same line as this assignment
+    const lineCalls = callsByLine.get(assignment.line) || [];
 
-      // Check if constructor is imported
-      const importInfo = imports.find(imp =>
-        imp.names.includes(constructorName) || imp.alias === constructorName
-      );
+    // Strategy 1: new Constructor(...) calls
+    for (const call of lineCalls) {
+      // Check if it's a 'new' expression (constructor call)
+      const isConstructor = call.callee.startsWith('new ') || call.memberChain.length === 1;
 
-      // Try to resolve the type
-      let resolvedType: string | undefined;
+      if (isConstructor && call.memberChain.length > 0) {
+        const constructorName = call.memberChain[0].replace(/^new\s+/, '');
 
-      if (importInfo) {
-        // Use module-qualified constructor name
-        const qualifiedName = `${importInfo.module}.${constructorName}`;
-        resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[qualifiedName] || CONSTRUCTOR_TYPE_MAPPINGS[constructorName];
-      } else {
-        // Try direct constructor name
-        resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[constructorName];
-      }
+        // Check if constructor is imported
+        const importInfo = imports.find(imp =>
+          imp.names.includes(constructorName) || imp.alias === constructorName
+        );
 
-      if (resolvedType) {
-        typeMap.set(assignment.target, resolvedType);
-      }
-    }
+        // Try to resolve the type
+        let resolvedType: string | undefined;
 
-    // Check for factory function calls like createTransport(...), createClient(...)
-    const factoryMatch = assignment.value.match(/^(\w+)\s*\(/);
-    if (factoryMatch) {
-      const factoryName = factoryMatch[1];
-      const resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[factoryName];
-      if (resolvedType) {
-        typeMap.set(assignment.target, resolvedType);
+        if (importInfo) {
+          // Use module-qualified constructor name
+          const qualifiedName = `${importInfo.module}.${constructorName}`;
+          resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[qualifiedName] || CONSTRUCTOR_TYPE_MAPPINGS[constructorName];
+        } else {
+          // Try direct constructor name
+          resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[constructorName];
+        }
+
+        if (resolvedType) {
+          typeMap.set(assignment.target, resolvedType);
+          break; // Found the constructor for this assignment
+        }
       }
     }
 
-    // Check for chained factory calls like nodemailer.createTransport(...)
-    const chainedFactoryMatch = assignment.value.match(/^(\w+)\.(\w+)\s*\(/);
-    if (chainedFactoryMatch) {
-      const qualifiedName = `${chainedFactoryMatch[1]}.${chainedFactoryMatch[2]}`;
-      const resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[qualifiedName];
-      if (resolvedType) {
-        typeMap.set(assignment.target, resolvedType);
+    // Strategy 2: Factory function calls like createTransport(...), createClient(...)
+    for (const call of lineCalls) {
+      if (call.memberChain.length === 1) {
+        // Direct function call: createTransport(...)
+        const factoryName = call.memberChain[0];
+        const resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[factoryName];
+        if (resolvedType) {
+          typeMap.set(assignment.target, resolvedType);
+          break;
+        }
+      } else if (call.memberChain.length === 2) {
+        // Chained factory call: nodemailer.createTransport(...)
+        const qualifiedName = call.memberChain.join('.');
+        const resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[qualifiedName];
+        if (resolvedType) {
+          typeMap.set(assignment.target, resolvedType);
+          break;
+        }
       }
     }
   }
