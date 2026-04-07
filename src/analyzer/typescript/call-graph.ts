@@ -243,6 +243,7 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
   { identity: /^(pool|client|connection|db|sqlite|mysql|pg|postgres)\.(query|exec|execute|run)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database query execution', changesState: true },
   { identity: /^(pool|client|connection|db)\.(begin|commit|rollback)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database transaction control', changesState: true },
   { identity: /^cursor\.(execute|executemany|executescript)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.CRITICAL, description: 'SQLite cursor execution', changesState: true },
+  { identity: /^better-sqlite3\.Database\.(exec|run|prepare)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'SQLite operation via better-sqlite3', changesState: true },
   { identity: /^better-sqlite3\.(exec|run|prepare)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'SQLite operation via better-sqlite3', changesState: true },
 
   // ============================================
@@ -333,7 +334,7 @@ const DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
   { identity: /^(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|outputFile)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File write', changesState: true },
   { identity: /^(readFile|readFileSync|createReadStream|readdir|readdirSync)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read', changesState: false },
 
-  // Database (WARNING)
+  // Database (WARNING/CRITICAL)
   { identity: /^(query|execute|exec|run|prepare)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database operation', changesState: true },
   { identity: /^(insert|update|delete|destroy|upsert|bulkCreate|deleteMany|updateMany|insertMany)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database mutation', changesState: true },
   { identity: /^(executeRaw|executeRawUnsafe|queryRaw|queryRawUnsafe)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.CRITICAL, description: 'Raw SQL execution', changesState: true },
@@ -349,6 +350,37 @@ const DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
   // Browser automation (WARNING)
   { identity: /^(goto|fill|type|click|screenshot)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Browser automation', changesState: true },
 ];
+
+/**
+ * Factory constructor to return type mappings
+ * Maps constructor/factory calls to their return type for method resolution
+ */
+const CONSTRUCTOR_TYPE_MAPPINGS: Record<string, string> = {
+  // SQLite
+  'Database': 'better-sqlite3.Database',
+  'better-sqlite3': 'better-sqlite3.Database',
+  'sqlite3.Database': 'sqlite3.Database',
+  // PostgreSQL
+  'Pool': 'pg.Pool',
+  'Client': 'pg.Client',
+  'pg.Pool': 'pg.Pool',
+  'pg.Client': 'pg.Client',
+  // MySQL
+  'mysql.createConnection': 'mysql.Connection',
+  'mysql.createPool': 'mysql.Pool',
+  'mysql2.createConnection': 'mysql2.Connection',
+  // Redis
+  'createClient': 'redis.RedisClient',
+  'Redis': 'ioredis.Redis',
+  'ioredis.Redis': 'ioredis.Redis',
+  // MongoDB
+  'MongoClient': 'mongodb.MongoClient',
+  // Email
+  'createTransport': 'nodemailer.Transporter',
+  'nodemailer.createTransport': 'nodemailer.Transporter',
+  // OpenAI
+  'OpenAI': 'openai.OpenAI',
+};
 
 /**
  * Determine if function is a structural policy gate
@@ -394,19 +426,88 @@ function isStructuralPolicyGate(func: FunctionDef): boolean {
 }
 
 /**
- * Resolve call identity from imports and semantic resolution
+ * Build a map of variable names to their inferred types from constructor calls
+ * e.g., const db = new Database(...) => { db: 'better-sqlite3.Database' }
+ */
+function buildVariableTypeMap(
+  parsed: ParsedTypeScriptFile,
+  imports: ImportInfo[]
+): Map<string, string> {
+  const typeMap = new Map<string, string>();
+
+  for (const assignment of parsed.assignments) {
+    // Check for new Constructor(...) pattern
+    const newMatch = assignment.value.match(/^new\s+(\w+)\s*\(/);
+    if (newMatch) {
+      const constructorName = newMatch[1];
+
+      // Check if constructor is imported
+      const importInfo = imports.find(imp =>
+        imp.names.includes(constructorName) || imp.alias === constructorName
+      );
+
+      // Try to resolve the type
+      let resolvedType: string | undefined;
+
+      if (importInfo) {
+        // Use module-qualified constructor name
+        const qualifiedName = `${importInfo.module}.${constructorName}`;
+        resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[qualifiedName] || CONSTRUCTOR_TYPE_MAPPINGS[constructorName];
+      } else {
+        // Try direct constructor name
+        resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[constructorName];
+      }
+
+      if (resolvedType) {
+        typeMap.set(assignment.target, resolvedType);
+      }
+    }
+
+    // Check for factory function calls like createTransport(...), createClient(...)
+    const factoryMatch = assignment.value.match(/^(\w+)\s*\(/);
+    if (factoryMatch) {
+      const factoryName = factoryMatch[1];
+      const resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[factoryName];
+      if (resolvedType) {
+        typeMap.set(assignment.target, resolvedType);
+      }
+    }
+
+    // Check for chained factory calls like nodemailer.createTransport(...)
+    const chainedFactoryMatch = assignment.value.match(/^(\w+)\.(\w+)\s*\(/);
+    if (chainedFactoryMatch) {
+      const qualifiedName = `${chainedFactoryMatch[1]}.${chainedFactoryMatch[2]}`;
+      const resolvedType = CONSTRUCTOR_TYPE_MAPPINGS[qualifiedName];
+      if (resolvedType) {
+        typeMap.set(assignment.target, resolvedType);
+      }
+    }
+  }
+
+  return typeMap;
+}
+
+/**
+ * Resolve call identity from imports, semantic resolution, and variable type inference
  */
 function resolveCallIdentity(
   call: CallSite,
   imports: ImportInfo[],
   files: Map<string, ParsedTypeScriptFile>,
   currentFile: string,
-  config: ImportResolutionConfig
+  config: ImportResolutionConfig,
+  variableTypeMap?: Map<string, string>
 ): string | null {
-  // For member expressions like child_process.exec
+  // For member expressions like db.exec, client.sendMail
   if (call.memberChain.length > 1) {
     const base = call.memberChain[0];
     const method = call.memberChain[call.memberChain.length - 1];
+
+    // First check if base variable has a known type from constructor
+    if (variableTypeMap?.has(base)) {
+      const baseType = variableTypeMap.get(base)!;
+      return `${baseType}.${method}`;
+    }
 
     // Check if base is an imported module
     const importInfo = imports.find(imp =>
@@ -559,6 +660,9 @@ export function buildCallGraph(
 
   // Build nodes
   for (const [filePath, parsed] of files) {
+    // Build variable type map for this file (for constructor/factory call tracking)
+    const variableTypeMap = buildVariableTypeMap(parsed, parsed.imports);
+
     // Process functions
     for (const func of parsed.functions) {
       const nodeId = func.className
@@ -577,8 +681,8 @@ export function buildCallGraph(
         if (call.enclosingFunction === func.name ||
             (func.className && call.enclosingClass === func.className && call.enclosingFunction === func.name)) {
 
-          // Try to resolve call identity
-          const resolvedIdentity = resolveCallIdentity(call, parsed.imports, files, filePath, config);
+          // Try to resolve call identity (now with variable type map)
+          const resolvedIdentity = resolveCallIdentity(call, parsed.imports, files, filePath, config, variableTypeMap);
 
           // Check if dangerous
           const dangerousOp = matchDangerousOperation(call, resolvedIdentity, filePath);

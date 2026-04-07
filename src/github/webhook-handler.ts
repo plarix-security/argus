@@ -283,7 +283,7 @@ export async function handleInstallationEvent(
     const context: InstallationContext = {
       owner: repo.full_name.split('/')[0],
       repo: repo.name,
-      defaultBranch: repo.default_branch || 'main',
+      defaultBranch: 'main', // Installation repositories don't include default_branch, use 'main' as default
       installationId: installation.id,
       commitSha: 'HEAD', // Will resolve to actual SHA during clone
     };

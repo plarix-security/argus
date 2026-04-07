@@ -112,9 +112,12 @@ export function extractSemanticInvocationRoots(
  * Extract OpenAI SDK tool registrations
  *
  * Pattern:
- * client.chat.completions.create({
- *   tools: [{ type: 'function', function: { name: 'myTool', ... } }]
- * })
+ * const tools: OpenAI.ChatCompletionTool[] = [
+ *   { type: 'function', function: { name: 'myTool', ... } }
+ * ]
+ *
+ * Then we register the actual function 'myTool' as the tool root,
+ * NOT the function that calls chat.completions.create.
  */
 function extractOpenAITools(
   filePath: string,
@@ -129,8 +132,50 @@ function extractOpenAITools(
 
   if (!hasOpenAI) return roots;
 
-  // Look for chat.completions.create calls with tools parameter
-  // Must match full chain, not just 'create' to avoid false positives
+  // Strategy: Find OpenAI tool schema definitions and extract the tool names
+  // from `function: { name: 'toolName' }` patterns, then map to actual function definitions
+
+  // Step 1: Find tool schema arrays/objects in assignments
+  // Look for patterns like: const tools: OpenAI.ChatCompletionTool[] = [{ type: 'function', function: { name: 'query_orders' } }]
+  for (const assignment of parsed.assignments) {
+    // Check if this looks like an OpenAI tools array
+    const isToolsArray = assignment.value.includes('ChatCompletionTool') ||
+                          (assignment.target.toLowerCase().includes('tool') &&
+                           assignment.value.includes("type:") &&
+                           assignment.value.includes("'function'")) ||
+                          (assignment.value.includes("type: 'function'") &&
+                           assignment.value.includes("function: {"));
+
+    if (isToolsArray) {
+      // Extract tool names from function: { name: 'toolName' } patterns
+      // Match both single and double quotes
+      const toolNameMatches = assignment.value.matchAll(/function:\s*\{[^}]*name:\s*['"]([^'"]+)['"]/g);
+
+      for (const match of toolNameMatches) {
+        const toolName = match[1];
+
+        // Find the corresponding function definition
+        const toolFunc = parsed.functions.find(f => f.name === toolName);
+
+        if (toolFunc) {
+          const nodeId = toolFunc.className
+            ? `${filePath}:${toolFunc.className}.${toolName}`
+            : `${filePath}:${toolName}`;
+
+          roots.push({
+            nodeId,
+            toolName,
+            framework: 'openai',
+            evidence: `OpenAI tool schema defines function "${toolName}"`,
+            sourceFile: filePath,
+            line: toolFunc.startLine,
+          });
+        }
+      }
+    }
+  }
+
+  // Step 2: Also look for inline tool definitions in chat.completions.create calls
   for (const call of parsed.calls) {
     const chainStr = call.memberChain.join('.');
     const isOpenAICompletions = chainStr.includes('chat.completions.create') ||
@@ -138,19 +183,35 @@ function extractOpenAITools(
                                  (chainStr.endsWith('.create') && chainStr.includes('chat'));
 
     if (isOpenAICompletions) {
-      // Check if arguments contain 'tools'
-      const hasTools = call.arguments.some(arg => arg.includes('tools:') || arg.includes('tools'));
+      // Check arguments for inline tool definitions
+      for (const arg of call.arguments) {
+        if (arg.includes("function: {") && arg.includes("name:")) {
+          // Extract inline tool names
+          const inlineToolMatches = arg.matchAll(/function:\s*\{[^}]*name:\s*['"]([^'"]+)['"]/g);
 
-      if (hasTools && call.enclosingFunction) {
-        const nodeId = `${filePath}:${call.enclosingFunction}`;
-        roots.push({
-          nodeId,
-          toolName: call.enclosingFunction,
-          framework: 'openai',
-          evidence: 'OpenAI chat.completions.create with tools parameter',
-          sourceFile: filePath,
-          line: call.line,
-        });
+          for (const match of inlineToolMatches) {
+            const toolName = match[1];
+            const toolFunc = parsed.functions.find(f => f.name === toolName);
+
+            if (toolFunc) {
+              const nodeId = toolFunc.className
+                ? `${filePath}:${toolFunc.className}.${toolName}`
+                : `${filePath}:${toolName}`;
+
+              // Avoid duplicates
+              if (!roots.some(r => r.nodeId === nodeId)) {
+                roots.push({
+                  nodeId,
+                  toolName,
+                  framework: 'openai',
+                  evidence: `OpenAI inline tool schema defines function "${toolName}"`,
+                  sourceFile: filePath,
+                  line: toolFunc.startLine,
+                });
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -324,8 +385,8 @@ function extractVercelAITools(
 /**
  * Extract generic tool patterns
  *
- * Pattern: Any function/method that contains 'tool' in name and appears
- * to be exported or assigned to a tools array
+ * Pattern: Any function/method that is referenced in a tools array by name,
+ * either directly or via function schema { name: 'funcName' }
  */
 function extractGenericTools(
   filePath: string,
@@ -338,22 +399,51 @@ function extractGenericTools(
     if (assignment.target.toLowerCase().includes('tool') &&
         (assignment.value.includes('[') || assignment.value.includes('{'))) {
 
-      // This might be a tools array/object
-      // Check if any functions are referenced in the value
+      // Strategy 1: Direct function references in the value
       for (const func of parsed.functions) {
-        if (assignment.value.includes(func.name)) {
+        // Check for direct reference: [myFunc, otherFunc] or { tool: myFunc }
+        const directRef = new RegExp(`\\b${func.name}\\b(?!['":])`);
+        if (directRef.test(assignment.value)) {
           const nodeId = func.className
             ? `${filePath}:${func.className}.${func.name}`
             : `${filePath}:${func.name}`;
 
-          roots.push({
-            nodeId,
-            toolName: func.name,
-            framework: 'generic',
-            evidence: `Function referenced in ${assignment.target} tools collection`,
-            sourceFile: filePath,
-            line: func.startLine,
-          });
+          // Check we haven't already added this via OpenAI or other extractors
+          if (!roots.some(r => r.nodeId === nodeId)) {
+            roots.push({
+              nodeId,
+              toolName: func.name,
+              framework: 'generic',
+              evidence: `Function referenced in ${assignment.target} tools collection`,
+              sourceFile: filePath,
+              line: func.startLine,
+            });
+          }
+        }
+      }
+
+      // Strategy 2: Named tool schemas like { name: 'funcName' } or function: { name: 'funcName' }
+      const schemaNameMatches = assignment.value.matchAll(/(?:name|function\.name|"name"):\s*['"]([^'"]+)['"]/g);
+      for (const match of schemaNameMatches) {
+        const toolName = match[1];
+        const toolFunc = parsed.functions.find(f => f.name === toolName);
+
+        if (toolFunc) {
+          const nodeId = toolFunc.className
+            ? `${filePath}:${toolFunc.className}.${toolName}`
+            : `${filePath}:${toolName}`;
+
+          // Avoid duplicates
+          if (!roots.some(r => r.nodeId === nodeId)) {
+            roots.push({
+              nodeId,
+              toolName,
+              framework: 'generic',
+              evidence: `Tool schema references function "${toolName}" in ${assignment.target}`,
+              sourceFile: filePath,
+              line: toolFunc.startLine,
+            });
+          }
         }
       }
     }
