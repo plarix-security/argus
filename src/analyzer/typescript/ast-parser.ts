@@ -72,11 +72,29 @@ export interface CallArgumentInfo {
   identifierName?: string;
 }
 
+export interface ArrayElement {
+  text: string;
+  objectProperties?: ObjectProperty[];
+}
+
+export interface ObjectProperty {
+  key: string;
+  value: string;
+  valueType: 'string' | 'number' | 'boolean' | 'identifier' | 'object' | 'array' | 'function' | 'unknown';
+  stringValue?: string; // For string literals, the unquoted value
+  nestedProperties?: ObjectProperty[]; // For nested objects
+}
+
 export interface AssignmentInfo {
   target: string;
   value: string;
   line: number;
   enclosingFunction?: string;
+  // Structured data extracted from AST (not regex)
+  isObjectLiteral?: boolean;
+  isArrayLiteral?: boolean;
+  objectProperties?: ObjectProperty[];
+  arrayElements?: ArrayElement[];
 }
 
 export interface ReturnInfo {
@@ -772,6 +790,107 @@ function extractImports(rootNode: Parser.SyntaxNode): ImportInfo[] {
 }
 
 /**
+ * Extract structured properties from an object literal AST node
+ * Uses AST traversal instead of regex pattern matching
+ */
+function extractObjectProperties(node: Parser.SyntaxNode): ObjectProperty[] {
+  const properties: ObjectProperty[] = [];
+
+  // Object literals have type 'object' or 'object_pattern'
+  if (node.type !== 'object' && node.type !== 'object_pattern') {
+    return properties;
+  }
+
+  // Find all pair nodes (key-value pairs)
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    if (!child || child.type !== 'pair') continue;
+
+    const keyNode = child.childForFieldName('key');
+    const valueNode = child.childForFieldName('value');
+
+    if (!keyNode || !valueNode) continue;
+
+    const key = keyNode.text.replace(/['"]/g, ''); // Remove quotes if string key
+    const value = valueNode.text;
+
+    let valueType: ObjectProperty['valueType'] = 'unknown';
+    let stringValue: string | undefined;
+    let nestedProperties: ObjectProperty[] | undefined;
+
+    // Determine value type from AST node type
+    switch (valueNode.type) {
+      case 'string':
+      case 'template_string':
+        valueType = 'string';
+        stringValue = valueNode.text.replace(/^['"`]|['"`]$/g, ''); // Remove quotes
+        break;
+      case 'number':
+        valueType = 'number';
+        break;
+      case 'true':
+      case 'false':
+        valueType = 'boolean';
+        break;
+      case 'identifier':
+        valueType = 'identifier';
+        break;
+      case 'object':
+      case 'object_pattern':
+        valueType = 'object';
+        nestedProperties = extractObjectProperties(valueNode);
+        break;
+      case 'array':
+      case 'array_pattern':
+        valueType = 'array';
+        break;
+      case 'arrow_function':
+      case 'function_expression':
+      case 'function':
+        valueType = 'function';
+        break;
+    }
+
+    properties.push({
+      key,
+      value,
+      valueType,
+      stringValue,
+      nestedProperties,
+    });
+  }
+
+  return properties;
+}
+
+/**
+ * Extract array elements from an array literal AST node
+ * Returns structured objects for object literal elements
+ */
+function extractArrayElements(node: Parser.SyntaxNode): Array<{text: string, objectProperties?: ObjectProperty[]}> {
+  const elements: Array<{text: string, objectProperties?: ObjectProperty[]}> = [];
+
+  if (node.type !== 'array' && node.type !== 'array_pattern') {
+    return elements;
+  }
+
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    if (!child || child.type === ',' || child.type === '[' || child.type === ']') continue;
+
+    // Check if element is an object literal
+    const isObject = child.type === 'object' || child.type === 'object_pattern';
+
+    elements.push({
+      text: child.text,
+      objectProperties: isObject ? extractObjectProperties(child) : undefined,
+    });
+  }
+
+  return elements;
+}
+
+/**
  * Extract assignments
  */
 function extractAssignments(rootNode: Parser.SyntaxNode): AssignmentInfo[] {
@@ -785,12 +904,18 @@ function extractAssignments(rootNode: Parser.SyntaxNode): AssignmentInfo[] {
 
     if (nameNode && valueNode) {
       const enclosingFunction = findEnclosingFunction(node);
+      const isObjectLiteral = valueNode.type === 'object' || valueNode.type === 'object_pattern';
+      const isArrayLiteral = valueNode.type === 'array' || valueNode.type === 'array_pattern';
 
       assignments.push({
         target: nameNode.text,
         value: valueNode.text,
         line: node.startPosition.row + 1,
         enclosingFunction,
+        isObjectLiteral,
+        isArrayLiteral,
+        objectProperties: isObjectLiteral ? extractObjectProperties(valueNode) : undefined,
+        arrayElements: isArrayLiteral ? extractArrayElements(valueNode) : undefined,
       });
     }
   }
@@ -803,12 +928,18 @@ function extractAssignments(rootNode: Parser.SyntaxNode): AssignmentInfo[] {
 
     if (leftNode && rightNode) {
       const enclosingFunction = findEnclosingFunction(node);
+      const isObjectLiteral = rightNode.type === 'object' || rightNode.type === 'object_pattern';
+      const isArrayLiteral = rightNode.type === 'array' || rightNode.type === 'array_pattern';
 
       assignments.push({
         target: leftNode.text,
         value: rightNode.text,
         line: node.startPosition.row + 1,
         enclosingFunction,
+        isObjectLiteral,
+        isArrayLiteral,
+        objectProperties: isObjectLiteral ? extractObjectProperties(rightNode) : undefined,
+        arrayElements: isArrayLiteral ? extractArrayElements(rightNode) : undefined,
       });
     }
   }
