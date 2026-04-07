@@ -78,7 +78,7 @@ export function summarizeReportForCheck(report: AnalysisReport): CheckOutput {
     summaryLines.push(`Skipped languages: ${skippedLanguages.join(', ')}`);
   }
 
-  summaryLines.push('The analyzed Python file set is graphed together. Changed-file scans do not guarantee full repository coverage.');
+  summaryLines.push('The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage.');
 
   return {
     title,

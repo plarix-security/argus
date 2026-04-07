@@ -4,12 +4,12 @@
  * Core types for Agent Failure Boundary detection through static analysis.
  * Based on the AFB Taxonomy v2.0 specification.
  *
- * v1.2.2: WyScan is Python-only and detects AFB04 only.
+ * v1.5.0: WyScan supports Python, TypeScript, and JavaScript. Detects AFB04 only.
  */
 
 /**
  * Supported programming languages for analysis.
- * v1.2.2: Python only. TypeScript/JavaScript not supported.
+ * v1.5.0: Python, TypeScript, and JavaScript supported.
  */
 export type SupportedLanguage = 'python' | 'typescript' | 'javascript';
 

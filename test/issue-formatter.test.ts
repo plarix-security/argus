@@ -106,7 +106,7 @@ describe('Issue Formatter', () => {
     test('includes coverage notes section', () => {
       const body = generateIssueBody(mockReport, 'owner/repo', 'abc123');
       expect(body).toContain('## 📋 Coverage Notes');
-      expect(body).toContain('The analyzed Python file set is graphed together');
+      expect(body).toContain('The analyzed file set is graphed together per language');
     });
 
     test('includes footer with version', () => {

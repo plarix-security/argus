@@ -148,8 +148,8 @@ function extractOpenAITools(
 
     if (isToolsArray) {
       // Extract tool names from function: { name: 'toolName' } patterns
-      // Match both single and double quotes
-      const toolNameMatches = assignment.value.matchAll(/function:\s*\{[^}]*name:\s*['"]([^'"]+)['"]/g);
+      // Use [\s\S]*? to handle multiline schemas (non-greedy to avoid matching too much)
+      const toolNameMatches = assignment.value.matchAll(/function:\s*\{[\s\S]*?name:\s*['"]([^'"]+)['"]/g);
 
       for (const match of toolNameMatches) {
         const toolName = match[1];

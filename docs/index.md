@@ -1,13 +1,12 @@
 # WyScan
 
-WyScan is a Python-first static scanner for AFB04-style unauthorized action exposure in agent code.
+WyScan is a static scanner for AFB04-style unauthorized action exposure in agent code. It supports Python, TypeScript, and JavaScript.
 
 Current shipped behavior:
 
-- Parses Python with tree-sitter.
-- Detects Python tool registrations using framework and decorator patterns.
+- Parses Python, TypeScript, and JavaScript with tree-sitter.
+- Detects tool registrations using framework and decorator patterns across all supported languages.
 - Reports matched reachable operations when no credited policy gate is detected in the analyzed path.
-- Skips TypeScript and JavaScript explicitly.
 
 Use these pages for the current shipped behavior:
 

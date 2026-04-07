@@ -32,4 +32,4 @@
 - PASS on an exact-match Python case means the current scanner found the same number of findings as the benchmark manifest and reported no failed files.
 - PASS on a CEE-validated Python case means the current scanner also satisfied the manifest's required CEE identities or minimum CEE coverage.
 - NOT VALIDATED on an asset-limited case means the repository snapshot contained no analyzable source files. The result is informational only and does not validate language support or skipped-language handling.
-- These results validate the current Python-first scanner. They do not claim TypeScript, JavaScript, or Rust finding support.
+- These results validate the scanner. Rust finding support is not yet implemented.

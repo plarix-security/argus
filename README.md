@@ -246,25 +246,19 @@ Current CLI JSON shape:
     "suppressed": 0
   },
   "coverage": {
-    "languages_scanned": ["python"],
-    "languages_skipped": ["typescript", "javascript"],
+    "languages_scanned": ["python", "typescript", "javascript"],
+    "languages_skipped": [],
     "frameworks_detected": ["langchain", "openai"],
     "files_analyzed": 34,
-    "files_skipped": 2,
+    "files_skipped": 0,
     "failed_files": [],
-    "skipped_files": [
-      {
-        "file": "/absolute/path/src/tool.ts",
-        "language": "typescript",
-        "reason": "TypeScript scanning is not implemented in this version. File skipped."
-      }
-    ],
-    "partial": true,
-    "total_files_discovered": 36,
+    "skipped_files": [],
+    "partial": false,
+    "total_files_discovered": 34,
     "file_limit": 9007199254740991,
     "file_limit_hit": false,
     "limitations": [
-      "The analyzed Python file set is graphed together. Changed-file scans do not guarantee full repository coverage."
+      "The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage."
     ]
   }
 }
@@ -273,8 +267,7 @@ Current CLI JSON shape:
 Notes:
 
 - `files_analyzed` at the top level is the report file count used by the current CLI output.
-- `coverage.files_analyzed` counts Python files only.
-- TypeScript and JavaScript files are reflected as skipped coverage, not findings.
+- `coverage.files_analyzed` counts all analyzed files across languages.
 - `cees` is the full detected execution-event inventory for the analyzed path set.
 - `findings` is the AFB04 subset of `cees`.
 - `call_path` lists the traced function path in the analyzed file set.

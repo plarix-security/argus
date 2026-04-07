@@ -37,7 +37,7 @@ Current CLI JSON shape:
 
 ```json
 {
-  "version": "1.3.0",
+  "version": "1.5.0",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,
@@ -112,25 +112,19 @@ Current CLI JSON shape:
     "suppressed": 0
   },
   "coverage": {
-    "languages_scanned": ["python"],
-    "languages_skipped": ["typescript", "javascript"],
-    "frameworks_detected": ["langchain"],
+    "languages_scanned": ["python", "typescript", "javascript"],
+    "languages_skipped": [],
+    "frameworks_detected": ["langchain", "openai"],
     "files_analyzed": 34,
-    "files_skipped": 2,
+    "files_skipped": 0,
     "failed_files": [],
-    "skipped_files": [
-      {
-        "file": "/absolute/path/src/tool.ts",
-        "language": "typescript",
-        "reason": "TypeScript scanning is not implemented in this version. File skipped."
-      }
-    ],
-    "partial": true,
-    "total_files_discovered": 36,
+    "skipped_files": [],
+    "partial": false,
+    "total_files_discovered": 34,
     "file_limit": 9007199254740991,
     "file_limit_hit": false,
     "limitations": [
-      "The analyzed Python file set is graphed together. Changed-file scans do not guarantee full repository coverage."
+      "The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage."
     ]
   }
 }

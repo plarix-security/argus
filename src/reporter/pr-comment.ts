@@ -37,7 +37,7 @@ function getCoverageLines(report: AnalysisReport): string[] {
 
 function getCoverageNotes(report: AnalysisReport): string[] {
   const notes = [
-    'The analyzed Python file set is graphed together. Changed-file scans do not guarantee full repository coverage.',
+    'The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage.',
   ];
 
   if (report.metadata.failedFiles.length > 0) {

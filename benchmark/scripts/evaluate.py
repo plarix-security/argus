@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-WyScan benchmark validator for the current Python-first scanner.
+WyScan benchmark validator.
 
 This script runs the built CLI against each benchmark directory and writes a
 single markdown summary to benchmark/BENCHMARK_RESULTS.md.
@@ -249,7 +249,7 @@ def write_report(results: list[BenchmarkResult]) -> None:
     lines.append("- PASS on an exact-match Python case means the current scanner found the same number of findings as the benchmark manifest and reported no failed files.")
     lines.append("- PASS on a CEE-validated Python case means the current scanner also satisfied the manifest's required CEE identities or minimum CEE coverage.")
     lines.append("- NOT VALIDATED on an asset-limited case means the repository snapshot contained no analyzable source files. The result is informational only and does not validate language support or skipped-language handling.")
-    lines.append("- These results validate the current Python-first scanner. They do not claim TypeScript, JavaScript, or Rust finding support.")
+    lines.append("- These results validate the scanner. Rust finding support is not yet implemented.")
 
     RESULTS_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
