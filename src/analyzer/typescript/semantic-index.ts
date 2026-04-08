@@ -103,6 +103,34 @@ export function extractSemanticInvocationRoots(
     for (const root of genericRoots) {
       roots.set(root.nodeId, root);
     }
+
+    // Check for action object patterns (Eliza, custom frameworks)
+    const actionRoots = extractActionObjectPatterns(filePath, parsed);
+    for (const root of actionRoots) {
+      roots.set(root.nodeId, root);
+    }
+
+    // Check for plugin array patterns
+    const pluginRoots = extractPluginArrayPatterns(filePath, parsed);
+    for (const root of pluginRoots) {
+      roots.set(root.nodeId, root);
+    }
+
+    // Check for registration call patterns
+    const registrationRoots = extractRegistrationCallPatterns(filePath, parsed);
+    for (const root of registrationRoots) {
+      roots.set(root.nodeId, root);
+    }
+  }
+
+  // If no roots found, try exported entry points as fallback
+  if (roots.size === 0) {
+    for (const [filePath, parsed] of files) {
+      const exportRoots = extractExportedEntryPoints(filePath, parsed);
+      for (const root of exportRoots) {
+        roots.set(root.nodeId, root);
+      }
+    }
   }
 
   return roots;
@@ -654,6 +682,354 @@ function extractPlaywrightTools(
         sourceFile: filePath,
         line: func.startLine,
       });
+    }
+  }
+
+  return roots;
+}
+
+/**
+ * Extract action object patterns
+ *
+ * Detects objects with action-like callback properties:
+ * - handler: async (runtime, message, state) => { ... }
+ * - execute: async (context) => { ... }
+ * - run: async (params) => { ... }
+ * - action: async (...) => { ... }
+ *
+ * This pattern is used by Eliza, custom agent frameworks, and plugin systems.
+ * Detects: { name: "myAction", handler: async () => { ... } }
+ */
+function extractActionObjectPatterns(
+  filePath: string,
+  parsed: ParsedTypeScriptFile
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+
+  // Action-like property names that indicate callback functions
+  const actionPropertyNames = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform']);
+
+  for (const assignment of parsed.assignments) {
+    // Only check object literals
+    if (!assignment.isObjectLiteral || !assignment.objectProperties) continue;
+
+    // Look for action-like callback properties
+    for (const prop of assignment.objectProperties) {
+      if (!actionPropertyNames.has(prop.key)) continue;
+
+      // Case 1: Inline function - { handler: async () => { ... } }
+      if (prop.valueType === 'function') {
+        // Try to get a name from the object
+        const nameProp = assignment.objectProperties.find(p => p.key === 'name');
+        const toolName = nameProp?.stringValue || assignment.target;
+
+        const nodeId = assignment.enclosingFunction
+          ? `${filePath}:${assignment.enclosingFunction}`
+          : `${filePath}:${assignment.target}`;
+
+        if (!roots.some(r => r.nodeId === nodeId)) {
+          roots.push({
+            nodeId,
+            toolName,
+            framework: 'action-object',
+            evidence: `Action object "${assignment.target}" with inline ${prop.key} callback`,
+            sourceFile: filePath,
+            line: assignment.line,
+          });
+        }
+        break; // Only add once per object
+      }
+
+      // Case 2: Function reference - { handler: myHandlerFunc }
+      if (prop.valueType === 'identifier') {
+        const funcName = prop.value;
+        const func = parsed.functions.find(f => f.name === funcName);
+
+        if (func) {
+          const nameProp = assignment.objectProperties.find(p => p.key === 'name');
+          const toolName = nameProp?.stringValue || funcName;
+
+          const nodeId = func.className
+            ? `${filePath}:${func.className}.${funcName}`
+            : `${filePath}:${funcName}`;
+
+          if (!roots.some(r => r.nodeId === nodeId)) {
+            roots.push({
+              nodeId,
+              toolName,
+              framework: 'action-object',
+              evidence: `Action object "${assignment.target}" references ${prop.key} function "${funcName}"`,
+              sourceFile: filePath,
+              line: func.startLine,
+            });
+          }
+          break; // Only add once per object
+        }
+      }
+    }
+  }
+
+  return roots;
+}
+
+/**
+ * Extract plugin array patterns
+ *
+ * Detects arrays named actions, plugins, handlers, commands containing
+ * action objects or function references.
+ *
+ * Pattern: const myPlugin = { actions: [action1, action2] }
+ * Pattern: const actions = [myAction, anotherAction]
+ */
+function extractPluginArrayPatterns(
+  filePath: string,
+  parsed: ParsedTypeScriptFile
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+
+  // Plugin array property names
+  const pluginArrayNames = new Set(['actions', 'plugins', 'handlers', 'commands', 'evaluators', 'services', 'tools', 'capabilities']);
+
+  for (const assignment of parsed.assignments) {
+    // Case 1: Direct array assignment - const actions = [action1, action2]
+    const targetLower = assignment.target.toLowerCase();
+    const isPluginArray = Array.from(pluginArrayNames).some(name =>
+      targetLower === name || targetLower.endsWith(name)
+    );
+
+    if (assignment.isArrayLiteral && assignment.arrayElements && isPluginArray) {
+      for (const element of assignment.arrayElements) {
+        const trimmed = element.text.trim();
+
+        // Check if it's a function/variable reference
+        const func = parsed.functions.find(f => f.name === trimmed);
+        if (func) {
+          const nodeId = func.className
+            ? `${filePath}:${func.className}.${func.name}`
+            : `${filePath}:${func.name}`;
+
+          if (!roots.some(r => r.nodeId === nodeId)) {
+            roots.push({
+              nodeId,
+              toolName: func.name,
+              framework: 'plugin-array',
+              evidence: `Function "${func.name}" in ${assignment.target} array`,
+              sourceFile: filePath,
+              line: func.startLine,
+            });
+          }
+        }
+
+        // Check if it's an object with a name property
+        if (element.objectProperties) {
+          const nameProp = element.objectProperties.find(p => p.key === 'name');
+          const handlerProp = element.objectProperties.find(p =>
+            p.key === 'handler' || p.key === 'execute' || p.key === 'run'
+          );
+
+          if (nameProp?.stringValue && handlerProp) {
+            const toolName = nameProp.stringValue;
+
+            // If handler is a function reference, find it
+            if (handlerProp.valueType === 'identifier') {
+              const func = parsed.functions.find(f => f.name === handlerProp.value);
+              if (func) {
+                const nodeId = func.className
+                  ? `${filePath}:${func.className}.${func.name}`
+                  : `${filePath}:${func.name}`;
+
+                if (!roots.some(r => r.nodeId === nodeId)) {
+                  roots.push({
+                    nodeId,
+                    toolName,
+                    framework: 'plugin-array',
+                    evidence: `Action "${toolName}" in ${assignment.target} with ${handlerProp.key} function`,
+                    sourceFile: filePath,
+                    line: func.startLine,
+                  });
+                }
+              }
+            } else if (handlerProp.valueType === 'function') {
+              // Inline function in array element
+              const nodeId = `${filePath}:${toolName}`;
+              if (!roots.some(r => r.nodeId === nodeId)) {
+                roots.push({
+                  nodeId,
+                  toolName,
+                  framework: 'plugin-array',
+                  evidence: `Action "${toolName}" in ${assignment.target} with inline ${handlerProp.key}`,
+                  sourceFile: filePath,
+                  line: assignment.line,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Case 2: Object with plugin arrays - { name: "...", actions: [...] }
+    if (assignment.isObjectLiteral && assignment.objectProperties) {
+      for (const prop of assignment.objectProperties) {
+        if (!pluginArrayNames.has(prop.key)) continue;
+        if (prop.valueType !== 'array') continue;
+
+        // This property is an array of actions/plugins
+        // The array elements would be in the raw value, need to parse assignments that reference them
+        // For now, mark the whole plugin object as a root
+        const nameProp = assignment.objectProperties.find(p => p.key === 'name');
+        const pluginName = nameProp?.stringValue || assignment.target;
+
+        // Look for functions referenced in this file that might be handlers
+        // We'll mark the plugin itself as needing analysis
+        const nodeId = `${filePath}:${assignment.target}`;
+        if (!roots.some(r => r.nodeId === nodeId)) {
+          roots.push({
+            nodeId,
+            toolName: pluginName,
+            framework: 'plugin-array',
+            evidence: `Plugin "${pluginName}" exports ${prop.key} array`,
+            sourceFile: filePath,
+            line: assignment.line,
+          });
+        }
+      }
+    }
+  }
+
+  return roots;
+}
+
+/**
+ * Extract registration call patterns
+ *
+ * Detects function calls that register actions/handlers:
+ * - registerAction("name", handler)
+ * - addPlugin(plugin)
+ * - defineCommand("name", func)
+ * - runtime.registerAction(action)
+ */
+function extractRegistrationCallPatterns(
+  filePath: string,
+  parsed: ParsedTypeScriptFile
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+
+  // Registration function patterns
+  const registrationPatterns = [
+    'register', 'add', 'define', 'use', 'install', 'mount', 'attach', 'bind'
+  ];
+  const registrationTargets = [
+    'action', 'plugin', 'handler', 'command', 'tool', 'service', 'event', 'hook', 'capability'
+  ];
+
+  for (const call of parsed.calls) {
+    const calleeLower = call.callee.toLowerCase();
+    const lastMember = call.memberChain[call.memberChain.length - 1]?.toLowerCase() || calleeLower;
+
+    // Check if this is a registration call
+    const isRegistration = registrationPatterns.some(pattern =>
+      lastMember.startsWith(pattern)
+    );
+    const targetType = registrationTargets.find(target =>
+      lastMember.includes(target)
+    );
+
+    if (!isRegistration || !targetType) continue;
+
+    // First argument is typically the name or the handler
+    const firstArg = call.arguments[0];
+    const secondArg = call.arguments[1];
+
+    let toolName: string | undefined;
+    let handlerName: string | undefined;
+
+    // Pattern: registerAction("name", handler)
+    if (firstArg && firstArg.startsWith('"') || firstArg?.startsWith("'")) {
+      toolName = firstArg.replace(/['"]/g, '');
+      handlerName = secondArg;
+    }
+    // Pattern: registerAction(actionObject)
+    else if (firstArg && !firstArg.includes('(')) {
+      toolName = firstArg;
+      handlerName = firstArg;
+    }
+
+    if (toolName) {
+      // Try to find the handler function
+      const func = handlerName ? parsed.functions.find(f => f.name === handlerName) : undefined;
+
+      const nodeId = func
+        ? (func.className ? `${filePath}:${func.className}.${func.name}` : `${filePath}:${func.name}`)
+        : (call.enclosingFunction ? `${filePath}:${call.enclosingFunction}` : `${filePath}:${toolName}`);
+
+      if (!roots.some(r => r.nodeId === nodeId)) {
+        roots.push({
+          nodeId,
+          toolName,
+          framework: 'registration',
+          evidence: `${call.callee}() registration call for "${toolName}"`,
+          sourceFile: filePath,
+          line: func?.startLine || call.line,
+        });
+      }
+    }
+  }
+
+  return roots;
+}
+
+/**
+ * Extract exported entry points as fallback
+ *
+ * When no framework-specific patterns are detected, treat exported
+ * async functions with parameters as potential entry points.
+ *
+ * This is a lower-confidence fallback for custom/unknown frameworks.
+ */
+function extractExportedEntryPoints(
+  filePath: string,
+  parsed: ParsedTypeScriptFile
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+
+  // Entry point naming patterns
+  const entryPointNames = [
+    'execute', 'run', 'handle', 'process', 'action', 'handler',
+    'invoke', 'call', 'perform', 'dispatch', 'trigger'
+  ];
+
+  for (const func of parsed.functions) {
+    // Only consider exported functions
+    if (!func.isExported) continue;
+
+    // Skip methods (only top-level functions)
+    if (func.isMethod) continue;
+
+    // Must have parameters (receives external input)
+    if (func.parameters.length === 0) continue;
+
+    // Check if name suggests it's an entry point or if it's async
+    const nameLower = func.name.toLowerCase();
+    const hasEntryPointName = entryPointNames.some(name => nameLower.includes(name));
+    const isAsync = func.isAsync;
+
+    // Include if: has entry point name OR is async with parameters
+    if (hasEntryPointName || isAsync) {
+      const nodeId = func.className
+        ? `${filePath}:${func.className}.${func.name}`
+        : `${filePath}:${func.name}`;
+
+      if (!roots.some(r => r.nodeId === nodeId)) {
+        roots.push({
+          nodeId,
+          toolName: func.name,
+          framework: 'export-entry',
+          evidence: `Exported ${isAsync ? 'async ' : ''}function "${func.name}" as potential entry point`,
+          sourceFile: filePath,
+          line: func.startLine,
+        });
+      }
     }
   }
 
