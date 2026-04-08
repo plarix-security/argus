@@ -28,4 +28,7 @@ tmp/
 .tmp/
 *.tmp
 
+# Test repositories
+test-repos/
+
 .mailmap
