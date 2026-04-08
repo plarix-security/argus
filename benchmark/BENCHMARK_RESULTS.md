@@ -1,10 +1,10 @@
 # WyScan Benchmark Results
 
-**Run Date:** 2026-04-05
+**Run Date:** 2026-04-08
 **Benchmarks Evaluated:** 16
 **Python Exact-Match Cases:** 8/8 passed
 **Python CEE-Validated Cases:** 4/4 passed
-**Asset-Limited Cases:** 4
+**Asset-Limited Cases:** 1
 
 ## Summary
 
@@ -15,14 +15,14 @@
 | 02-langchain-rag-agent | python | Exact match with 6 expected Python findings | 6 cees, 6 afb04 findings (1C/4W/1I), exit 2, analyzed 6, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 6 CEEs were inventoried. |
 | 03-langgraph-supervisor | python | Exact match with 11 expected Python findings | 11 cees, 11 afb04 findings (2C/6W/3I), exit 2, analyzed 8, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 11 CEEs were inventoried. |
 | 04-crewai-research-crew | python | Exact match with 11 expected Python findings | 11 cees, 11 afb04 findings (1C/9W/1I), exit 2, analyzed 9, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 11 CEEs were inventoried. |
-| 05-openai-assistants-parallel | typescript | No analyzable source files in current snapshot | 0 cees, 0 afb04 findings (0C/0W/0I), exit 0, analyzed 0, skipped 0, failed 0 | NOT VALIDATED | This repo snapshot contains no analyzable source files for this fixture. The result is informational only and does not validate skipped-language handling. |
+| 05-openai-assistants-parallel | typescript | Observed current scanner behavior | 4 cees, 4 afb04 findings (0C/4W/0I), exit 1, analyzed 3, skipped 0, failed 0 | PASS | Observed current scanner behavior on this fixture. |
 | 06-autogen-code-executor | python | Exact match with 5 expected Python findings | 5 cees, 5 afb04 findings (2C/2W/1I), exit 2, analyzed 1, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 5 CEEs were inventoried. |
 | 07-langgraph-memory-agent | python | Exact match with 6 expected Python findings | 6 cees, 6 afb04 findings (0C/4W/2I), exit 1, analyzed 5, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 6 CEEs were inventoried. |
-| 08-typescript-browser-agent | typescript | No analyzable source files in current snapshot | 0 cees, 0 afb04 findings (0C/0W/0I), exit 0, analyzed 0, skipped 0, failed 0 | NOT VALIDATED | This repo snapshot contains no analyzable source files for this fixture. The result is informational only and does not validate skipped-language handling. |
+| 08-typescript-browser-agent | typescript | Observed current scanner behavior | 5 cees, 5 afb04 findings (1C/3W/1I), exit 2, analyzed 4, skipped 0, failed 0 | PASS | Observed current scanner behavior on this fixture. |
 | 09-multi-agent-pipeline-fastapi | python | Exact match with 7 expected Python findings | 7 cees, 7 afb04 findings (2C/2W/3I), exit 2, analyzed 7, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 7 CEEs were inventoried. |
 | 10-rust-agent-runtime | rust | No analyzable source files in current snapshot | 0 cees, 0 afb04 findings (0C/0W/0I), exit 0, analyzed 0, skipped 0, failed 0 | NOT VALIDATED | This repo snapshot contains no analyzable source files for this fixture. The result is informational only and does not validate skipped-language handling. |
 | 11-smolagents-computer-use | python | Exact match with 5 expected Python findings | 5 cees, 5 afb04 findings (2C/2W/1I), exit 2, analyzed 6, skipped 0, failed 0 | PASS | Python manifest count matched exactly. 5 CEEs were inventoried. |
-| 12-heterogeneous-multi-framework | python, typescript | No analyzable source files in current snapshot | 0 cees, 0 afb04 findings (0C/0W/0I), exit 0, analyzed 0, skipped 0, failed 0 | NOT VALIDATED | This repo snapshot contains no analyzable source files for this fixture. The result is informational only and does not validate skipped-language handling. |
+| 12-heterogeneous-multi-framework | python, typescript | Observed current scanner behavior | 9 cees, 9 afb04 findings (0C/6W/3I), exit 1, analyzed 6, skipped 0, failed 0 | PASS | Observed current scanner behavior on this fixture. |
 | 13-kubernetes-gitops-agent | python | Operational Python scan with no failed files plus CEE validation | 36 cees, 36 afb04 findings (19C/14W/3I), exit 2, analyzed 7, skipped 0, failed 0 | PASS | CEE validation passed with 36 inventoried events |
 | 14-code-execution-sandbox | python | Operational Python scan with no failed files plus CEE validation | 52 cees, 52 afb04 findings (17C/27W/8I), exit 2, analyzed 8, skipped 0, failed 0 | PASS | CEE validation passed with 52 inventoried events |
 | 15-data-pipeline-etl | python | Operational Python scan with no failed files plus CEE validation | 55 cees, 55 afb04 findings (6C/31W/18I), exit 2, analyzed 9, skipped 0, failed 0 | PASS | CEE validation passed with 55 inventoried events |

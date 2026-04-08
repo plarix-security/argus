@@ -262,7 +262,7 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
   // ============================================
   // EMAIL (WARNING)
   // ============================================
-  { identity: /^(transporter|mailer|nodemailer)\.(sendMail|send)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Email send via nodemailer', resourceHint: 'email', changesState: true },
+  { identity: /^(transporter|mailer|nodemailer|nodemailer\.Transporter)\.(sendMail|send)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Email send via nodemailer', resourceHint: 'email', changesState: true },
   { identity: /^sgMail\.(send|sendMultiple)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Email send via SendGrid', resourceHint: 'email', changesState: true },
   { identity: /^mailgun\.(messages\(\)\.send|messages\.create)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Email send via Mailgun', resourceHint: 'email', changesState: true },
   { identity: /^ses\.(sendEmail|sendRawEmail|sendTemplatedEmail)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Email send via AWS SES', resourceHint: 'email', changesState: true },
