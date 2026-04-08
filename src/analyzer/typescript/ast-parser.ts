@@ -43,6 +43,10 @@ export interface FunctionDef {
   endLine: number;
   bodyNode?: ASTNode;
   controlFlow?: ControlFlowInfo;
+  /** Whether this function is exported */
+  isExported?: boolean;
+  /** How this function is exported */
+  exportKind?: 'named' | 'default' | 'commonjs';
 }
 
 export interface ClassDef {
@@ -121,6 +125,8 @@ export interface ParsedTypeScriptFile {
   imports: ImportInfo[];
   assignments: AssignmentInfo[];
   returns: ReturnInfo[];
+  /** Map of exported symbol names to their export kind */
+  exports?: Map<string, 'named' | 'default' | 'commonjs'>;
 }
 
 // Parser state
@@ -550,9 +556,139 @@ function analyzeControlFlow(funcNode: Parser.SyntaxNode): ControlFlowInfo {
 }
 
 /**
+ * Extract exported symbol names from AST
+ * Detects: export function foo(), export const foo, export default, export { foo }, module.exports
+ */
+function extractExports(rootNode: Parser.SyntaxNode): Map<string, 'named' | 'default' | 'commonjs'> {
+  const exports = new Map<string, 'named' | 'default' | 'commonjs'>();
+
+  // Find all export_statement nodes
+  const exportStatements = findAllNodes(rootNode, ['export_statement']);
+
+  for (const node of exportStatements) {
+    const text = node.text;
+
+    // export default function/class/expression
+    if (text.startsWith('export default')) {
+      // Try to find the name of what's being exported
+      const declaration = node.childForFieldName('declaration');
+      const value = node.childForFieldName('value');
+
+      if (declaration) {
+        // export default function foo() or export default class Foo
+        const nameNode = declaration.childForFieldName('name');
+        if (nameNode) {
+          exports.set(nameNode.text, 'default');
+        } else {
+          exports.set('default', 'default');
+        }
+      } else if (value) {
+        // export default identifier or export default expression
+        if (value.type === 'identifier') {
+          exports.set(value.text, 'default');
+        } else {
+          exports.set('default', 'default');
+        }
+      }
+      continue;
+    }
+
+    // export function foo() {}
+    const funcDecl = node.children.find(c => c.type === 'function_declaration');
+    if (funcDecl) {
+      const nameNode = funcDecl.childForFieldName('name');
+      if (nameNode) {
+        exports.set(nameNode.text, 'named');
+      }
+      continue;
+    }
+
+    // export class Foo {}
+    const classDecl = node.children.find(c => c.type === 'class_declaration');
+    if (classDecl) {
+      const nameNode = classDecl.childForFieldName('name');
+      if (nameNode) {
+        exports.set(nameNode.text, 'named');
+      }
+      continue;
+    }
+
+    // export const/let/var foo = ...
+    const lexicalDecl = node.children.find(c => c.type === 'lexical_declaration');
+    const varDecl = node.children.find(c => c.type === 'variable_declaration');
+    const decl = lexicalDecl || varDecl;
+    if (decl) {
+      const declarators = findAllNodes(decl, ['variable_declarator']);
+      for (const declarator of declarators) {
+        const nameNode = declarator.childForFieldName('name');
+        if (nameNode) {
+          exports.set(nameNode.text, 'named');
+        }
+      }
+      continue;
+    }
+
+    // export { foo, bar as baz }
+    const exportClause = node.children.find(c => c.type === 'export_clause');
+    if (exportClause) {
+      for (let i = 0; i < exportClause.childCount; i++) {
+        const child = exportClause.child(i);
+        if (child?.type === 'export_specifier') {
+          const nameNode = child.childForFieldName('name');
+          if (nameNode) {
+            exports.set(nameNode.text, 'named');
+          }
+        }
+      }
+      continue;
+    }
+  }
+
+  // Handle CommonJS: module.exports = ... or exports.foo = ...
+  const assignExprs = findAllNodes(rootNode, ['assignment_expression']);
+  for (const node of assignExprs) {
+    const left = node.childForFieldName('left');
+    if (!left) continue;
+
+    const leftText = left.text;
+
+    // module.exports = something
+    if (leftText === 'module.exports') {
+      const right = node.childForFieldName('right');
+      if (right?.type === 'identifier') {
+        exports.set(right.text, 'commonjs');
+      } else if (right?.type === 'object') {
+        // module.exports = { foo, bar }
+        const props = extractObjectProperties(right);
+        for (const prop of props) {
+          exports.set(prop.key, 'commonjs');
+        }
+      }
+      continue;
+    }
+
+    // exports.foo = something
+    if (leftText.startsWith('exports.')) {
+      const name = leftText.replace('exports.', '');
+      exports.set(name, 'commonjs');
+      continue;
+    }
+
+    // module.exports.foo = something
+    if (leftText.startsWith('module.exports.')) {
+      const name = leftText.replace('module.exports.', '');
+      exports.set(name, 'commonjs');
+      continue;
+    }
+  }
+
+  return exports;
+}
+
+/**
  * Extract functions from AST
  */
-function extractFunctions(rootNode: Parser.SyntaxNode): FunctionDef[] {
+function extractFunctions(rootNode: Parser.SyntaxNode, exports: Map<string, 'named' | 'default' | 'commonjs'>): FunctionDef[] {
   const functions: FunctionDef[] = [];
 
   // Function declarations
@@ -563,6 +699,7 @@ function extractFunctions(rootNode: Parser.SyntaxNode): FunctionDef[] {
     const decorators = extractDecorators(node);
     const isAsync = node.text.startsWith('async ');
     const controlFlow = analyzeControlFlow(node);
+    const exportKind = exports.get(name);
 
     functions.push({
       name,
@@ -575,6 +712,8 @@ function extractFunctions(rootNode: Parser.SyntaxNode): FunctionDef[] {
       endLine: node.endPosition.row + 1,
       bodyNode: convertNode(node),
       controlFlow,
+      isExported: !!exportKind,
+      exportKind,
     });
   }
 
@@ -589,6 +728,7 @@ function extractFunctions(rootNode: Parser.SyntaxNode): FunctionDef[] {
       const parameters = extractParameters(valueNode);
       const isAsync = valueNode.text.startsWith('async ');
       const controlFlow = analyzeControlFlow(valueNode);
+      const exportKind = exports.get(name);
 
       functions.push({
         name,
@@ -601,6 +741,8 @@ function extractFunctions(rootNode: Parser.SyntaxNode): FunctionDef[] {
         endLine: valueNode.endPosition.row + 1,
         bodyNode: convertNode(valueNode),
         controlFlow,
+        isExported: !!exportKind,
+        exportKind,
       });
     }
   }
@@ -1003,7 +1145,8 @@ export function parseTypeScriptSource(sourceCode: string, isTSX: boolean = false
     const tree = activeParser.parse(sourceCode);
     const rootNode = tree.rootNode;
 
-    const functions = extractFunctions(rootNode);
+    const exports = extractExports(rootNode);
+    const functions = extractFunctions(rootNode, exports);
     const classes = extractClasses(rootNode);
     const calls = extractCalls(rootNode);
     const imports = extractImports(rootNode);
@@ -1018,6 +1161,7 @@ export function parseTypeScriptSource(sourceCode: string, isTSX: boolean = false
       imports,
       assignments,
       returns,
+      exports,
     };
   } catch (error) {
     return {
