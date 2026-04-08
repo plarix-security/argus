@@ -133,6 +133,29 @@ export function extractSemanticInvocationRoots(
     }
   }
 
+  // Always add exported entry points that contain dangerous-looking patterns
+  // This ensures files like plugin.ts get analyzed even when other files have framework patterns
+  for (const [filePath, parsed] of files) {
+    // Check if this file has dangerous calls but no roots yet
+    const hasDangerousCalls = parsed.calls.some(call => {
+      const callee = call.callee.toLowerCase();
+      return callee.includes('spawn') || callee.includes('exec') || callee.includes('eval') ||
+             callee.includes('unlink') || callee.includes('rmdir') || callee.includes('delete') ||
+             callee.includes('shell') || callee.includes('command');
+    });
+
+    if (hasDangerousCalls) {
+      const fileHasRoots = [...roots.values()].some(r => r.sourceFile === filePath);
+      if (!fileHasRoots) {
+        // Add exported entry points for this file specifically
+        const exportRoots = extractExportedEntryPoints(filePath, parsed);
+        for (const root of exportRoots) {
+          roots.set(root.nodeId, root);
+        }
+      }
+    }
+  }
+
   return roots;
 }
 
