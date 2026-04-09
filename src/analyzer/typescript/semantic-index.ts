@@ -105,20 +105,32 @@ export function extractSemanticInvocationRoots(
     }
 
     // Check for action object patterns (Eliza, custom frameworks)
-    const actionRoots = extractActionObjectPatterns(filePath, parsed);
+    const actionRoots = extractActionObjectPatterns(filePath, parsed, files);
     for (const root of actionRoots) {
       roots.set(root.nodeId, root);
     }
 
     // Check for plugin array patterns
-    const pluginRoots = extractPluginArrayPatterns(filePath, parsed);
+    const pluginRoots = extractPluginArrayPatterns(filePath, parsed, files);
     for (const root of pluginRoots) {
       roots.set(root.nodeId, root);
     }
 
     // Check for registration call patterns
-    const registrationRoots = extractRegistrationCallPatterns(filePath, parsed);
+    const registrationRoots = extractRegistrationCallPatterns(filePath, parsed, files);
     for (const root of registrationRoots) {
+      roots.set(root.nodeId, root);
+    }
+
+    // Check for service class lifecycle patterns
+    const serviceRoots = extractServiceClassPatterns(filePath, parsed);
+    for (const root of serviceRoots) {
+      roots.set(root.nodeId, root);
+    }
+
+    // Check for event handler object patterns
+    const eventRoots = extractEventHandlerPatterns(filePath, parsed);
+    for (const root of eventRoots) {
       roots.set(root.nodeId, root);
     }
   }
@@ -725,25 +737,17 @@ function extractPlaywrightTools(
  */
 function extractActionObjectPatterns(
   filePath: string,
-  parsed: ParsedTypeScriptFile
+  parsed: ParsedTypeScriptFile,
+  files: Map<string, ParsedTypeScriptFile>
 ): SemanticInvocationRoot[] {
   const roots: SemanticInvocationRoot[] = [];
 
   // Action-like property names that indicate callback functions
-  const actionPropertyNames = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform']);
-
-  console.log(`[DEBUG] extractActionObjectPatterns for ${filePath}`);
-  console.log(`[DEBUG] Total assignments: ${parsed.assignments.length}`);
-  console.log(`[DEBUG] Total functions: ${parsed.functions.length}`);
-  console.log(`[DEBUG] Functions:`, parsed.functions.map(f => f.name).join(', '));
+  const actionPropertyNames = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform', 'get', 'validate', 'init', 'dispose']);
 
   for (const assignment of parsed.assignments) {
-    console.log(`[DEBUG] Assignment: ${assignment.target}, isObjectLiteral: ${assignment.isObjectLiteral}, props: ${assignment.objectProperties?.length || 0}`);
-
     // Only check object literals
     if (!assignment.isObjectLiteral || !assignment.objectProperties) continue;
-
-    console.log(`[DEBUG] Object properties for ${assignment.target}:`, assignment.objectProperties.map(p => `${p.key}: ${p.valueType}`).join(', '));
 
     // Look for action-like callback properties
     for (const prop of assignment.objectProperties) {
@@ -751,8 +755,6 @@ function extractActionObjectPatterns(
 
       // Case 1: Inline function - { handler: async () => { ... } }
       if (prop.valueType === 'function') {
-        console.log(`[DEBUG] Found action property ${prop.key} with function value!`);
-
         // Create nodeId pointing to the synthetic function name
         // AST parser now extracts these as "${objectName}.${propertyName}"
         const syntheticFuncName = `${assignment.target}.${prop.key}`;
@@ -764,8 +766,6 @@ function extractActionObjectPatterns(
         const nameProp = assignment.objectProperties.find(p => p.key === 'name');
         const toolName = nameProp?.stringValue || assignment.target;
 
-        console.log(`[DEBUG] Adding root: nodeId=${nodeId}, toolName=${toolName}, syntheticFunc=${syntheticFuncName}`);
-
         if (!roots.some(r => r.nodeId === nodeId)) {
           roots.push({
             nodeId,
@@ -775,31 +775,31 @@ function extractActionObjectPatterns(
             sourceFile: filePath,
             line: assignment.line,
           });
-          console.log(`[DEBUG] Root added! Total roots: ${roots.length}`);
         }
         break; // Only add once per object
       }
 
       // Case 2: Function reference - { handler: myHandlerFunc }
       if (prop.valueType === 'identifier') {
-        const funcName = prop.value;
-        const func = parsed.functions.find(f => f.name === funcName);
+        const resolved = resolveFunctionReference(files, filePath, prop.value);
+        const func = resolved?.func;
+        const resolvedFilePath = resolved?.filePath || filePath;
 
         if (func) {
           const nameProp = assignment.objectProperties.find(p => p.key === 'name');
-          const toolName = nameProp?.stringValue || funcName;
+          const toolName = nameProp?.stringValue || prop.value;
 
           const nodeId = func.className
-            ? `${filePath}:${func.className}.${funcName}`
-            : `${filePath}:${funcName}`;
+            ? `${resolvedFilePath}:${func.className}.${func.name}`
+            : `${resolvedFilePath}:${func.name}`;
 
           if (!roots.some(r => r.nodeId === nodeId)) {
             roots.push({
               nodeId,
               toolName,
               framework: 'action-object',
-              evidence: `Action object "${assignment.target}" references ${prop.key} function "${funcName}"`,
-              sourceFile: filePath,
+              evidence: `Action object "${assignment.target}" references ${prop.key} function "${func.name}"`,
+              sourceFile: resolvedFilePath,
               line: func.startLine,
             });
           }
@@ -823,7 +823,8 @@ function extractActionObjectPatterns(
  */
 function extractPluginArrayPatterns(
   filePath: string,
-  parsed: ParsedTypeScriptFile
+  parsed: ParsedTypeScriptFile,
+  files: Map<string, ParsedTypeScriptFile>
 ): SemanticInvocationRoot[] {
   const roots: SemanticInvocationRoot[] = [];
 
@@ -842,11 +843,13 @@ function extractPluginArrayPatterns(
         const trimmed = element.text.trim();
 
         // Check if it's a function/variable reference
-        const func = parsed.functions.find(f => f.name === trimmed);
+        const resolved = resolveFunctionReference(files, filePath, trimmed);
+        const func = resolved?.func;
+        const resolvedFilePath = resolved?.filePath || filePath;
         if (func) {
           const nodeId = func.className
-            ? `${filePath}:${func.className}.${func.name}`
-            : `${filePath}:${func.name}`;
+            ? `${resolvedFilePath}:${func.className}.${func.name}`
+            : `${resolvedFilePath}:${func.name}`;
 
           if (!roots.some(r => r.nodeId === nodeId)) {
             roots.push({
@@ -854,7 +857,7 @@ function extractPluginArrayPatterns(
               toolName: func.name,
               framework: 'plugin-array',
               evidence: `Function "${func.name}" in ${assignment.target} array`,
-              sourceFile: filePath,
+              sourceFile: resolvedFilePath,
               line: func.startLine,
             });
           }
@@ -872,11 +875,13 @@ function extractPluginArrayPatterns(
 
             // If handler is a function reference, find it
             if (handlerProp.valueType === 'identifier') {
-              const func = parsed.functions.find(f => f.name === handlerProp.value);
+              const resolved = resolveFunctionReference(files, filePath, handlerProp.value);
+              const func = resolved?.func;
+              const resolvedFilePath = resolved?.filePath || filePath;
               if (func) {
                 const nodeId = func.className
-                  ? `${filePath}:${func.className}.${func.name}`
-                  : `${filePath}:${func.name}`;
+                  ? `${resolvedFilePath}:${func.className}.${func.name}`
+                  : `${resolvedFilePath}:${func.name}`;
 
                 if (!roots.some(r => r.nodeId === nodeId)) {
                   roots.push({
@@ -884,7 +889,7 @@ function extractPluginArrayPatterns(
                     toolName,
                     framework: 'plugin-array',
                     evidence: `Action "${toolName}" in ${assignment.target} with ${handlerProp.key} function`,
-                    sourceFile: filePath,
+                    sourceFile: resolvedFilePath,
                     line: func.startLine,
                   });
                 }
@@ -951,7 +956,8 @@ function extractPluginArrayPatterns(
  */
 function extractRegistrationCallPatterns(
   filePath: string,
-  parsed: ParsedTypeScriptFile
+  parsed: ParsedTypeScriptFile,
+  files: Map<string, ParsedTypeScriptFile>
 ): SemanticInvocationRoot[] {
   const roots: SemanticInvocationRoot[] = [];
 
@@ -997,10 +1003,12 @@ function extractRegistrationCallPatterns(
 
     if (toolName) {
       // Try to find the handler function
-      const func = handlerName ? parsed.functions.find(f => f.name === handlerName) : undefined;
+      const resolved = handlerName ? resolveFunctionReference(files, filePath, handlerName) : undefined;
+      const func = resolved?.func;
+      const resolvedFilePath = resolved?.filePath || filePath;
 
       const nodeId = func
-        ? (func.className ? `${filePath}:${func.className}.${func.name}` : `${filePath}:${func.name}`)
+        ? (func.className ? `${resolvedFilePath}:${func.className}.${func.name}` : `${resolvedFilePath}:${func.name}`)
         : (call.enclosingFunction ? `${filePath}:${call.enclosingFunction}` : `${filePath}:${toolName}`);
 
       if (!roots.some(r => r.nodeId === nodeId)) {
@@ -1009,7 +1017,7 @@ function extractRegistrationCallPatterns(
           toolName,
           framework: 'registration',
           evidence: `${call.callee}() registration call for "${toolName}"`,
-          sourceFile: filePath,
+          sourceFile: func ? resolvedFilePath : filePath,
           line: func?.startLine || call.line,
         });
       }
@@ -1017,6 +1025,116 @@ function extractRegistrationCallPatterns(
   }
 
   return roots;
+}
+
+function extractServiceClassPatterns(
+  filePath: string,
+  parsed: ParsedTypeScriptFile
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+
+  for (const classDef of parsed.classes) {
+    if (!classDef.extends.some(base => base.endsWith('Service') || base === 'Service')) continue;
+    const startMethod = parsed.functions.find(f => f.className === classDef.name && f.name === 'start');
+    if (!startMethod) continue;
+
+    const nodeId = `${filePath}:${classDef.name}.start`;
+    if (!roots.some(r => r.nodeId === nodeId)) {
+      roots.push({
+        nodeId,
+        toolName: `${classDef.name}.start`,
+        framework: 'service-class',
+        evidence: `Service class "${classDef.name}" start() lifecycle entry`,
+        sourceFile: filePath,
+        line: startMethod.startLine,
+      });
+    }
+  }
+
+  return roots;
+}
+
+function extractEventHandlerPatterns(
+  filePath: string,
+  parsed: ParsedTypeScriptFile
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+
+  for (const assignment of parsed.assignments) {
+    const typeHint = [assignment.typeAnnotation, assignment.assertedType].filter(Boolean).join(' ').toLowerCase();
+    const prefixes: string[] = [];
+    const isEventsName = assignment.target.toLowerCase().includes('events');
+    const isPluginEventsType = typeHint.includes('pluginevents');
+
+    if (isEventsName || isPluginEventsType) {
+      prefixes.push(`${assignment.target}.`);
+    }
+
+    if (assignment.isObjectLiteral && assignment.objectProperties) {
+      const eventsProp = assignment.objectProperties.find(p => p.key === 'events' && p.valueType === 'object');
+      if (eventsProp) {
+        prefixes.push(`${assignment.target}.events.`);
+      }
+    }
+
+    if (prefixes.length === 0) continue;
+
+    for (const func of parsed.functions) {
+      if (!func.name.includes('[')) continue;
+      if (!prefixes.some(prefix => func.name.startsWith(prefix))) continue;
+
+      const nodeId = func.className
+        ? `${filePath}:${func.className}.${func.name}`
+        : `${filePath}:${func.name}`;
+
+      if (!roots.some(r => r.nodeId === nodeId)) {
+        roots.push({
+          nodeId,
+          toolName: func.name,
+          framework: 'event-handlers',
+          evidence: `Event handler callback extracted from "${assignment.target}"`,
+          sourceFile: filePath,
+          line: func.startLine,
+        });
+      }
+    }
+  }
+
+  return roots;
+}
+
+function resolveFunctionReference(
+  files: Map<string, ParsedTypeScriptFile>,
+  currentFilePath: string,
+  functionName: string
+): { filePath: string; func: FunctionDef } | undefined {
+  const currentFile = files.get(currentFilePath);
+  if (currentFile) {
+    const local = currentFile.functions.find(f => f.name === functionName);
+    if (local) {
+      return { filePath: currentFilePath, func: local };
+    }
+  }
+
+  const matches: Array<{ filePath: string; func: FunctionDef }> = [];
+  for (const [filePath, parsed] of files) {
+    for (const func of parsed.functions) {
+      if (func.name === functionName) {
+        matches.push({ filePath, func });
+      }
+    }
+  }
+
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  const exportedMatches = matches.filter(match => match.func.isExported);
+  if (exportedMatches.length === 1) {
+    return exportedMatches[0];
+  }
+
+  return undefined;
 }
 
 /**
