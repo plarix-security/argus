@@ -94,6 +94,8 @@ export interface AssignmentInfo {
   value: string;
   line: number;
   enclosingFunction?: string;
+  typeAnnotation?: string;
+  assertedType?: string;
   // Structured data extracted from AST (not regex)
   isObjectLiteral?: boolean;
   isArrayLiteral?: boolean;
@@ -264,15 +266,26 @@ function extractClassName(node: Parser.SyntaxNode): string {
 function extractExtends(node: Parser.SyntaxNode): string[] {
   const extends_: string[] = [];
 
-  const heritage = node.childForFieldName('heritage');
+  let heritage = node.childForFieldName('heritage');
+  if (!heritage) {
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (child?.type === 'class_heritage') {
+        heritage = child;
+        break;
+      }
+    }
+  }
+
   if (heritage) {
     for (let i = 0; i < heritage.childCount; i++) {
       const child = heritage.child(i);
-      if (child?.type === 'extends_clause') {
-        const typeNode = child.childForFieldName('value');
-        if (typeNode) {
-          extends_.push(typeNode.text);
-        }
+      if (child?.type !== 'extends_clause') continue;
+
+      for (let j = 0; j < child.childCount; j++) {
+        const typeNode = child.child(j);
+        if (!typeNode || typeNode.type === 'extends') continue;
+        extends_.push(typeNode.text);
       }
     }
   }
@@ -478,6 +491,141 @@ function findAllNodes(rootNode: Parser.SyntaxNode, types: string[]): Parser.Synt
 
   visit(rootNode);
   return results;
+}
+
+function normalizeTypeText(raw: string): string {
+  return raw.replace(/^:\s*/, '').replace(/^<\s*|\s*>$/g, '').trim();
+}
+
+function extractAssertedType(node: Parser.SyntaxNode): string | undefined {
+  if (node.type === 'as_expression' || node.type === 'satisfies_expression') {
+    const lastChild = node.child(node.childCount - 1);
+    if (lastChild) {
+      return normalizeTypeText(lastChild.text);
+    }
+  }
+
+  if (node.type === 'type_assertion') {
+    const firstChild = node.child(0);
+    if (firstChild) {
+      return normalizeTypeText(firstChild.text);
+    }
+  }
+
+  return undefined;
+}
+
+function unwrapExpressionNode(node: Parser.SyntaxNode): Parser.SyntaxNode {
+  let current = node;
+
+  while (true) {
+    if (current.type === 'parenthesized_expression') {
+      let inner: Parser.SyntaxNode | null = null;
+      for (let i = 0; i < current.childCount; i++) {
+        const child = current.child(i);
+        if (!child || child.type === '(' || child.type === ')') continue;
+        inner = child;
+        break;
+      }
+      if (!inner) return current;
+      current = inner;
+      continue;
+    }
+
+    if (current.type === 'as_expression' || current.type === 'satisfies_expression') {
+      const exprChild = current.child(0);
+      if (!exprChild) return current;
+      current = exprChild;
+      continue;
+    }
+
+    if (current.type === 'type_assertion') {
+      const exprChild = current.child(current.childCount - 1);
+      if (!exprChild) return current;
+      current = exprChild;
+      continue;
+    }
+
+    return current;
+  }
+}
+
+function extractInlineObjectFunctions(
+  objectNode: Parser.SyntaxNode,
+  objectName: string,
+  exports: Map<string, 'named' | 'default' | 'commonjs'>
+): FunctionDef[] {
+  const extracted: FunctionDef[] = [];
+  const actionPropertyNames = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform', 'get', 'validate', 'init', 'dispose']);
+
+  const visitObject = (node: Parser.SyntaxNode, prefix: string) => {
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (!child || child.type !== 'pair') continue;
+
+      const keyNode = child.childForFieldName('key');
+      const rawValueNode = child.childForFieldName('value');
+      if (!keyNode || !rawValueNode) continue;
+
+      const key = keyNode.text.replace(/['"]/g, '');
+      const valueNode = unwrapExpressionNode(rawValueNode);
+      const exportKind = exports.get(objectName);
+
+      if ((valueNode.type === 'arrow_function' || valueNode.type === 'function_expression' || valueNode.type === 'function') &&
+          (actionPropertyNames.has(key) || key.startsWith('['))) {
+        const syntheticName = `${prefix}.${key}`;
+        extracted.push({
+          name: syntheticName,
+          parameters: extractParameters(valueNode),
+          decorators: [],
+          isAsync: valueNode.text.startsWith('async '),
+          isArrow: valueNode.type === 'arrow_function',
+          isMethod: false,
+          startLine: valueNode.startPosition.row + 1,
+          endLine: valueNode.endPosition.row + 1,
+          bodyNode: convertNode(valueNode),
+          controlFlow: analyzeControlFlow(valueNode),
+          isExported: !!exportKind,
+          exportKind,
+        });
+        continue;
+      }
+
+      if (valueNode.type === 'array' || valueNode.type === 'array_pattern') {
+        let fnIndex = 0;
+        for (let j = 0; j < valueNode.childCount; j++) {
+          const arrChild = valueNode.child(j);
+          if (!arrChild || arrChild.type === ',' || arrChild.type === '[' || arrChild.type === ']') continue;
+          const elementNode = unwrapExpressionNode(arrChild);
+          if (elementNode.type !== 'arrow_function' && elementNode.type !== 'function_expression' && elementNode.type !== 'function') continue;
+          const syntheticName = `${prefix}.${key}[${fnIndex}]`;
+          extracted.push({
+            name: syntheticName,
+            parameters: extractParameters(elementNode),
+            decorators: [],
+            isAsync: elementNode.text.startsWith('async '),
+            isArrow: elementNode.type === 'arrow_function',
+            isMethod: false,
+            startLine: elementNode.startPosition.row + 1,
+            endLine: elementNode.endPosition.row + 1,
+            bodyNode: convertNode(elementNode),
+            controlFlow: analyzeControlFlow(elementNode),
+            isExported: !!exportKind,
+            exportKind,
+          });
+          fnIndex++;
+        }
+        continue;
+      }
+
+      if (valueNode.type === 'object' || valueNode.type === 'object_pattern') {
+        visitObject(valueNode, `${prefix}.${key}`);
+      }
+    }
+  };
+
+  visitObject(objectNode, objectName);
+  return extracted;
 }
 
 /**
@@ -721,7 +869,8 @@ function extractFunctions(rootNode: Parser.SyntaxNode, exports: Map<string, 'nam
   const varDecls = findAllNodes(rootNode, ['variable_declarator']);
   for (const node of varDecls) {
     const nameNode = node.childForFieldName('name');
-    const valueNode = node.childForFieldName('value');
+    const rawValueNode = node.childForFieldName('value');
+    const valueNode = rawValueNode ? unwrapExpressionNode(rawValueNode) : undefined;
 
     if (valueNode && (valueNode.type === 'arrow_function' || valueNode.type === 'function')) {
       const name = nameNode?.text || '<anonymous>';
@@ -745,6 +894,13 @@ function extractFunctions(rootNode: Parser.SyntaxNode, exports: Map<string, 'nam
         exportKind,
       });
     }
+
+    // Extract inline handler functions inside action objects
+    // Pattern: const action = { handler: async () => {}, execute: () => {} }
+    if (valueNode && (valueNode.type === 'object' || valueNode.type === 'object_pattern')) {
+      const objectName = nameNode?.text || '<anonymous>';
+      functions.push(...extractInlineObjectFunctions(valueNode, objectName, exports));
+    }
   }
 
   // Method definitions
@@ -752,29 +908,25 @@ function extractFunctions(rootNode: Parser.SyntaxNode, exports: Map<string, 'nam
   for (const node of methodDefs) {
     const nameNode = node.childForFieldName('name');
     const name = nameNode?.text || '<anonymous>';
-    const valueNode = node.childForFieldName('value');
+    const parameters = extractParameters(node);
+    const decorators = extractDecorators(node);
+    const isAsync = node.text.includes('async ');
+    const className = findEnclosingClass(node);
+    const controlFlow = analyzeControlFlow(node);
 
-    if (valueNode) {
-      const parameters = extractParameters(valueNode);
-      const decorators = extractDecorators(node);
-      const isAsync = node.text.includes('async ');
-      const className = findEnclosingClass(node);
-      const controlFlow = analyzeControlFlow(valueNode);
-
-      functions.push({
-        name,
-        parameters,
-        decorators,
-        isAsync,
-        isArrow: false,
-        isMethod: true,
-        className,
-        startLine: node.startPosition.row + 1,
-        endLine: node.endPosition.row + 1,
-        bodyNode: convertNode(valueNode),
-        controlFlow,
-      });
-    }
+    functions.push({
+      name,
+      parameters,
+      decorators,
+      isAsync,
+      isArrow: false,
+      isMethod: true,
+      className,
+      startLine: node.startPosition.row + 1,
+      endLine: node.endPosition.row + 1,
+      bodyNode: convertNode(node),
+      controlFlow,
+    });
   }
 
   return functions;
@@ -785,7 +937,7 @@ function extractFunctions(rootNode: Parser.SyntaxNode, exports: Map<string, 'nam
  */
 function extractClasses(rootNode: Parser.SyntaxNode): ClassDef[] {
   const classes: ClassDef[] = [];
-  const classDecls = findAllNodes(rootNode, ['class_declaration', 'class']);
+  const classDecls = findAllNodes(rootNode, ['class_declaration', 'class_expression']);
 
   for (const node of classDecls) {
     const name = extractClassName(node);
@@ -1042,18 +1194,22 @@ function extractAssignments(rootNode: Parser.SyntaxNode): AssignmentInfo[] {
   const varDecls = findAllNodes(rootNode, ['variable_declarator']);
   for (const node of varDecls) {
     const nameNode = node.childForFieldName('name');
-    const valueNode = node.childForFieldName('value');
+    const rawValueNode = node.childForFieldName('value');
+    const valueNode = rawValueNode ? unwrapExpressionNode(rawValueNode) : undefined;
 
-    if (nameNode && valueNode) {
+    if (nameNode && rawValueNode && valueNode) {
       const enclosingFunction = findEnclosingFunction(node);
+      const typeNode = node.childForFieldName('type');
       const isObjectLiteral = valueNode.type === 'object' || valueNode.type === 'object_pattern';
       const isArrayLiteral = valueNode.type === 'array' || valueNode.type === 'array_pattern';
 
       assignments.push({
         target: nameNode.text,
-        value: valueNode.text,
+        value: rawValueNode.text,
         line: node.startPosition.row + 1,
         enclosingFunction,
+        typeAnnotation: typeNode ? normalizeTypeText(typeNode.text) : undefined,
+        assertedType: extractAssertedType(rawValueNode),
         isObjectLiteral,
         isArrayLiteral,
         objectProperties: isObjectLiteral ? extractObjectProperties(valueNode) : undefined,
@@ -1066,18 +1222,20 @@ function extractAssignments(rootNode: Parser.SyntaxNode): AssignmentInfo[] {
   const assignExprs = findAllNodes(rootNode, ['assignment_expression']);
   for (const node of assignExprs) {
     const leftNode = node.childForFieldName('left');
-    const rightNode = node.childForFieldName('right');
+    const rawRightNode = node.childForFieldName('right');
+    const rightNode = rawRightNode ? unwrapExpressionNode(rawRightNode) : undefined;
 
-    if (leftNode && rightNode) {
+    if (leftNode && rawRightNode && rightNode) {
       const enclosingFunction = findEnclosingFunction(node);
       const isObjectLiteral = rightNode.type === 'object' || rightNode.type === 'object_pattern';
       const isArrayLiteral = rightNode.type === 'array' || rightNode.type === 'array_pattern';
 
       assignments.push({
         target: leftNode.text,
-        value: rightNode.text,
+        value: rawRightNode.text,
         line: node.startPosition.row + 1,
         enclosingFunction,
+        assertedType: extractAssertedType(rawRightNode),
         isObjectLiteral,
         isArrayLiteral,
         objectProperties: isObjectLiteral ? extractObjectProperties(rightNode) : undefined,
