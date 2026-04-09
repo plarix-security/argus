@@ -732,9 +732,18 @@ function extractActionObjectPatterns(
   // Action-like property names that indicate callback functions
   const actionPropertyNames = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform']);
 
+  console.log(`[DEBUG] extractActionObjectPatterns for ${filePath}`);
+  console.log(`[DEBUG] Total assignments: ${parsed.assignments.length}`);
+  console.log(`[DEBUG] Total functions: ${parsed.functions.length}`);
+  console.log(`[DEBUG] Functions:`, parsed.functions.map(f => f.name).join(', '));
+
   for (const assignment of parsed.assignments) {
+    console.log(`[DEBUG] Assignment: ${assignment.target}, isObjectLiteral: ${assignment.isObjectLiteral}, props: ${assignment.objectProperties?.length || 0}`);
+
     // Only check object literals
     if (!assignment.isObjectLiteral || !assignment.objectProperties) continue;
+
+    console.log(`[DEBUG] Object properties for ${assignment.target}:`, assignment.objectProperties.map(p => `${p.key}: ${p.valueType}`).join(', '));
 
     // Look for action-like callback properties
     for (const prop of assignment.objectProperties) {
@@ -742,13 +751,20 @@ function extractActionObjectPatterns(
 
       // Case 1: Inline function - { handler: async () => { ... } }
       if (prop.valueType === 'function') {
+        console.log(`[DEBUG] Found action property ${prop.key} with function value!`);
+
+        // Create nodeId pointing to the synthetic function name
+        // AST parser now extracts these as "${objectName}.${propertyName}"
+        const syntheticFuncName = `${assignment.target}.${prop.key}`;
+        const nodeId = assignment.enclosingFunction
+          ? `${filePath}:${assignment.enclosingFunction}`
+          : `${filePath}:${syntheticFuncName}`;
+
         // Try to get a name from the object
         const nameProp = assignment.objectProperties.find(p => p.key === 'name');
         const toolName = nameProp?.stringValue || assignment.target;
 
-        const nodeId = assignment.enclosingFunction
-          ? `${filePath}:${assignment.enclosingFunction}`
-          : `${filePath}:${assignment.target}`;
+        console.log(`[DEBUG] Adding root: nodeId=${nodeId}, toolName=${toolName}, syntheticFunc=${syntheticFuncName}`);
 
         if (!roots.some(r => r.nodeId === nodeId)) {
           roots.push({
@@ -759,6 +775,7 @@ function extractActionObjectPatterns(
             sourceFile: filePath,
             line: assignment.line,
           });
+          console.log(`[DEBUG] Root added! Total roots: ${roots.length}`);
         }
         break; // Only add once per object
       }

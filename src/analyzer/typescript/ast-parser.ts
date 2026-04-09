@@ -745,6 +745,52 @@ function extractFunctions(rootNode: Parser.SyntaxNode, exports: Map<string, 'nam
         exportKind,
       });
     }
+
+    // Extract inline handler functions inside action objects
+    // Pattern: const action = { handler: async () => {}, execute: () => {} }
+    if (valueNode && (valueNode.type === 'object' || valueNode.type === 'object_pattern')) {
+      const objectName = nameNode?.text || '<anonymous>';
+      const actionPropertyNames = ['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform'];
+
+      // Find all pair nodes (key-value pairs) in the object
+      for (let i = 0; i < valueNode.childCount; i++) {
+        const child = valueNode.child(i);
+        if (!child || child.type !== 'pair') continue;
+
+        const keyNode = child.childForFieldName('key');
+        const pairValueNode = child.childForFieldName('value');
+
+        if (!keyNode || !pairValueNode) continue;
+
+        const key = keyNode.text.replace(/['"]/g, '');
+
+        // Only extract action-like callback properties
+        if (actionPropertyNames.includes(key) &&
+            (pairValueNode.type === 'arrow_function' || pairValueNode.type === 'function_expression' || pairValueNode.type === 'function')) {
+
+          const syntheticName = `${objectName}.${key}`;
+          const parameters = extractParameters(pairValueNode);
+          const isAsync = pairValueNode.text.startsWith('async ');
+          const controlFlow = analyzeControlFlow(pairValueNode);
+          const exportKind = exports.get(objectName); // Use parent object's export status
+
+          functions.push({
+            name: syntheticName,
+            parameters,
+            decorators: [],
+            isAsync,
+            isArrow: pairValueNode.type === 'arrow_function',
+            isMethod: false,
+            startLine: pairValueNode.startPosition.row + 1,
+            endLine: pairValueNode.endPosition.row + 1,
+            bodyNode: convertNode(pairValueNode),
+            controlFlow,
+            isExported: !!exportKind,
+            exportKind,
+          });
+        }
+      }
+    }
   }
 
   // Method definitions
