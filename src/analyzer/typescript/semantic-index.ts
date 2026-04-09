@@ -142,10 +142,8 @@ export function extractSemanticInvocationRoots(
       return callee.includes('spawn') ||
              callee.includes('exec') ||
              callee.includes('eval') ||
-             callee.includes('function') ||
              callee.includes('unlink') ||
              callee.includes('rmdir') ||
-             callee.includes('rm') ||
              callee.includes('delete') ||
              callee.includes('read') ||
              callee.includes('write') ||
@@ -158,7 +156,6 @@ export function extractSemanticInvocationRoots(
              callee.includes('post') ||
              callee.includes('put') ||
              callee.includes('patch') ||
-             callee.includes('get') ||
              callee.includes('query') ||
              callee.includes('execute') ||
              callee.includes('shell') ||
