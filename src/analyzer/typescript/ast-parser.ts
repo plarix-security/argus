@@ -1015,28 +1015,47 @@ function extractImports(rootNode: Parser.SyntaxNode): ImportInfo[] {
 
     const clauseNode = node.childForFieldName('import_clause') || node.child(1);
     if (clauseNode) {
-      // Check for default import
-      if (clauseNode.type === 'identifier') {
-        isDefault = true;
-        names.push(clauseNode.text);
-      }
-      // Check for namespace import (import * as foo)
-      else if (clauseNode.type === 'namespace_import') {
-        isNamespace = true;
-        const nameNode = clauseNode.childForFieldName('name');
-        if (nameNode) {
-          alias = nameNode.text;
-        }
-      }
-      // Check for named imports
-      else if (clauseNode.type === 'named_imports') {
-        for (let i = 0; i < clauseNode.childCount; i++) {
-          const child = clauseNode.child(i);
+      const parseNamedImports = (namedImportsNode: Parser.SyntaxNode) => {
+        for (let i = 0; i < namedImportsNode.childCount; i++) {
+          const child = namedImportsNode.child(i);
           if (child?.type === 'import_specifier') {
             const nameNode = child.childForFieldName('name');
             if (nameNode) {
               names.push(nameNode.text);
             }
+          }
+        }
+      };
+
+      const parseNamespaceImport = (namespaceNode: Parser.SyntaxNode) => {
+        isNamespace = true;
+        const nameNode = namespaceNode.childForFieldName('name');
+        if (nameNode) {
+          alias = nameNode.text;
+        }
+      };
+
+      // Handle direct clause forms
+      if (clauseNode.type === 'identifier') {
+        isDefault = true;
+        names.push(clauseNode.text);
+      } else if (clauseNode.type === 'namespace_import') {
+        parseNamespaceImport(clauseNode);
+      } else if (clauseNode.type === 'named_imports') {
+        parseNamedImports(clauseNode);
+      } else if (clauseNode.type === 'import_clause') {
+        // Handle "import foo, { bar } from '...'" and similar forms
+        for (let i = 0; i < clauseNode.childCount; i++) {
+          const child = clauseNode.child(i);
+          if (!child) continue;
+
+          if (child.type === 'identifier') {
+            isDefault = true;
+            names.push(child.text);
+          } else if (child.type === 'named_imports') {
+            parseNamedImports(child);
+          } else if (child.type === 'namespace_import') {
+            parseNamespaceImport(child);
           }
         }
       }
