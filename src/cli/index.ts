@@ -36,6 +36,7 @@ import {
   printZeroFindings,
   isTTY,
 } from './formatter';
+import { getMethodologyDisclosure } from './methodology-disclosure';
 
 /**
  * Exit codes
@@ -239,6 +240,7 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
         'The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage.',
       ],
     },
+    methodology: getMethodologyDisclosure(),
   };
   return JSON.stringify(output, null, 2);
 }

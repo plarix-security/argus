@@ -2,7 +2,7 @@
 
 ## Language Scope
 
-- Python, TypeScript, and JavaScript are supported with full analysis.
+- Python, TypeScript, and JavaScript are supported, but coverage is best-effort rather than guaranteed complete.
 - Rust support is planned but not yet implemented.
 - Analysis is static only - no runtime execution.
 
@@ -18,6 +18,7 @@
 - Tool detection is semantic-only.
 - Dynamic runtime registration may be missed.
 - Framework labels do not imply complete runtime coverage.
+- Regex is still used in helper paths (for example text cleanup and include/exclude pattern conversion), so the codebase is not regex-free.
 
 ## Gate Detection Scope
 

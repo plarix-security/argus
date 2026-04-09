@@ -43,6 +43,8 @@ WyScan currently does not do any of the following:
 - Execute your code.
 - Trace into third-party package internals.
 - Detect AFB01, AFB02, or AFB03.
+- Guarantee complete coverage on very large, highly dynamic multi-repo agent systems.
+- Operate as a regex-free codebase. Detection is AST/semantic-first, but helper logic still uses regex in a few places.
 
 ## Quick Start
 
@@ -260,6 +262,14 @@ Current CLI JSON shape:
     "limitations": [
       "The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage."
     ]
+  },
+  "methodology": {
+    "ast_based": true,
+    "semantic_registration_analysis": true,
+    "regex_free": false,
+    "uses_regex_for_helpers": true,
+    "ready_for_full_large_scale_coverage": false,
+    "note": "WyScan does not use regex-only fallback detection, but it still uses regex in helper paths (normalization, glob conversion, and text cleanup). Coverage is best-effort, not complete for large-scale systems."
   }
 }
 ```
@@ -272,6 +282,7 @@ Notes:
 - `findings` is the AFB04 subset of `cees`.
 - `call_path` lists the traced function path in the analyzed file set.
 - `evidence_kind`, `supporting_evidence`, `resource`, and `changes_state` expose the current proof and action summary for each finding or CEE.
+- `methodology.regex_free` is currently `false`; WyScan is AST/semantic-first but not a regex-free implementation.
 - The repository does not currently promise a separately versioned stable JSON schema.
 
 ## GitHub App
