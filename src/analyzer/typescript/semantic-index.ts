@@ -158,8 +158,11 @@ export function extractSemanticInvocationRoots(
              callee === 'eval' ||
              // File deletion / destructive FS
              callee === 'unlink' || callee === 'unlinksync' ||
+             callee.endsWith('.unlink') || callee.endsWith('.unlinksync') ||
              callee === 'rmdir' || callee === 'rmdirSync' ||
+             callee.endsWith('.rmdir') || callee.endsWith('.rmdirSync') ||
              callee === 'rm' || callee === 'rmsync' ||
+             callee.endsWith('.rm') || callee.endsWith('.rmsync') ||
              // Specific HTTP clients (avoid generic 'request' which matches too broadly)
              callee === 'fetch' || callee.endsWith('.fetch') ||
              callee.startsWith('axios.') ||
@@ -1195,16 +1198,28 @@ function extractExportedEntryPoints(
     // Skip methods (only top-level functions)
     if (func.isMethod) continue;
 
-    // Must have parameters (receives external input)
-    if (func.parameters.length === 0) continue;
-
     // Check if name suggests it's an entry point or if it's async
     const nameLower = func.name.toLowerCase();
     const hasEntryPointName = entryPointNames.some(name => nameLower.includes(name));
     const isAsync = func.isAsync;
+    const hasParameters = func.parameters.length > 0;
+    const hasDangerousCallInFunction = parsed.calls.some((call) => {
+      if (call.enclosingFunction !== func.name) {
+        return false;
+      }
+      const callee = call.callee.toLowerCase();
+      return callee.includes('exec') ||
+             callee.includes('spawn') ||
+             callee.includes('eval') ||
+             callee.includes('write') ||
+             callee.includes('read') ||
+             callee.includes('delete') ||
+             callee.includes('fetch') ||
+             callee.includes('request');
+    });
 
-    // Include if: has entry point name OR is async with parameters
-    if (hasEntryPointName || isAsync) {
+    // Include if it looks like an entry point or directly performs sensitive work.
+    if (hasEntryPointName || (isAsync && hasParameters) || hasDangerousCallInFunction) {
       const nodeId = func.className
         ? `${filePath}:${func.className}.${func.name}`
         : `${filePath}:${func.name}`;

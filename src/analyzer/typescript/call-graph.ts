@@ -59,7 +59,7 @@ export interface CallGraphNode {
   sourceFile?: string;
   parameters?: string[];
   outgoingCalls: Array<{
-    targetId?: string;
+    targetCandidates: string[];
     call: CallSite;
   }>;
   isCrossFileResolved?: boolean;
@@ -676,6 +676,59 @@ function resolveModulePath(
   return null;
 }
 
+function resolveCallTargetCandidates(
+  call: CallSite,
+  enclosingFunction: FunctionDef,
+  imports: ImportInfo[],
+  currentFile: string,
+  config: ImportResolutionConfig,
+  availableFiles: Set<string>
+): string[] {
+  const candidates: string[] = [];
+  const pushCandidate = (candidate: string | null | undefined) => {
+    if (candidate && !candidates.includes(candidate)) {
+      candidates.push(candidate);
+    }
+  };
+
+  const memberChain = call.memberChain || [];
+  const simpleCallee = call.callee;
+  const lastMember = memberChain.length > 0 ? memberChain[memberChain.length - 1] : simpleCallee;
+
+  // Same-file direct function calls
+  if (memberChain.length <= 1 && simpleCallee && simpleCallee !== '<unknown>') {
+    pushCandidate(`${currentFile}:${simpleCallee}`);
+  }
+
+  // this.method() within class methods
+  if (memberChain.length > 1 && memberChain[0] === 'this' && enclosingFunction.className) {
+    pushCandidate(`${currentFile}:${enclosingFunction.className}.${lastMember}`);
+  }
+
+  // ClassName.method() in same file (static or direct class reference)
+  if (memberChain.length > 1 && memberChain[0] !== 'this') {
+    pushCandidate(`${currentFile}:${memberChain[0]}.${lastMember}`);
+    pushCandidate(`${currentFile}:${lastMember}`);
+  }
+
+  // Imported symbol resolution for relative modules
+  const importedBase = memberChain.length > 1 ? memberChain[0] : simpleCallee;
+  if (importedBase) {
+    const importInfo = imports.find((imp) => imp.names.includes(importedBase) || imp.alias === importedBase);
+    if (importInfo) {
+      const resolvedFile = resolveModulePath(importInfo.module, currentFile, config, availableFiles);
+      if (resolvedFile) {
+        pushCandidate(`${resolvedFile}:${lastMember}`);
+        if (importInfo.isDefault && memberChain.length <= 1) {
+          pushCandidate(`${resolvedFile}:default`);
+        }
+      }
+    }
+  }
+
+  return candidates;
+}
+
 /**
  * Build call graph from parsed files
  */
@@ -686,6 +739,7 @@ export function buildCallGraph(
 ): CallGraphAnalysis {
   const nodes = new Map<string, CallGraphNode>();
   const toolRegistrations: CallGraphNode[] = [];
+  const availableFiles = new Set(files.keys());
 
   // Extract semantic roots if not provided
   if (!semanticRoots) {
@@ -709,7 +763,7 @@ export function buildCallGraph(
 
       // Find dangerous operations in this function
       const dangerousOps: DangerousOperation[] = [];
-      const outgoingCalls: Array<{ targetId?: string; call: CallSite }> = [];
+      const outgoingCalls: Array<{ targetCandidates: string[]; call: CallSite }> = [];
 
       for (const call of parsed.calls) {
         if (call.enclosingFunction === func.name ||
@@ -725,13 +779,15 @@ export function buildCallGraph(
             dangerousOps.push(dangerousOp);
           }
 
-          // Track outgoing call
-          const targetId = call.enclosingClass
-            ? `${filePath}:${call.enclosingClass}.${call.callee}`
-            : `${filePath}:${call.callee}`;
-
           outgoingCalls.push({
-            targetId: nodes.has(targetId) ? targetId : undefined,
+            targetCandidates: resolveCallTargetCandidates(
+              call,
+              func,
+              parsed.imports,
+              filePath,
+              config,
+              availableFiles
+            ),
             call,
           });
         }
@@ -771,9 +827,10 @@ export function buildCallGraph(
   // Build edges
   for (const node of nodes.values()) {
     for (const outgoing of node.outgoingCalls) {
-      if (outgoing.targetId && nodes.has(outgoing.targetId)) {
-        node.callees.add(outgoing.targetId);
-        nodes.get(outgoing.targetId)!.callers.add(node.id);
+      const resolvedTarget = outgoing.targetCandidates.find((candidate) => nodes.has(candidate));
+      if (resolvedTarget) {
+        node.callees.add(resolvedTarget);
+        nodes.get(resolvedTarget)!.callers.add(node.id);
       }
     }
   }
