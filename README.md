@@ -257,8 +257,25 @@ Current CLI JSON shape:
     "total_files_discovered": 34,
     "file_limit": 9007199254740991,
     "file_limit_hit": false,
-    "limitations": [
-      "The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage."
+      "limitations": [
+        "The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage."
+      ]
+  },
+  "methodology": {
+    "short_answer": "No. WyScan is on the right track, but it is not yet ready to guarantee full CEE coverage for large-scale agentic systems such as Eliza.",
+    "regex_main_method": false,
+    "primary_method": "Tree-sitter AST parsing plus semantic tool-registration and call-path analysis.",
+    "large_scale_agentic_readiness": {
+      "ready": false,
+      "verdict": "Not nearly ready for complete coverage of all CEEs in large-scale agentic systems."
+    },
+    "plan_for_large_scale_cee_coverage": [
+      "Build and maintain a versioned large-scale benchmark corpus (including Eliza-style repositories) with hand-labeled CEEs.",
+      "Add whole-repository symbol and module resolution for dynamic exports/imports and cross-file indirection.",
+      "Add deeper interprocedural dataflow and alias tracking from tool inputs to execution sinks.",
+      "Improve dynamic registration recovery (config-driven/plugin-based/runtime-composed tools) with explicit uncertainty reporting.",
+      "Replace remaining regex sink matching paths with typed semantic sink models where possible; keep regex as fallback only.",
+      "Gate releases on benchmark precision/recall targets and publish those metrics in CI artifacts and release notes."
     ]
   }
 }
@@ -272,6 +289,7 @@ Notes:
 - `findings` is the AFB04 subset of `cees`.
 - `call_path` lists the traced function path in the analyzed file set.
 - `evidence_kind`, `supporting_evidence`, `resource`, and `changes_state` expose the current proof and action summary for each finding or CEE.
+- `methodology` includes a blunt readiness verdict, whether regex is the main method, and the concrete plan for large-scale CEE coverage.
 - The repository does not currently promise a separately versioned stable JSON schema.
 
 ## GitHub App
@@ -367,7 +385,7 @@ For complete setup instructions including GitHub App registration, see `docs/GIT
 - Directory scans graph the analyzed file set together per language. Changed-file scans still do not guarantee full repository coverage.
 - External packages are not traced.
 - Dynamic runtime tool registration is not guaranteed to be detected.
-- Framework labels are pattern matches, not complete framework models.
+- Framework labels and sink matching are not complete runtime framework models and are not guaranteed to cover all CEEs in large-scale systems.
 - Validation-helper severity downgrades are heuristic only.
 - AFB01, AFB02, and AFB03 are not implemented.
 - Rust support is not yet implemented.

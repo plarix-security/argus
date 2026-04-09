@@ -23,6 +23,7 @@ import * as path from 'path';
 import { AFBAnalyzer } from '../analyzer';
 import { AnalysisReport, Severity } from '../types';
 import { VERSION, NAME } from './version';
+import { buildMethodologyDisclosure } from './methodology-disclosure';
 import {
   printHeader,
   printScanTarget,
@@ -239,6 +240,7 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
         'The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage.',
       ],
     },
+    methodology: buildMethodologyDisclosure(report),
   };
   return JSON.stringify(output, null, 2);
 }
