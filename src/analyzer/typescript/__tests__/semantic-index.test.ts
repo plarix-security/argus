@@ -32,6 +32,31 @@ describe('TypeScript semantic index Eliza patterns', () => {
     expect(parsed.functions.some(f => f.name === 'plugin.dispose')).toBe(true);
   });
 
+  it('prefers handler over validate when both props are present on the same action object', () => {
+    const filePath = '/tmp/action-priority.ts';
+    // Object has both validate (secondary) and handler (primary) — handler must win
+    const source = `
+      import type { Action } from '@elizaos/core';
+
+      const myAction: Action = {
+        name: 'test',
+        validate: async () => { return true; },
+        handler: async () => { doWork(); },
+      };
+    `;
+    const parsed = parseTypeScriptSource(source);
+    expect(parsed.success).toBe(true);
+
+    const files = new Map([[filePath, parsed]]);
+    const roots = extractSemanticInvocationRoots(files);
+
+    const rootKeys = Array.from(roots.keys());
+    // handler root must be present
+    expect(rootKeys.some(k => k.endsWith(':myAction.handler'))).toBe(true);
+    // validate root must NOT be present (handler takes priority)
+    expect(rootKeys.some(k => k.endsWith(':myAction.validate'))).toBe(false);
+  });
+
   it('detects service start, plugin events, and cross-file function references', () => {
     const runtimeFile = '/tmp/runtime.ts';
     const pluginFile = '/tmp/plugin.ts';

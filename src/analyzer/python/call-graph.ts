@@ -380,6 +380,7 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /^runtime\.(send_message|reply)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'ElizaOS runtime message send' },
   { pattern: /^runtime\.execute_action$/i, category: ExecutionCategory.API_CALL, severity: Severity.CRITICAL, description: 'ElizaOS runtime action dispatch (recursive LLM control)' },
   { pattern: /^runtime\.(update_world|create_entity|update_entity|delete_entity)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ElizaOS runtime world/entity mutation' },
+  { pattern: /^runtime\.compose_state$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'ElizaOS runtime state composition' },
 ];
 
 const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: {

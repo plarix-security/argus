@@ -3,6 +3,7 @@ import {
   AssignmentInfo,
   CallArgumentInfo,
   CallSite,
+  DecoratorDef,
   FunctionDispatchMapping,
   OpenAIToolSchema,
   ParsedPythonFile,
@@ -204,7 +205,7 @@ export class PythonSemanticIndex {
 
     for (const [filePath, parsed] of this.files) {
       for (const func of parsed.functions) {
-        const root = this.extractDecoratorRoot(func.decorators, filePath, func.className, func.name);
+        const root = this.extractDecoratorRoot(func.decorators, filePath, func.className, func.name, parsed.decoratorDefs);
         if (!root || roots.has(root.nodeId)) {
           continue;
         }
@@ -449,7 +450,11 @@ export class PythonSemanticIndex {
     }
   }
 
-  private extractDecoratorRoot(decorators: string[], filePath: string, className: string | undefined, functionName: string): SemanticInvocationRoot | null {
+  private extractDecoratorRoot(decorators: string[], filePath: string, className: string | undefined, functionName: string, decoratorDefs: DecoratorDef[] = []): SemanticInvocationRoot | null {
+    // Build a set of locally-defined decorator names to avoid false positives:
+    // a decorator defined in the same file is not a framework tool-registration decorator.
+    const locallyDefinedNames = new Set(decoratorDefs.map(d => d.name));
+
     let heuristicResult: SemanticInvocationRoot | null = null;
 
     for (const decorator of decorators) {
@@ -500,9 +505,12 @@ export class PythonSemanticIndex {
 
       // Heuristic: bare @tool, @function_tool, or @tool_call decorators that are not imported
       // from any resolvable module are common in many agent frameworks and custom wrappers.
+      // Only apply when the decorator is NOT locally defined in the same file (to avoid
+      // treating user-defined utility decorators as tool registrations).
       // Record as heuristic fallback but keep looking for a structural match.
       if (
         !heuristicResult &&
+        !locallyDefinedNames.has(baseName) &&
         (baseName === 'tool' || baseName === 'function_tool' || baseName === 'tool_call' ||
          baseName === 'mcp_tool' || baseName === 'agent_tool' || baseName === 'register_tool')
       ) {

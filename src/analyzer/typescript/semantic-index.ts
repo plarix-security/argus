@@ -151,20 +151,25 @@ export function extractSemanticInvocationRoots(
     // Check if this file has dangerous calls but no roots yet
     const hasDangerousCalls = parsed.calls.some(call => {
       const callee = call.callee.toLowerCase();
-      return callee.includes('spawn') || callee.includes('exec') || callee.includes('eval') ||
-             callee.includes('unlink') || callee.includes('rmdir') || callee.includes('delete') ||
-             callee.includes('shell') || callee.includes('command') ||
-             // HTTP/network operations
-             callee === 'fetch' || callee.includes('.fetch') ||
-             callee.includes('axios') || callee.includes('request') ||
-             callee.includes('http.get') || callee.includes('http.post') ||
-             // File system
-             callee.includes('writefile') || callee.includes('readfile') ||
-             callee.includes('mkdir') || callee.includes('stat') ||
-             // Database
-             callee.includes('query') || callee.includes('execute') ||
-             // Process
-             callee.includes('process.exit') || callee.includes('childprocess');
+      // High-signal process/shell execution
+      return callee === 'spawn' || callee === 'exec' || callee === 'execsync' ||
+             callee === 'execfile' || callee === 'execfilesync' || callee === 'spawnSync' ||
+             callee.endsWith('.spawn') || callee.endsWith('.exec') ||
+             callee === 'eval' ||
+             // File deletion / destructive FS
+             callee === 'unlink' || callee === 'unlinksync' ||
+             callee === 'rmdir' || callee === 'rmdirSync' ||
+             callee === 'rm' || callee === 'rmsync' ||
+             // Specific HTTP clients (avoid generic 'request' which matches too broadly)
+             callee === 'fetch' || callee.endsWith('.fetch') ||
+             callee.startsWith('axios.') ||
+             // Specific file-write operations
+             callee === 'writefile' || callee === 'writefilesync' ||
+             callee.endsWith('.writefile') || callee.endsWith('.writefilesync') ||
+             // Process control
+             callee === 'process.exit' ||
+             // child_process module usage
+             callee.includes('child_process') || callee.includes('childprocess');
     });
 
     if (hasDangerousCalls) {
