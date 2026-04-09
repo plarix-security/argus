@@ -249,23 +249,34 @@ export class PythonSemanticIndex {
       };
     }
 
-    if (call.baseExpression) {
-      const moduleBinding = this.resolveImportedSymbol(call.baseExpression, filePath);
-      if (moduleBinding?.modulePath && memberChain.length > 0) {
+    // Derive baseExpression from callee when not explicitly provided.
+    // Real AST parser always sets baseExpression for attribute calls, but
+    // test data and some edge cases may omit it. Handle: "conn.execute" with
+    // no baseExpression by splitting on the first dot.
+    const effectiveBase = call.baseExpression ?? (call.callee.includes('.') ? call.callee.split('.')[0] : undefined);
+    const effectiveMemberChain = call.baseExpression
+      ? memberChain
+      : (call.callee.includes('.') ? call.callee.split('.').slice(1) : memberChain);
+
+    if (effectiveBase) {
+      const moduleBinding = this.resolveImportedSymbol(effectiveBase, filePath);
+      if (moduleBinding?.modulePath && effectiveMemberChain.length > 0) {
         return {
-          identity: `${moduleBinding.modulePath}.${memberChain.join('.')}`,
+          identity: `${moduleBinding.modulePath}.${effectiveMemberChain.join('.')}`,
           kind: 'semantic',
-          evidence: `resolved module alias ${call.baseExpression}`,
+          evidence: `resolved module alias ${effectiveBase}`,
         };
       }
 
-      const receiverReference = this.buildReceiverReference(call, 1);
+      // Build a synthetic call for receiver resolution when baseExpression is derived
+      const syntheticCall = call.baseExpression ? call : { ...call, baseExpression: effectiveBase, memberChain: effectiveMemberChain };
+      const receiverReference = this.buildReceiverReference(syntheticCall, 1);
       const constructor = this.resolveAssignedConstructor(receiverReference, context);
       if (constructor.identity) {
         const receiverSegments = splitReferenceSegments(receiverReference);
         const matchedSegments = splitReferenceSegments(constructor.matchedReference);
         const trailingSegments = receiverSegments.slice(matchedSegments.length);
-        const lastMember = memberChain[memberChain.length - 1];
+        const lastMember = effectiveMemberChain[effectiveMemberChain.length - 1];
 
         return {
           identity: [constructor.identity, ...trailingSegments, lastMember].filter(Boolean).join('.'),
@@ -274,9 +285,9 @@ export class PythonSemanticIndex {
         };
       }
 
-      const inlineConstructor = this.resolveInlineConstructor(call.baseExpression, filePath);
+      const inlineConstructor = this.resolveInlineConstructor(effectiveBase, filePath);
       if (inlineConstructor.identity) {
-        const lastMember = memberChain[memberChain.length - 1];
+        const lastMember = effectiveMemberChain[effectiveMemberChain.length - 1];
         return {
           identity: `${inlineConstructor.identity}.${lastMember}`,
           kind: 'semantic',

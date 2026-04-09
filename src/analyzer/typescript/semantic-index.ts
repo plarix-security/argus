@@ -153,7 +153,18 @@ export function extractSemanticInvocationRoots(
       const callee = call.callee.toLowerCase();
       return callee.includes('spawn') || callee.includes('exec') || callee.includes('eval') ||
              callee.includes('unlink') || callee.includes('rmdir') || callee.includes('delete') ||
-             callee.includes('shell') || callee.includes('command');
+             callee.includes('shell') || callee.includes('command') ||
+             // HTTP/network operations
+             callee === 'fetch' || callee.includes('.fetch') ||
+             callee.includes('axios') || callee.includes('request') ||
+             callee.includes('http.get') || callee.includes('http.post') ||
+             // File system
+             callee.includes('writefile') || callee.includes('readfile') ||
+             callee.includes('mkdir') || callee.includes('stat') ||
+             // Database
+             callee.includes('query') || callee.includes('execute') ||
+             // Process
+             callee.includes('process.exit') || callee.includes('chilprocess');
     });
 
     if (hasDangerousCalls) {
@@ -734,6 +745,10 @@ function extractPlaywrightTools(
  *
  * This pattern is used by Eliza, custom agent frameworks, and plugin systems.
  * Detects: { name: "myAction", handler: async () => { ... } }
+ *
+ * Priority order for execution properties: handler, execute, run, action, handle, invoke,
+ * call, perform (these are primary execution callbacks). Gating/lifecycle props like
+ * validate, init, dispose are lower priority and are only used when no execution prop exists.
  */
 function extractActionObjectPatterns(
   filePath: string,
@@ -742,16 +757,34 @@ function extractActionObjectPatterns(
 ): SemanticInvocationRoot[] {
   const roots: SemanticInvocationRoot[] = [];
 
-  // Action-like property names that indicate callback functions
-  const actionPropertyNames = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform', 'get', 'validate', 'init', 'dispose']);
+  // Primary execution callback names (preferred as roots)
+  const primaryExecutionProps = ['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform'];
+  // Secondary props (used only if no primary prop found)
+  const secondaryExecutionProps = ['get', 'validate', 'init', 'dispose'];
+  const allActionPropertyNames = new Set([...primaryExecutionProps, ...secondaryExecutionProps]);
 
   for (const assignment of parsed.assignments) {
     // Only check object literals
     if (!assignment.isObjectLiteral || !assignment.objectProperties) continue;
 
-    // Look for action-like callback properties
-    for (const prop of assignment.objectProperties) {
-      if (!actionPropertyNames.has(prop.key)) continue;
+    const nameProp = assignment.objectProperties.find(p => p.key === 'name');
+    const toolName = nameProp?.stringValue || assignment.target;
+
+    // Build ordered list: primary props first, then secondary
+    const propsToCheck: Array<typeof assignment.objectProperties[0]> = [];
+    for (const key of primaryExecutionProps) {
+      const found = assignment.objectProperties.find(p => p.key === key);
+      if (found) propsToCheck.push(found);
+    }
+    if (propsToCheck.length === 0) {
+      for (const key of secondaryExecutionProps) {
+        const found = assignment.objectProperties.find(p => p.key === key);
+        if (found) propsToCheck.push(found);
+      }
+    }
+
+    for (const prop of propsToCheck) {
+      if (!allActionPropertyNames.has(prop.key)) continue;
 
       // Case 1: Inline function - { handler: async () => { ... } }
       if (prop.valueType === 'function') {
@@ -761,10 +794,6 @@ function extractActionObjectPatterns(
         const nodeId = assignment.enclosingFunction
           ? `${filePath}:${assignment.enclosingFunction}`
           : `${filePath}:${syntheticFuncName}`;
-
-        // Try to get a name from the object
-        const nameProp = assignment.objectProperties.find(p => p.key === 'name');
-        const toolName = nameProp?.stringValue || assignment.target;
 
         if (!roots.some(r => r.nodeId === nodeId)) {
           roots.push({
@@ -776,7 +805,7 @@ function extractActionObjectPatterns(
             line: assignment.line,
           });
         }
-        break; // Only add once per object
+        break; // Only add once per object (highest-priority prop wins)
       }
 
       // Case 2: Function reference - { handler: myHandlerFunc }
@@ -786,9 +815,6 @@ function extractActionObjectPatterns(
         const resolvedFilePath = resolved?.filePath || filePath;
 
         if (func) {
-          const nameProp = assignment.objectProperties.find(p => p.key === 'name');
-          const toolName = nameProp?.stringValue || prop.value;
-
           const nodeId = func.className
             ? `${resolvedFilePath}:${func.className}.${func.name}`
             : `${resolvedFilePath}:${func.name}`;
