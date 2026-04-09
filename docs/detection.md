@@ -13,9 +13,9 @@ The shipped detector does this:
 
 ## Supported Languages
 
-- **Python**: Full support with comprehensive framework detection
-- **TypeScript**: Full support with Node.js ecosystem patterns
-- **JavaScript**: Full support (same analysis as TypeScript)
+- **Python**: Broad static-analysis support with semantic framework extraction, but still non-comprehensive.
+- **TypeScript**: Broad static-analysis support for common Node.js agent patterns, but non-comprehensive.
+- **JavaScript**: Uses the same static-analysis engine as TypeScript, with the same non-comprehensive limits.
 
 ## Severity Model
 

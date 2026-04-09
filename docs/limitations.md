@@ -2,7 +2,7 @@
 
 ## Language Scope
 
-- Python, TypeScript, and JavaScript are supported with full analysis.
+- Python, TypeScript, and JavaScript are supported for broad static analysis, but not full or guaranteed-complete coverage.
 - Rust support is planned but not yet implemented.
 - Analysis is static only - no runtime execution.
 
@@ -15,7 +15,7 @@
 
 ## Registration Scope
 
-- Tool detection is semantic-only.
+- Tool detection is primarily semantic (AST + call-path analysis) but still includes pattern/regex-based matching in parts of sink classification.
 - Dynamic runtime registration may be missed.
 - Framework labels do not imply complete runtime coverage.
 
