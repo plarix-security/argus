@@ -422,36 +422,72 @@ export class PythonSemanticIndex {
   }
 
   private extractDecoratorRoot(decorators: string[], filePath: string, className: string | undefined, functionName: string): SemanticInvocationRoot | null {
+    let heuristicResult: SemanticInvocationRoot | null = null;
+
     for (const decorator of decorators) {
       const baseName = decorator.split('(')[0].trim();
       const imported = this.resolveImportedSymbol(baseName, filePath);
-      if (!imported?.importedName) {
-        continue;
+
+      if (imported?.importedName) {
+        if (
+          imported.importedName === 'tool' &&
+          (imported.modulePath === 'langchain_core.tools' || imported.modulePath === 'langchain.tools')
+        ) {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return {
+            nodeId: makeNodeId(filePath, localId),
+            framework: 'langchain',
+            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
+          };
+        }
+
+        if (imported.importedName === 'tool' && imported.modulePath === 'crewai.tools') {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return {
+            nodeId: makeNodeId(filePath, localId),
+            framework: 'crewai',
+            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
+          };
+        }
+
+        if (imported.importedName === 'tool' && matchesFrameworkModule(imported.modulePath, 'smolagents')) {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return {
+            nodeId: makeNodeId(filePath, localId),
+            framework: 'smolagents',
+            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
+          };
+        }
+
+        // Any resolved 'tool' import from any framework module
+        if (imported.importedName === 'tool') {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return {
+            nodeId: makeNodeId(filePath, localId),
+            framework: imported.modulePath.split('.')[0] || 'unknown',
+            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
+          };
+        }
       }
 
+      // Heuristic: bare @tool, @function_tool, or @tool_call decorators that are not imported
+      // from any resolvable module are common in many agent frameworks and custom wrappers.
+      // Record as heuristic fallback but keep looking for a structural match.
       if (
-        imported.importedName === 'tool' &&
-        (imported.modulePath === 'langchain_core.tools' || imported.modulePath === 'langchain.tools')
+        !heuristicResult &&
+        (baseName === 'tool' || baseName === 'function_tool' || baseName === 'tool_call' ||
+         baseName === 'mcp_tool' || baseName === 'agent_tool' || baseName === 'register_tool')
       ) {
         const localId = className ? `${className}.${functionName}` : functionName;
-        return {
+        heuristicResult = {
           nodeId: makeNodeId(filePath, localId),
-          framework: 'langchain',
-          evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
-        };
-      }
-
-      if (imported.importedName === 'tool' && imported.modulePath === 'crewai.tools') {
-        const localId = className ? `${className}.${functionName}` : functionName;
-        return {
-          nodeId: makeNodeId(filePath, localId),
-          framework: 'crewai',
-          evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
+          framework: 'unknown',
+          evidence: `heuristic: @${baseName} decorator (unresolved import)`,
         };
       }
     }
 
-    return null;
+    return heuristicResult;
   }
 
   private addRootsFromArgument(
@@ -465,9 +501,28 @@ export class PythonSemanticIndex {
       return;
     }
 
-    for (const nodeId of this.expandExpressionToFunctionNodes(argument.value, context, new Set<string>())) {
-      if (!roots.has(nodeId)) {
-        roots.set(nodeId, { nodeId, framework, evidence });
+    const nodeIds = this.expandExpressionToFunctionNodes(argument.value, context, new Set<string>());
+
+    if (nodeIds.size > 0) {
+      for (const nodeId of nodeIds) {
+        if (!roots.has(nodeId)) {
+          roots.set(nodeId, { nodeId, framework, evidence });
+        }
+      }
+      return;
+    }
+
+    // Fallback: when tool references cannot be resolved to known function nodes
+    // (e.g., tools defined in external packages not yet in the analysis corpus),
+    // create synthetic roots so the framework is still detected.
+    for (const ref of argument.value.references) {
+      const syntheticNodeId = makeNodeId(context.filePath, ref);
+      if (!roots.has(syntheticNodeId)) {
+        roots.set(syntheticNodeId, {
+          nodeId: syntheticNodeId,
+          framework,
+          evidence: `${evidence} (unresolved reference: ${ref})`,
+        });
       }
     }
   }
