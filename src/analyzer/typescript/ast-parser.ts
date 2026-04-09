@@ -468,8 +468,7 @@ function findEnclosingFunction(node: Parser.SyntaxNode): string | undefined {
         }
       }
 
-      // For arrow functions in export statements assigned to variables
-      // export const foo = () => {}
+      // For arrow functions inside variable declarations (const/let/var)
       if (parent?.type === 'lexical_declaration' || parent?.type === 'variable_declaration') {
         // walk siblings to find variable_declarator
         for (let i = 0; i < (parent?.childCount ?? 0); i++) {

@@ -164,7 +164,7 @@ export function extractSemanticInvocationRoots(
              // Database
              callee.includes('query') || callee.includes('execute') ||
              // Process
-             callee.includes('process.exit') || callee.includes('chilprocess');
+             callee.includes('process.exit') || callee.includes('childprocess');
     });
 
     if (hasDangerousCalls) {

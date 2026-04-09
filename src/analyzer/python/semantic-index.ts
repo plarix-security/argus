@@ -430,6 +430,23 @@ export class PythonSemanticIndex {
       const toolArg = getCallArgument(call, 'tools');
       this.addRootsFromOpenAITools(toolArg, context, `chat.completions.create at line ${call.startLine}`, roots);
     }
+
+    // ElizaOS / generic agent framework: Action(handler=func) or ActionDefinition(handler=func)
+    // Matches Action imported from framework modules (elizaos, eliza) OR any Action() call
+    // that has a 'handler' kwarg paired with a 'name' kwarg (both required to reduce false positives).
+    if (call.callee === 'Action' || call.callee === 'ActionDefinition') {
+      const handlerArg = getCallArgument(call, 'handler');
+      const nameArg = getCallArgument(call, 'name');
+      const isFrameworkImport = directImport?.modulePath.includes('eliza') ||
+                                directImport?.modulePath.includes('elizaos') ||
+                                directImport?.modulePath.includes('action');
+      // Require either a framework import OR both name+handler kwargs (strict heuristic)
+      if (handlerArg && (isFrameworkImport || nameArg)) {
+        const framework = directImport?.modulePath?.includes('eliza') ? 'elizaos' : 'action-object';
+        this.addRootsFromArgument(handlerArg, context, framework, `Action(handler=...) at line ${call.startLine}`, roots);
+        return;
+      }
+    }
   }
 
   private extractDecoratorRoot(decorators: string[], filePath: string, className: string | undefined, functionName: string): SemanticInvocationRoot | null {
@@ -526,6 +543,40 @@ export class PythonSemanticIndex {
     // Fallback: when tool references cannot be resolved to known function nodes
     // (e.g., tools defined in external packages not yet in the analysis corpus),
     // create synthetic roots so the framework is still detected.
+
+    // Special case: ClassName().method_name pattern - common in frameworks like ElizaOS Python
+    // where handlers are instance methods passed by reference: Action(handler=MyClass().handler)
+    const instanceMethodMatch = argument.value.text?.match(/^(\w+)\(\)\.(\w+)$/);
+    if (instanceMethodMatch) {
+      const [, className, methodName] = instanceMethodMatch;
+      const qualifiedId = `${className}.${methodName}`;
+      const syntheticNodeId = makeNodeId(context.filePath, qualifiedId);
+      if (!roots.has(syntheticNodeId)) {
+        roots.set(syntheticNodeId, {
+          nodeId: syntheticNodeId,
+          framework,
+          evidence: `${evidence} (instance method reference: ${qualifiedId})`,
+        });
+      }
+      return;
+    }
+
+    // Special case: ClassName.method_name (unbound method reference)
+    const unboundMethodMatch = argument.value.text?.match(/^(\w+)\.(\w+)$/);
+    if (unboundMethodMatch) {
+      const [, className, methodName] = unboundMethodMatch;
+      const qualifiedId = `${className}.${methodName}`;
+      const syntheticNodeId = makeNodeId(context.filePath, qualifiedId);
+      if (!roots.has(syntheticNodeId)) {
+        roots.set(syntheticNodeId, {
+          nodeId: syntheticNodeId,
+          framework,
+          evidence: `${evidence} (unbound method reference: ${qualifiedId})`,
+        });
+      }
+      return;
+    }
+
     for (const ref of argument.value.references) {
       const syntheticNodeId = makeNodeId(context.filePath, ref);
       if (!roots.has(syntheticNodeId)) {
