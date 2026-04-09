@@ -37,7 +37,7 @@ Current CLI JSON shape:
 
 ```json
 {
-  "version": "1.6.0",
+  "version": "1.5.5",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,

@@ -11,7 +11,7 @@ function createReport(partial: boolean): AnalysisReport {
     findings: [],
     cees: [],
     metadata: {
-      scannerVersion: '1.6.0',
+      scannerVersion: '1.5.5',
       timestamp: new Date().toISOString(),
       totalTimeMs: 1,
       failedFiles: partial ? ['a.py'] : [],
