@@ -1,6 +1,7 @@
+import type { Request, Response } from 'express';
 import { getApp } from '../src/app';
 
-export default function handler(req: any, res: any): void {
+export default function handler(req: Request, res: Response): void {
   try {
     const app = getApp();
     app(req, res);

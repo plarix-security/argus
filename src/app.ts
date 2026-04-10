@@ -10,7 +10,7 @@ function validateEnv(): void {
   const required = ['GITHUB_APP_ID', 'GITHUB_PRIVATE_KEY', 'GITHUB_WEBHOOK_SECRET'];
   const missing = required.filter(v => !process.env[v]);
   if (missing.length > 0) {
-    throw new Error('Missing: ' + missing.join(', '));
+    throw new Error('Missing required environment variables: ' + missing.join(', '));
   }
 }
 
