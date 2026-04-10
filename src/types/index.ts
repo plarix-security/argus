@@ -256,6 +256,44 @@ export interface AnalyzerConfig {
 }
 
 /**
+ * GitHub webhook event context.
+ */
+export interface WebhookContext {
+  /** Event type (push, pull_request) */
+  event: 'push' | 'pull_request';
+  /** Repository owner */
+  owner: string;
+  /** Repository name */
+  repo: string;
+  /** Commit SHA */
+  sha: string;
+  /** Pull request number (if PR event) */
+  pullNumber?: number;
+  /** Branch name */
+  branch: string;
+  /** List of changed files (for PRs) */
+  changedFiles?: string[];
+  /** Installation ID for GitHub App */
+  installationId: number;
+}
+
+/**
+ * Installation event context for new GitHub App installations.
+ */
+export interface InstallationContext {
+  /** Repository owner */
+  owner: string;
+  /** Repository name */
+  repo: string;
+  /** Default branch of the repository */
+  defaultBranch: string;
+  /** Installation ID for GitHub App */
+  installationId: number;
+  /** Commit SHA (HEAD for installations, specific SHA for pushes) */
+  commitSha: string;
+}
+
+/**
  * AST node location information.
  */
 export interface NodeLocation {
