@@ -13,7 +13,22 @@ function getAppInstance(): App {
   return appInstance;
 }
 
+function isHealthRequest(req: AppRequest): boolean {
+  const request = req as { method?: string; url?: string };
+  if (request.method !== 'GET') {
+    return false;
+  }
+
+  const requestUrl = request.url ?? '';
+  return requestUrl === '/' || requestUrl.startsWith('/health');
+}
+
 export default function handler(req: AppRequest, res: AppResponse): void {
+  if (isHealthRequest(req)) {
+    res.status(200).json({ status: 'ok' });
+    return;
+  }
+
   try {
     const app = getAppInstance();
     app(req, res);
