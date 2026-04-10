@@ -13,7 +13,7 @@ wyscan scan ./agent-project
 Example output:
 
 ```text
-wyscan v1.5.8  ·  Plarix
+wyscan v1.6.0  ·  Plarix
 
 Scanning  agent-project
 
@@ -131,20 +131,28 @@ Framework detection supports both Python and TypeScript/JavaScript. WyScan uses 
 ### Python Frameworks
 
 - LangChain/LangGraph
-- CrewAI
-- AutoGen
-- OpenAI tool schemas and dispatch maps
-- LlamaIndex
-- MCP
-- Framework-core structural decorator registrations
+- CrewAI (decorator and class-based `BaseTool` subclasses)
+- AutoGen (v0.2 and v0.4)
+- OpenAI tool schemas and dispatch maps / Swarm
+- Pydantic AI (`Agent.tool`, `@agent.tool_plain`)
+- LlamaIndex (`FunctionTool`, `QueryEngineTool`)
+- Haystack (`@component`, `Pipeline.add_component`)
+- Google ADK (`Agent`, `LlmAgent`)
+- Smolagents / HuggingFace Agents
+- Semantic Kernel (Python)
+- MCP Python SDK
+- Generic `@tool` decorators from any import
 
 ### TypeScript/JavaScript Frameworks
 
-- OpenAI SDK
+- ElizaOS (`Action`, `Plugin`, handler functions)
+- OpenAI Agents SDK
 - LangChain.js/LangGraph.js
 - Vercel AI SDK
 - MCP SDK
-- Mastra
+- Mastra (`createTool`, `Agent`, `Workflow`)
+- Anthropic SDK
+- Inngest / Temporal workflow steps
 - Playwright/Puppeteer browser automation
 - Framework-core structural registrations only (no generic exported-entry fallback)
 
@@ -177,7 +185,7 @@ Current CLI JSON shape:
 
 ```json
 {
-  "version": "1.5.8",
+  "version": "1.6.0",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,
