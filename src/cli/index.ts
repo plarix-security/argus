@@ -53,6 +53,30 @@ const EXIT = {
   ERROR: 3,
 };
 
+function resolveCliProjectRoot(): string {
+  const candidates = [
+    path.resolve(__dirname, '../..'),
+    process.cwd(),
+  ];
+
+  for (const candidate of candidates) {
+    const pkgPath = path.join(candidate, 'package.json');
+    if (!fs.existsSync(pkgPath)) {
+      continue;
+    }
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { name?: string };
+      if (pkg.name === NAME) {
+        return candidate;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return process.cwd();
+}
+
 /**
  * Scan options
  */
@@ -430,6 +454,8 @@ async function runInstall(): Promise<number> {
   console.log('  Preparing local CLI installation...');
   console.log();
 
+  const projectRoot = resolveCliProjectRoot();
+
   const steps = [
     { step: 'npm install', cmd: 'npm', args: ['install'] },
     { step: 'npm run build', cmd: 'npm', args: ['run', 'build'] },
@@ -439,7 +465,7 @@ async function runInstall(): Promise<number> {
 
   for (const s of steps) {
     const result = spawnSync(s.cmd, s.args, {
-      cwd: process.cwd(),
+      cwd: projectRoot,
       encoding: 'utf-8',
       stdio: 'pipe',
     });

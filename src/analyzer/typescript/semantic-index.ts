@@ -24,6 +24,12 @@ import {
   ImportInfo,
 } from './ast-parser';
 
+const PRIMARY_ACTION_EXECUTION_PROPS = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform']);
+const SECONDARY_ACTION_EXECUTION_PROPS = new Set(['validate', 'init', 'dispose']);
+// Token list is used for semantic context scoring (type/target/name),
+// while execution-prop sets are used for callback-shape detection.
+const AGENTIC_CORE_TOKENS = ['action', 'tool', 'plugin', 'handler', 'command', 'provider', 'service', 'capability', 'evaluator', 'agent', 'runtime'];
+
 export interface SemanticInvocationRoot {
   /** Node ID (file:function or file:class.method) */
   nodeId: string;
@@ -61,46 +67,47 @@ export function extractSemanticInvocationRoots(
   files: Map<string, ParsedTypeScriptFile>
 ): Map<string, SemanticInvocationRoot> {
   const roots = new Map<string, SemanticInvocationRoot>();
+  const addRoots = (newRoots: SemanticInvocationRoot[]) => {
+    for (const root of newRoots) {
+      roots.set(root.nodeId, root);
+    }
+  };
 
   for (const [filePath, parsed] of files) {
+    const fileRoots: SemanticInvocationRoot[] = [];
+
     // Check for OpenAI SDK usage
-    const openaiRoots = extractOpenAITools(filePath, parsed);
-    for (const root of openaiRoots) {
-      roots.set(root.nodeId, root);
-    }
+    fileRoots.push(...extractOpenAITools(filePath, parsed));
 
     // Check for LangChain.js/LangGraph.js usage
-    const langchainRoots = extractLangChainTools(filePath, parsed);
-    for (const root of langchainRoots) {
-      roots.set(root.nodeId, root);
-    }
+    fileRoots.push(...extractLangChainTools(filePath, parsed));
 
     // Check for Vercel AI SDK usage
-    const vercelRoots = extractVercelAITools(filePath, parsed);
-    for (const root of vercelRoots) {
-      roots.set(root.nodeId, root);
-    }
+    fileRoots.push(...extractVercelAITools(filePath, parsed));
 
     // Check for MCP SDK usage
-    const mcpRoots = extractMCPTools(filePath, parsed);
-    for (const root of mcpRoots) {
-      roots.set(root.nodeId, root);
-    }
+    fileRoots.push(...extractMCPTools(filePath, parsed));
 
     // Check for Mastra usage
-    const mastraRoots = extractMastraTools(filePath, parsed);
-    for (const root of mastraRoots) {
-      roots.set(root.nodeId, root);
-    }
+    fileRoots.push(...extractMastraTools(filePath, parsed));
 
     // Check for Playwright browser automation
-    const playwrightRoots = extractPlaywrightTools(filePath, parsed);
-    for (const root of playwrightRoots) {
-      roots.set(root.nodeId, root);
+    fileRoots.push(...extractPlaywrightTools(filePath, parsed));
+
+    // Check framework-core structural patterns (agent-system agnostic)
+    fileRoots.push(...extractActionObjectPatterns(filePath, parsed, files));
+    fileRoots.push(...extractPluginArrayPatterns(filePath, parsed, files));
+    fileRoots.push(...extractRegistrationCallPatterns(filePath, parsed, files));
+    fileRoots.push(...extractServiceClassPatterns(filePath, parsed));
+    fileRoots.push(...extractEventHandlerPatterns(filePath, parsed));
+
+    // Controlled fallback for unknown frameworks:
+    // only when the file has clear agentic context and no stronger structural evidence.
+    if (fileRoots.length === 0 && hasAgenticContext(parsed)) {
+      fileRoots.push(...extractExportedEntryPoints(filePath, parsed));
     }
 
-    // Intentionally no generic or exported-entry fallback roots.
-    // Root registration must be framework-core and structurally evidenced.
+    addRoots(fileRoots);
   }
 
   return roots;
@@ -692,6 +699,8 @@ function extractActionObjectPatterns(
     if (!assignment.isObjectLiteral || !assignment.objectProperties) continue;
 
     const nameProp = assignment.objectProperties.find(p => p.key === 'name');
+    if (!isLikelyAgenticActionObject(parsed, assignment, nameProp?.stringValue)) continue;
+
     const toolName = nameProp?.stringValue || assignment.target;
 
     // Build ordered list: primary props first, then secondary
@@ -760,6 +769,58 @@ function extractActionObjectPatterns(
   }
 
   return roots;
+}
+
+function isLikelyAgenticActionObject(
+  parsed: ParsedTypeScriptFile,
+  assignment: AssignmentInfo,
+  nameValue?: string
+): boolean {
+  if (!assignment.objectProperties) return false;
+
+  const hasPrimaryExecutionProp = assignment.objectProperties.some(prop => PRIMARY_ACTION_EXECUTION_PROPS.has(prop.key));
+  const hasSecondaryExecutionProp = assignment.objectProperties.some(prop => SECONDARY_ACTION_EXECUTION_PROPS.has(prop.key));
+  if (!hasPrimaryExecutionProp && !hasSecondaryExecutionProp) return false;
+
+  const typedContext = `${assignment.typeAnnotation || ''} ${assignment.assertedType || ''}`.toLowerCase();
+  const target = assignment.target.toLowerCase();
+  const nameLower = (nameValue || '').toLowerCase();
+
+  const hasTypeToken = AGENTIC_CORE_TOKENS.some(token => typedContext.includes(token));
+  const hasTargetToken = AGENTIC_CORE_TOKENS.some(token => target.includes(token));
+  const hasNameToken = AGENTIC_CORE_TOKENS.some(token => nameLower.includes(token));
+  const hasAgenticImport = hasAgenticContext(parsed);
+
+  // Require semantic context to avoid turning arbitrary callback objects into roots.
+  // Secondary-only callbacks are common outside agent systems, so require stronger context.
+  if (hasPrimaryExecutionProp) {
+    // Explicit type evidence is strongest. Otherwise require combined shape/context signals
+    // so generic web/service handlers are less likely to be misclassified as agent roots.
+    if (hasTypeToken) return true;
+    if (hasTargetToken && (hasNameToken || hasAgenticImport)) return true;
+    if (hasNameToken && hasAgenticImport) return true;
+    return false;
+  }
+
+  return hasTypeToken || (hasTargetToken && hasNameToken);
+}
+
+function hasAgenticContext(parsed: ParsedTypeScriptFile): boolean {
+  return parsed.imports.some(imp => {
+    const moduleLower = imp.module.toLowerCase();
+    return (
+      moduleLower.includes('agent') ||
+      moduleLower.includes('plugin') ||
+      moduleLower.includes('tool') ||
+      moduleLower.includes('runtime') ||
+      moduleLower.includes('langchain') ||
+      moduleLower.includes('langgraph') ||
+      moduleLower.includes('mastra') ||
+      moduleLower.includes('modelcontextprotocol') ||
+      moduleLower.includes('openai') ||
+      moduleLower.includes('/ai')
+    );
+  });
 }
 
 /**

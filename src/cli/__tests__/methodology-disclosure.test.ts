@@ -1,5 +1,6 @@
 import { buildMethodologyDisclosure } from '../methodology-disclosure';
 import { AnalysisReport } from '../../types';
+import { VERSION } from '../version';
 
 function createReport(partial: boolean): AnalysisReport {
   return {
@@ -11,7 +12,7 @@ function createReport(partial: boolean): AnalysisReport {
     findings: [],
     cees: [],
     metadata: {
-      scannerVersion: '1.6.0',
+      scannerVersion: VERSION,
       timestamp: new Date().toISOString(),
       totalTimeMs: 1,
       failedFiles: partial ? ['a.py'] : [],
