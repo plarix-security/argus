@@ -256,18 +256,31 @@ export class PythonSemanticIndex {
 
     // Known tool base class names across all Python frameworks
     const TOOL_BASE_CLASSES = new Set([
+      // LangChain / CrewAI
       'BaseTool', 'Tool', 'StructuredTool', 'DynamicTool', 'FunctionTool',
       'QueryEngineTool', 'BaseToolMixin',
-      // smolagents
+      // smolagents / HuggingFace
       'PipelineTool', 'CodeAgent',
       // semantic kernel
       'KernelFunction', 'KernelPlugin',
       // haystack component marker
       'Component',
+      // MetaGPT action/role pattern
+      'Action', 'Role', 'BaseRole', 'BaseAction',
+      // AutoGPT command pattern
+      'BaseCommand', 'Command',
+      // Generic agentic base classes
+      'BaseAgent', 'AgentAction', 'AgentStep',
+      // OpenHands
+      'RuntimeAction', 'Action',
+      // Letta / MemGPT
+      'AgentState', 'BaseAgentState',
+      // Agno / Phidata
+      'Toolkit', 'BaseToolkit',
     ]);
 
     // Execution method names for class-based tools
-    const EXECUTION_METHODS = new Set(['_run', 'run', 'execute', 'arun', '_arun', 'ainvoke', '__call__', 'call']);
+    const EXECUTION_METHODS = new Set(['_run', 'run', 'execute', 'arun', '_arun', 'ainvoke', '__call__', 'call', 'perform', '_execute']);
 
     // Determine if this class inherits from a known tool base
     const matchedBase = classDef.bases.find(base => {
@@ -1410,6 +1423,11 @@ export class PythonSemanticIndex {
     context: ResolutionContext,
     visited: Set<string>
   ): ConstructorBinding {
+    // Guard against mutual recursion: resolveCallResultBinding ↔ resolveFunctionReturnBinding
+    const cycleKey = `rcr:${context.filePath}:${callCallee}`;
+    if (visited.has(cycleKey)) return {};
+    visited.add(cycleKey);
+
     if (callCallee === 'open' || callCallee === 'eval' || callCallee === 'exec') {
       return {
         modulePath: 'builtins',
@@ -1466,6 +1484,11 @@ export class PythonSemanticIndex {
     context: ResolutionContext,
     visited: Set<string>
   ): ConstructorBinding {
+    // Guard against mutual recursion: resolveFunctionReturnBinding ↔ resolveCallResultBinding
+    const cycleKey = `rfr:${context.filePath}:${reference}`;
+    if (visited.has(cycleKey)) return {};
+    visited.add(cycleKey);
+
     const target = this.resolveFunctionReference(reference, context);
     if (!target) {
       return {};
