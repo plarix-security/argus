@@ -941,7 +941,21 @@ export function buildCallGraph(
 }
 
 /**
- * Find exposed paths from tools to dangerous operations
+ * Find exposed paths from tools to dangerous operations.
+ *
+ * For every tool registration, this function:
+ * 1. Traverses the call graph BFS to find all reachable dangerous operations.
+ * 2. If any are found, emits an ExposedPath for each (the normal AFB04 path).
+ * 3. If NONE are found, emits a single registration-level ExposedPath with
+ *    category=TOOL_CALL and severity=INFO so that every tool produces at least
+ *    one CEE for audit purposes. This ensures complete CEE coverage even when
+ *    the static call-graph traversal cannot trace a specific external operation.
+ *
+ * @param nodes - All call graph nodes
+ * @param toolRegistrations - Nodes identified as tool registration points
+ * @param files - All parsed source files (for supporting evidence)
+ * @param maxDepth - Maximum BFS traversal depth
+ * @returns All exposed paths (including registration-only entries)
  */
 function findExposedPaths(
   nodes: Map<string, CallGraphNode>,
@@ -954,22 +968,56 @@ function findExposedPaths(
   for (const tool of toolRegistrations) {
     const paths = findDangerousPathsFromNode(tool, nodes, maxDepth);
 
-    for (const pathInfo of paths) {
-      const hasGate = pathInfo.path.some(nodeId => {
-        const node = nodes.get(nodeId);
-        return node?.hasPolicyGate || false;
-      });
+    if (paths.length > 0) {
+      for (const pathInfo of paths) {
+        const hasGate = pathInfo.path.some(nodeId => {
+          const node = nodes.get(nodeId);
+          return node?.hasPolicyGate || false;
+        });
+
+        exposedPaths.push({
+          tool,
+          operation: pathInfo.operation,
+          path: pathInfo.path,
+          hasGate,
+          involvesCrossFile: pathInfo.involvesCrossFile,
+          unresolvedCalls: pathInfo.unresolvedCalls,
+          depthLimitHit: pathInfo.depthLimitHit,
+          inputFlowsToOperation: pathInfo.inputFlowsToOperation,
+          supportingEvidence: pathInfo.supportingEvidence,
+        });
+      }
+    } else {
+      // STEP 5: Emit a registration-level CEE so every tool produces at least one entry.
+      // This ensures complete audit coverage even when traversal finds no dangerous op.
+      const hasGate = tool.hasPolicyGate;
+      const unresolvedCalls = collectUnresolvedCalls([tool.id], nodes);
+      const registrationOp: DangerousOperation = {
+        callee: `agent-tool-registration:${tool.name}`,
+        category: ExecutionCategory.TOOL_CALL,
+        severity: Severity.INFO,
+        line: tool.startLine,
+        column: 0,
+        codeSnippet: tool.name,
+        sourceFile: tool.sourceFile,
+        changesState: false,
+        detectionKind: 'semantic',
+        detectionEvidence: tool.toolDetectionEvidence || `Tool registration: ${tool.framework || 'unknown'}`,
+      };
 
       exposedPaths.push({
         tool,
-        operation: pathInfo.operation,
-        path: pathInfo.path,
+        operation: registrationOp,
+        path: [tool.id],
         hasGate,
-        involvesCrossFile: pathInfo.involvesCrossFile,
-        unresolvedCalls: pathInfo.unresolvedCalls,
-        depthLimitHit: pathInfo.depthLimitHit,
-        inputFlowsToOperation: pathInfo.inputFlowsToOperation,
-        supportingEvidence: pathInfo.supportingEvidence,
+        involvesCrossFile: false,
+        unresolvedCalls,
+        depthLimitHit: false,
+        inputFlowsToOperation: false,
+        supportingEvidence: [
+          `Tool registration evidence: ${tool.toolDetectionEvidence || tool.framework || 'structural'}`,
+          `No external operations traced from this entry point.`,
+        ],
       });
     }
   }

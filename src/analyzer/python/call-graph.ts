@@ -1058,49 +1058,93 @@ export function buildCallGraph(
       0
     );
 
-    for (const { operation, path, hasGate, involvesCrossFile, unresolvedCalls, depthLimitHit } of paths) {
-      const file = operation.sourceFile || tool.sourceFile || '<unknown>';
-      const flowEvidence = analyzePathFlow(tool, path, operation, nodes, files);
+    if (paths.length > 0) {
+      for (const { operation, path, hasGate, involvesCrossFile, unresolvedCalls, depthLimitHit } of paths) {
+        const file = operation.sourceFile || tool.sourceFile || '<unknown>';
+        const flowEvidence = analyzePathFlow(tool, path, operation, nodes, files);
 
-      // Check if any node in the path is a validation helper
-      const hasValidationHelperInPath = path.some(nodeId => {
-        const node = nodes.get(nodeId);
-        return node?.isValidationHelper || false;
-      });
-      const hasHeuristicGateInPath = path.some((nodeId) => {
-        const node = nodes.get(nodeId);
-        return node?.hasHeuristicGateIndicator || false;
-      });
-      const supportingEvidence = [...(flowEvidence.supportingEvidence || [])];
-      if (tool.toolDetectionEvidence) {
-        supportingEvidence.unshift(`Tool registration evidence: ${tool.toolDetectionEvidence}`);
-      }
-      if (operation.detectionEvidence) {
-        supportingEvidence.push(`Operation evidence: ${operation.detectionEvidence}`);
-      }
-      if (hasHeuristicGateInPath) {
-        supportingEvidence.push('Authorization-like decorator names were present, but no structural gate was proven in the analyzed path');
-      }
+        const hasValidationHelperInPath = path.some(nodeId => {
+          const node = nodes.get(nodeId);
+          return node?.isValidationHelper || false;
+        });
+        const hasHeuristicGateInPath = path.some((nodeId) => {
+          const node = nodes.get(nodeId);
+          return node?.hasHeuristicGateIndicator || false;
+        });
+        const supportingEvidence = [...(flowEvidence.supportingEvidence || [])];
+        if (tool.toolDetectionEvidence) {
+          supportingEvidence.unshift(`Tool registration evidence: ${tool.toolDetectionEvidence}`);
+        }
+        if (operation.detectionEvidence) {
+          supportingEvidence.push(`Operation evidence: ${operation.detectionEvidence}`);
+        }
+        if (hasHeuristicGateInPath) {
+          supportingEvidence.push('Authorization-like decorator names were present, but no structural gate was proven in the analyzed path');
+        }
 
-      const evidenceKind = determinePathEvidenceKind(tool.toolDetectionKind, operation.detectionKind, flowEvidence.inputFlowsToOperation);
+        const evidenceKind = determinePathEvidenceKind(tool.toolDetectionKind, operation.detectionKind, flowEvidence.inputFlowsToOperation);
+
+        exposedPaths.push({
+          tool,
+          operation,
+          path,
+          hasGateInPath: hasGate,
+          hasHeuristicGateInPath,
+          hasValidationHelperInPath,
+          file,
+          involvesCrossFile,
+          unresolvedCrossFileCalls: unresolvedCalls,
+          depthLimitHit,
+          inputFlowsToOperation: flowEvidence.inputFlowsToOperation,
+          instructionLikeInput: flowEvidence.instructionLikeInput,
+          resourceHint: operation.resourceHint,
+          changesState: operation.changesState,
+          supportingEvidence,
+          evidenceKind,
+        });
+      }
+    } else {
+      // STEP 5: Emit a registration-level CEE when no dangerous operation is traced.
+      // Every identified tool produces at least one CEE for audit completeness.
+      const unresolvedCalls: string[] = [];
+      for (const outgoing of tool.outgoingCalls) {
+        if (!outgoing.targetId) {
+          unresolvedCalls.push(outgoing.call.callee);
+        }
+      }
+      const registrationOp: DangerousOperation = {
+        callee: `agent-tool-registration:${tool.name}`,
+        category: ExecutionCategory.TOOL_CALL,
+        severity: Severity.INFO,
+        line: tool.startLine,
+        column: 0,
+        codeSnippet: tool.name,
+        sourceFile: tool.sourceFile,
+        changesState: false,
+        detectionKind: 'semantic',
+        detectionEvidence: tool.toolDetectionEvidence || `Tool registration: ${tool.framework || 'unknown'}`,
+      };
 
       exposedPaths.push({
         tool,
-        operation,
-        path,
-        hasGateInPath: hasGate,
-        hasHeuristicGateInPath,
-        hasValidationHelperInPath,
-        file,
-        involvesCrossFile,
+        operation: registrationOp,
+        path: [tool.id],
+        hasGateInPath: tool.hasPolicyGate,
+        hasHeuristicGateInPath: false,
+        hasValidationHelperInPath: false,
+        file: tool.sourceFile || '<unknown>',
+        involvesCrossFile: false,
         unresolvedCrossFileCalls: unresolvedCalls,
-        depthLimitHit,
-        inputFlowsToOperation: flowEvidence.inputFlowsToOperation,
-        instructionLikeInput: flowEvidence.instructionLikeInput,
-        resourceHint: operation.resourceHint,
-        changesState: operation.changesState,
-        supportingEvidence,
-        evidenceKind,
+        depthLimitHit: false,
+        inputFlowsToOperation: false,
+        instructionLikeInput: false,
+        resourceHint: undefined,
+        changesState: false,
+        supportingEvidence: [
+          `Tool registration evidence: ${tool.toolDetectionEvidence || tool.framework || 'structural'}`,
+          `No external operations traced from this entry point.`,
+        ],
+        evidenceKind: 'semantic',
       });
     }
   }
