@@ -80,16 +80,26 @@ export function printHeader(): void {
  * Print concise TUI-style quick panel
  */
 export function printTuiQuickPanel(): void {
-  const lines = [
-    '  ┌───────────────────────────────────────────────────┐',
-    `  │ ${styled('WYSCAN CLI QUICK PANEL', chalk.white.bold)}                               │`,
-    '  ├───────────────────────────────────────────────────┤',
-    '  │ scan  : wyscan scan <path> [-l critical|warning] │',
-    '  │ check : wyscan check                              │',
-    '  │ json  : wyscan scan <path> --json                │',
-    '  │ quiet : wyscan scan <path> --summary             │',
-    '  └───────────────────────────────────────────────────┘',
+  const title = 'WYSCAN CLI QUICK PANEL';
+  const rows = [
+    'scan  : wyscan scan <path> [-l critical|warning]',
+    'check : wyscan check',
+    'json  : wyscan scan <path> --json',
+    'quiet : wyscan scan <path> --summary',
   ];
+
+  const contentWidth = Math.max(
+    title.length,
+    ...rows.map((row) => row.length),
+  );
+
+  const top = `  ┌${'─'.repeat(contentWidth + 2)}┐`;
+  const header = `  │ ${styled(title.padEnd(contentWidth, ' '), chalk.white.bold)} │`;
+  const divider = `  ├${'─'.repeat(contentWidth + 2)}┤`;
+  const body = rows.map((row) => `  │ ${row.padEnd(contentWidth, ' ')} │`);
+  const bottom = `  └${'─'.repeat(contentWidth + 2)}┘`;
+
+  const lines = [top, header, divider, ...body, bottom];
   for (const line of lines) {
     console.log(isTTY() ? styled(line, chalk.dim) : line);
   }
