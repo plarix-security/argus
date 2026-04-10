@@ -185,6 +185,8 @@ export interface FileAnalysisResult {
   skipped?: boolean;
   /** Reason for skipping this file */
   skipReason?: string;
+  /** Optional per-batch diagnostics attached by language analyzers */
+  analysisDiagnostics?: Record<string, unknown>;
 }
 
 /**
@@ -236,6 +238,8 @@ export interface AnalysisReport {
     fileLimit?: number;
     /** Total analyzable files discovered before applying any configured limit */
     totalFilesDiscovered?: number;
+    /** Optional diagnostics about analysis coverage and graphing gaps */
+    coverageDiagnostics?: Record<string, unknown>;
   };
 }
 

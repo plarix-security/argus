@@ -29,6 +29,9 @@ const SECONDARY_ACTION_EXECUTION_PROPS = new Set(['validate', 'init', 'dispose']
 // Token list is used for semantic context scoring (type/target/name),
 // while execution-prop sets are used for callback-shape detection.
 const AGENTIC_CORE_TOKENS = ['action', 'tool', 'plugin', 'handler', 'command', 'provider', 'service', 'capability', 'evaluator', 'agent', 'runtime'];
+const RUNTIME_COMPOSITION_VERBS = ['create', 'compose', 'build', 'bootstrap', 'initialize', 'init', 'start'];
+const RUNTIME_COMPOSITION_NOUNS = ['runtime', 'agent', 'pipeline', 'workflow', 'orchestrator', 'dispatcher'];
+const RUNTIME_REGISTRY_PROPERTY_NAMES = ['actions', 'tools', 'plugins', 'handlers', 'services', 'capabilities', 'evaluators'];
 
 export interface SemanticInvocationRoot {
   /** Node ID (file:function or file:class.method) */
@@ -100,14 +103,51 @@ export function extractSemanticInvocationRoots(
     fileRoots.push(...extractRegistrationCallPatterns(filePath, parsed, files));
     fileRoots.push(...extractServiceClassPatterns(filePath, parsed));
     fileRoots.push(...extractEventHandlerPatterns(filePath, parsed));
+    fileRoots.push(...extractRuntimeCompositionPatterns(filePath, parsed));
 
-    // Controlled fallback for unknown frameworks:
-    // only when the file has clear agentic context and no stronger structural evidence.
-    if (fileRoots.length === 0 && hasAgenticContext(parsed)) {
+    // Controlled fallback for unknown frameworks in agentic files.
+    // NOTE: This now runs even when structural roots already exist, so mixed files
+    // can add exported entrypoint roots that were previously skipped by fileRoots.length === 0.
+    if (hasAgenticContext(parsed)) {
       fileRoots.push(...extractExportedEntryPoints(filePath, parsed));
     }
 
     addRoots(fileRoots);
+  }
+
+  return roots;
+}
+
+function extractRuntimeCompositionPatterns(
+  filePath: string,
+  parsed: ParsedTypeScriptFile
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+
+  for (const call of parsed.calls) {
+    const calleeLower = call.callee.toLowerCase();
+    const hasCompositionVerb = RUNTIME_COMPOSITION_VERBS.some((verb) => calleeLower.includes(verb));
+    const target = RUNTIME_COMPOSITION_NOUNS.find((candidate) => calleeLower.includes(candidate));
+    if (!hasCompositionVerb || !target) continue;
+
+    const hasRegistryShape = call.arguments.some((arg) => {
+      const lower = arg.toLowerCase();
+      return RUNTIME_REGISTRY_PROPERTY_NAMES.some((key) => lower.includes(key));
+    });
+    if (!hasRegistryShape) continue;
+
+    const rootName = call.enclosingFunction || call.callee;
+    const nodeId = `${filePath}:${rootName}`;
+    if (!roots.some((root) => root.nodeId === nodeId)) {
+      roots.push({
+        nodeId,
+        toolName: rootName,
+        framework: 'runtime-composition',
+        evidence: `${call.callee} composes runtime/agent registries`,
+        sourceFile: filePath,
+        line: call.line,
+      });
+    }
   }
 
   return roots;

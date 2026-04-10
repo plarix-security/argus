@@ -159,6 +159,9 @@ export class AFBAnalyzer {
         language: result.language,
         reason: result.skipReason || 'File skipped.',
       }));
+    const coverageDiagnostics = results
+      .map((result) => result.analysisDiagnostics)
+      .find((diagnostics) => diagnostics && typeof diagnostics === 'object');
 
     allFindings.sort((a, b) => {
       const severityOrder = { critical: 0, warning: 1, info: 2, suppressed: 3 };
@@ -197,6 +200,7 @@ export class AFBAnalyzer {
         fileLimitHit: false,
         fileLimit: this.config.maxFiles,
         totalFilesDiscovered,
+        coverageDiagnostics,
       },
     };
   }

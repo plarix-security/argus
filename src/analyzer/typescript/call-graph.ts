@@ -92,6 +92,17 @@ export interface CallGraphAnalysis {
   nodes: Map<string, CallGraphNode>;
   toolRegistrations: CallGraphNode[];
   exposedPaths: ExposedPath[];
+  diagnostics: {
+    totalNodes: number;
+    totalToolRegistrations: number;
+    dangerousOperationsDiscovered: number;
+    unresolvedCallEdges: number;
+    crossFileResolvedEdges: number;
+    traversalDepthBudget: number;
+    depthLimitedExposedPaths: number;
+    exposedPathsWithUnresolvedCalls: number;
+    uniqueEntrypointsWithExposure: number;
+  };
 }
 
 /**
@@ -123,6 +134,20 @@ export const DEFAULT_IMPORT_CONFIG: ImportResolutionConfig = {
   fileExtensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'],
   packageJsonLookup: true,
 };
+
+const MIN_TRAVERSAL_DEPTH = 10;
+const MAX_TRAVERSAL_DEPTH = 20;
+// Add a small bonus so medium/large orchestration graphs are explored deeper
+// while MIN/MAX bounds keep traversal predictable.
+const DEPTH_BONUS = 8;
+
+function normalizePathWithoutExtension(filePath: string): string {
+  return filePath.replace(/\.(tsx?|jsx?|mjs|cjs)$/, '');
+}
+
+function toPosixPath(filePath: string): string {
+  return filePath.replace(/\\/g, '/');
+}
 
 /**
  * Dangerous operation patterns for Node.js/TypeScript
@@ -612,6 +637,18 @@ function resolveModulePath(
   config: ImportResolutionConfig,
   availableFiles?: Set<string>
 ): string | null {
+  const findBySuffix = (suffixes: string[]): string | null => {
+    if (!availableFiles) return null;
+    const normalizedSuffixes = suffixes.map((suffix) => toPosixPath(normalizePathWithoutExtension(suffix)));
+    for (const file of availableFiles) {
+      const normalized = toPosixPath(normalizePathWithoutExtension(file));
+      if (normalizedSuffixes.some((suffix) => normalized.endsWith(suffix))) {
+        return file;
+      }
+    }
+    return null;
+  };
+
   const currentDir = path.dirname(currentFile);
 
   // Relative import
@@ -651,7 +688,40 @@ function resolveModulePath(
   }
 
   // Absolute or package import - would need node_modules resolution
-  // For now, return null (unresolved)
+  // Try monorepo/workspace/package-suffix matching before giving up.
+  if (availableFiles) {
+    const parts = modulePath.split('/').filter(Boolean);
+    const isScoped = modulePath.startsWith('@');
+    const packageName = isScoped ? parts[1] : parts[0];
+    const packageRest = isScoped ? parts.slice(2).join('/') : parts.slice(1).join('/');
+    const suffixCandidates: string[] = [];
+
+    if (modulePath.startsWith('/')) {
+      suffixCandidates.push(modulePath);
+    }
+
+    suffixCandidates.push(`/${modulePath}`);
+    suffixCandidates.push(`/${modulePath}/index`);
+
+    if (packageName) {
+      suffixCandidates.push(`/packages/${packageName}/src/${packageRest || 'index'}`);
+      suffixCandidates.push(`/packages/${packageName}/${packageRest || 'index'}`);
+      suffixCandidates.push(`/modules/${packageName}/src/${packageRest || 'index'}`);
+      suffixCandidates.push(`/apps/${packageName}/src/${packageRest || 'index'}`);
+      suffixCandidates.push(`/${packageName}/src/${packageRest || 'index'}`);
+      suffixCandidates.push(`/${packageName}/${packageRest || 'index'}`);
+    }
+
+    for (const suffix of suffixCandidates) {
+      for (const ext of config.fileExtensions) {
+        const matched = findBySuffix([`${suffix}${ext}`]);
+        if (matched) return matched;
+      }
+      const matchedIndex = findBySuffix([`${suffix}/index`]);
+      if (matchedIndex) return matchedIndex;
+    }
+  }
+
   return null;
 }
 
@@ -804,23 +874,49 @@ export function buildCallGraph(
   }
 
   // Build edges
+  let unresolvedCallEdges = 0;
+  let crossFileResolvedEdges = 0;
   for (const node of nodes.values()) {
     for (const outgoing of node.outgoingCalls) {
       const resolvedTarget = outgoing.targetCandidates.find((candidate) => nodes.has(candidate));
       if (resolvedTarget) {
         node.callees.add(resolvedTarget);
         nodes.get(resolvedTarget)!.callers.add(node.id);
+        const targetNode = nodes.get(resolvedTarget);
+        if (targetNode && node.sourceFile && targetNode.sourceFile && node.sourceFile !== targetNode.sourceFile) {
+          crossFileResolvedEdges++;
+        }
+      } else {
+        unresolvedCallEdges++;
       }
     }
   }
 
   // Find exposed paths
-  const exposedPaths = findExposedPaths(nodes, toolRegistrations, files);
+  // Logarithmic scaling increases depth gradually as graph size grows,
+  // while DEPTH_BONUS helps medium-sized orchestration graphs get enough exploration.
+  const traversalDepthBudget = Math.min(
+    MAX_TRAVERSAL_DEPTH,
+    Math.max(MIN_TRAVERSAL_DEPTH, Math.ceil(Math.log2(Math.max(nodes.size, 1))) + DEPTH_BONUS),
+  );
+  const exposedPaths = findExposedPaths(nodes, toolRegistrations, files, traversalDepthBudget);
+  const dangerousOperationsDiscovered = Array.from(nodes.values()).reduce((sum, node) => sum + node.dangerousOps.length, 0);
 
   return {
     nodes,
     toolRegistrations,
     exposedPaths,
+    diagnostics: {
+      totalNodes: nodes.size,
+      totalToolRegistrations: toolRegistrations.length,
+      dangerousOperationsDiscovered,
+      unresolvedCallEdges,
+      crossFileResolvedEdges,
+      traversalDepthBudget,
+      depthLimitedExposedPaths: exposedPaths.filter((path) => path.depthLimitHit).length,
+      exposedPathsWithUnresolvedCalls: exposedPaths.filter((path) => path.unresolvedCalls.length > 0).length,
+      uniqueEntrypointsWithExposure: new Set(exposedPaths.map((path) => path.tool.id)).size,
+    },
   };
 }
 
@@ -830,12 +926,13 @@ export function buildCallGraph(
 function findExposedPaths(
   nodes: Map<string, CallGraphNode>,
   toolRegistrations: CallGraphNode[],
-  files: Map<string, ParsedTypeScriptFile>
+  files: Map<string, ParsedTypeScriptFile>,
+  maxDepth: number
 ): ExposedPath[] {
   const exposedPaths: ExposedPath[] = [];
 
   for (const tool of toolRegistrations) {
-    const paths = findDangerousPathsFromNode(tool, nodes, 10);
+    const paths = findDangerousPathsFromNode(tool, nodes, maxDepth);
 
     for (const pathInfo of paths) {
       const hasGate = pathInfo.path.some(nodeId => {
@@ -909,7 +1006,7 @@ function findDangerousPathsFromNode(
         operation: op,
         path: current.path,
         involvesCrossFile,
-        unresolvedCalls: [],
+        unresolvedCalls: collectUnresolvedCalls(current.path, nodes),
         depthLimitHit: current.depth >= maxDepth,
         inputFlowsToOperation: false, // Would need taint analysis
         supportingEvidence: [],
@@ -931,4 +1028,20 @@ function findDangerousPathsFromNode(
   }
 
   return results;
+}
+
+function collectUnresolvedCalls(pathNodeIds: string[], nodes: Map<string, CallGraphNode>): string[] {
+  const unresolved = new Set<string>();
+  for (const nodeId of pathNodeIds) {
+    const node = nodes.get(nodeId);
+    if (!node) continue;
+
+    for (const outgoing of node.outgoingCalls) {
+      const hasResolvedTarget = outgoing.targetCandidates.some((candidate) => nodes.has(candidate));
+      if (!hasResolvedTarget) {
+        unresolved.add(outgoing.call.callee);
+      }
+    }
+  }
+  return Array.from(unresolved);
 }
