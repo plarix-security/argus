@@ -268,6 +268,7 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
       limitations: [
         'The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage.',
       ],
+      coverage_gap_report: report.metadata.coverageDiagnostics || null,
     },
     methodology: buildMethodologyDisclosure(report),
   };

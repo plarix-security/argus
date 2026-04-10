@@ -246,6 +246,7 @@ function getCoverageNotes(report: AnalysisReport): string[] {
   const notes: string[] = [];
   const failedFiles = report.metadata.failedFiles;
   const skippedFiles = report.metadata.skippedFiles;
+  const diagnostics = report.metadata.coverageDiagnostics;
 
   if (failedFiles.length > 0) {
     const label = failedFiles.length === 1 ? 'file' : 'files';
@@ -256,6 +257,26 @@ function getCoverageNotes(report: AnalysisReport): string[] {
     const skippedLanguages = Array.from(new Set(skippedFiles.map((file) => file.language))).sort();
     const label = skippedFiles.length === 1 ? 'file' : 'files';
     notes.push(`Skipped ${skippedFiles.length} unsupported ${label}: ${skippedLanguages.join(', ')}.`);
+  }
+
+  if (diagnostics && typeof diagnostics === 'object') {
+    const unresolvedEdges = Number(diagnostics['unresolvedCallEdges'] || 0);
+    const depthLimited = Number(diagnostics['depthLimitedExposedPaths'] || 0);
+    const parseFailed = Number(Array.isArray(diagnostics['parseFailedFiles']) ? diagnostics['parseFailedFiles'].length : 0);
+    const uniqueEntrypoints = Number(diagnostics['uniqueEntrypointsWithExposure'] || 0);
+
+    if (uniqueEntrypoints > 0) {
+      notes.push(`Unique entrypoints reaching sensitive operations: ${uniqueEntrypoints}.`);
+    }
+    if (unresolvedEdges > 0) {
+      notes.push(`Coverage gap: ${unresolvedEdges} unresolved call edge(s) in call graph.`);
+    }
+    if (depthLimited > 0) {
+      notes.push(`Coverage gap: ${depthLimited} exposed path(s) hit traversal depth budget.`);
+    }
+    if (parseFailed > 0) {
+      notes.push(`Coverage gap: ${parseFailed} TypeScript/JavaScript parse failure(s).`);
+    }
   }
 
   return notes;

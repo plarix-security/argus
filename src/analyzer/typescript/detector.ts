@@ -42,6 +42,21 @@ interface TypeScriptSourceInput {
   sourceCode: string;
 }
 
+interface TypeScriptBatchDiagnostics {
+  language: 'typescript';
+  rootsByFramework: Record<string, number>;
+  totalRoots: number;
+  callGraphNodes: number;
+  dangerousOperationsDiscovered: number;
+  unresolvedCallEdges: number;
+  crossFileResolvedEdges: number;
+  traversalDepthBudget: number;
+  depthLimitedExposedPaths: number;
+  exposedPathsWithUnresolvedCalls: number;
+  uniqueEntrypointsWithExposure: number;
+  parseFailedFiles: Array<{ file: string; error: string }>;
+}
+
 /**
  * Irreversible operations (CRITICAL severity)
  */
@@ -164,21 +179,47 @@ export function analyzeTypeScriptFile(
  */
 export function analyzeTypeScriptFiles(inputs: TypeScriptSourceInput[]): FileAnalysisResult[] {
   const files = new Map<string, ParsedTypeScriptFile>();
+  const parseFailedFiles: Array<{ filePath: string; language: 'typescript' | 'javascript'; error: string }> = [];
 
   // Parse all files
   for (const input of inputs) {
     const ext = path.extname(input.filePath).toLowerCase();
     const isTSX = ext === '.tsx';
+    const language = ext === '.js' || ext === '.jsx' ? 'javascript' : 'typescript';
     const parsed = parseTypeScriptSource(input.sourceCode, isTSX);
 
     if (parsed.success) {
       files.set(input.filePath, parsed);
+    } else {
+      parseFailedFiles.push({
+        filePath: input.filePath,
+        language,
+        error: parsed.error || 'Unknown parse failure',
+      });
     }
   }
 
   // Build call graph across all files
   const semanticRoots = extractSemanticInvocationRoots(files);
   const callGraph = buildCallGraph(files, semanticRoots);
+  const rootsByFramework: Record<string, number> = {};
+  for (const root of semanticRoots.values()) {
+    rootsByFramework[root.framework] = (rootsByFramework[root.framework] || 0) + 1;
+  }
+  const batchDiagnostics: TypeScriptBatchDiagnostics = {
+    language: 'typescript',
+    rootsByFramework,
+    totalRoots: semanticRoots.size,
+    callGraphNodes: callGraph.diagnostics.totalNodes,
+    dangerousOperationsDiscovered: callGraph.diagnostics.dangerousOperationsDiscovered,
+    unresolvedCallEdges: callGraph.diagnostics.unresolvedCallEdges,
+    crossFileResolvedEdges: callGraph.diagnostics.crossFileResolvedEdges,
+    traversalDepthBudget: callGraph.diagnostics.traversalDepthBudget,
+    depthLimitedExposedPaths: callGraph.diagnostics.depthLimitedExposedPaths,
+    exposedPathsWithUnresolvedCalls: callGraph.diagnostics.exposedPathsWithUnresolvedCalls,
+    uniqueEntrypointsWithExposure: callGraph.diagnostics.uniqueEntrypointsWithExposure,
+    parseFailedFiles: parseFailedFiles.map((failed) => ({ file: failed.filePath, error: failed.error })),
+  };
 
   // Generate findings per file
   const results: FileAnalysisResult[] = [];
@@ -216,6 +257,21 @@ export function analyzeTypeScriptFiles(inputs: TypeScriptSourceInput[]): FileAna
       success: true,
       analysisTimeMs: Date.now() - startTime,
     });
+  }
+
+  for (const failed of parseFailedFiles) {
+    results.push({
+      file: failed.filePath,
+      language: failed.language,
+      findings: [],
+      success: false,
+      error: failed.error,
+      analysisTimeMs: 0,
+    });
+  }
+
+  if (results.length > 0) {
+    results[0].analysisDiagnostics = batchDiagnostics as unknown as Record<string, unknown>;
   }
 
   return results;

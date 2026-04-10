@@ -100,14 +100,53 @@ export function extractSemanticInvocationRoots(
     fileRoots.push(...extractRegistrationCallPatterns(filePath, parsed, files));
     fileRoots.push(...extractServiceClassPatterns(filePath, parsed));
     fileRoots.push(...extractEventHandlerPatterns(filePath, parsed));
+    fileRoots.push(...extractRuntimeCompositionPatterns(filePath, parsed));
 
-    // Controlled fallback for unknown frameworks:
-    // only when the file has clear agentic context and no stronger structural evidence.
-    if (fileRoots.length === 0 && hasAgenticContext(parsed)) {
+    // Controlled fallback for unknown frameworks in agentic files.
+    // Allow fallback even when structural roots exist so mixed files can add missed entrypoints.
+    if (hasAgenticContext(parsed)) {
       fileRoots.push(...extractExportedEntryPoints(filePath, parsed));
     }
 
     addRoots(fileRoots);
+  }
+
+  return roots;
+}
+
+function extractRuntimeCompositionPatterns(
+  filePath: string,
+  parsed: ParsedTypeScriptFile
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+  const compositionVerbs = ['create', 'compose', 'build', 'bootstrap', 'initialize', 'init', 'start'];
+  const runtimeTargets = ['runtime', 'agent', 'pipeline', 'workflow', 'orchestrator', 'dispatcher'];
+  const registryKeys = ['actions', 'tools', 'plugins', 'handlers', 'services', 'capabilities', 'evaluators'];
+
+  for (const call of parsed.calls) {
+    const calleeLower = call.callee.toLowerCase();
+    const hasCompositionVerb = compositionVerbs.some((verb) => calleeLower.includes(verb));
+    const target = runtimeTargets.find((candidate) => calleeLower.includes(candidate));
+    if (!hasCompositionVerb || !target) continue;
+
+    const hasRegistryShape = call.arguments.some((arg) => {
+      const lower = arg.toLowerCase();
+      return registryKeys.some((key) => lower.includes(key));
+    });
+    if (!hasRegistryShape) continue;
+
+    const rootName = call.enclosingFunction || call.callee;
+    const nodeId = `${filePath}:${rootName}`;
+    if (!roots.some((root) => root.nodeId === nodeId)) {
+      roots.push({
+        nodeId,
+        toolName: rootName,
+        framework: 'runtime-composition',
+        evidence: `${call.callee} composes runtime/agent registries`,
+        sourceFile: filePath,
+        line: call.line,
+      });
+    }
   }
 
   return roots;
