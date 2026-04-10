@@ -10,8 +10,7 @@ function validateEnv(): void {
   const required = ['GITHUB_APP_ID', 'GITHUB_PRIVATE_KEY', 'GITHUB_WEBHOOK_SECRET'];
   const missing = required.filter(v => !process.env[v]);
   if (missing.length > 0) {
-    console.error('Missing:' + missing.join(', '));
-    process.exit(1);
+    throw new Error('Missing required environment variables: ' + missing.join(', '));
   }
 }
 
@@ -38,9 +37,15 @@ function getApp(): express.Application {
 }
 
 function startServer(): void {
-  const app = getApp();
-  const port = process.env.PORT || 3000;
-  app.listen(port, () => console.log(`\n${NAME} ${VERSION}\nRunning on port ${port}\n`));
+  try {
+    const app = getApp();
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => console.log(`\n${NAME} ${VERSION}\nRunning on port ${port}\n`));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown startup error';
+    console.error(message);
+    process.exit(1);
+  }
 }
 
 if (require.main === module) {
