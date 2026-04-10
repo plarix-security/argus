@@ -791,6 +791,22 @@ function resolveCallTargetCandidates(
         if (importInfo.isDefault && memberChain.length <= 1) {
           pushCandidate(`${resolvedFile}:default`);
         }
+        // Namespace import: import * as ns from './module' → ns.method()
+        if (importInfo.alias === importedBase && memberChain.length > 1) {
+          pushCandidate(`${resolvedFile}:${memberChain.slice(1).join('.')}`);
+        }
+      }
+    }
+    // Also search any import that has no specific name list (wildcard re-export)
+    for (const imp of imports) {
+      if (imp.names.length === 0 && !imp.alias) {
+        const resolvedFile = resolveModulePath(imp.module, currentFile, config, availableFiles);
+        if (resolvedFile) {
+          pushCandidate(`${resolvedFile}:${importedBase}`);
+          if (memberChain.length > 1) {
+            pushCandidate(`${resolvedFile}:${lastMember}`);
+          }
+        }
       }
     }
   }

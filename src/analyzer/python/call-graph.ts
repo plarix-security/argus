@@ -199,7 +199,7 @@ export interface ImportResolutionConfig {
 
 /** Default import resolution configuration */
 export const DEFAULT_IMPORT_CONFIG: ImportResolutionConfig = {
-  maxDepth: 5,
+  maxDepth: 20,
   emitSuppressedOnLimit: true,
 };
 
@@ -1539,8 +1539,8 @@ function findDangerousPathsFromNode(
     });
   }
 
-  // Recursively check callees (limit total depth to 10, cross-file depth to config.maxDepth)
-  if (currentPath.length < 10) {
+  // Recursively check callees (limit total depth to 20, cross-file depth to config.maxDepth)
+  if (currentPath.length < 20) {
     for (const calleeId of node.callees) {
       const calleeNode = allNodes.get(calleeId);
 
