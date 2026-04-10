@@ -3,22 +3,22 @@ type App = ReturnType<AppModule['getApp']>;
 type AppRequest = Parameters<App>[0];
 type AppResponse = Parameters<App>[1];
 
-let appPromise: Promise<App> | undefined;
+let appInstance: App | undefined;
 
-function getAppInstance(): Promise<App> {
-  if (!appPromise) {
-    appPromise = import('../src/app').then(({ getApp }) => getApp());
+function getAppInstance(): App {
+  if (!appInstance) {
+    const appModule = require('../src/app') as AppModule;
+    appInstance = appModule.getApp();
   }
-  return appPromise;
+  return appInstance;
 }
 
 export default function handler(req: AppRequest, res: AppResponse): void {
-  getAppInstance()
-    .then((app) => {
-      app(req, res);
-    })
-    .catch((error) => {
-      const message = error instanceof Error ? error.message : 'Server initialization failed';
-      res.status(500).json({ error: message });
-    });
+  try {
+    const app = getAppInstance();
+    app(req, res);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Server initialization failed';
+    res.status(500).json({ error: message });
+  }
 }
