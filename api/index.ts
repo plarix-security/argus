@@ -1,15 +1,12 @@
 import { getApp } from '../src/app';
 
-interface MinimalResponse {
-  status(code: number): MinimalResponse;
-  json(payload: { error: string }): void;
-}
+type App = ReturnType<typeof getApp>;
+type AppRequest = Parameters<App>[0];
+type AppResponse = Parameters<App>[1];
 
-type AppHandler = (req: unknown, res: unknown) => void;
-
-export default function handler(req: unknown, res: MinimalResponse): void {
+export default function handler(req: AppRequest, res: AppResponse): void {
   try {
-    const app = getApp() as unknown as AppHandler;
+    const app = getApp();
     app(req, res);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server initialization failed';
