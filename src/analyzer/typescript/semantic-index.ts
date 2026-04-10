@@ -23,6 +23,7 @@ import {
   AssignmentInfo,
   ImportInfo,
 } from './ast-parser';
+import { ALL_TS_MODULE_TOKENS } from '../frameworks/signatures';
 
 const PRIMARY_ACTION_EXECUTION_PROPS = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform']);
 const SECONDARY_ACTION_EXECUTION_PROPS = new Set(['validate', 'init', 'dispose']);
@@ -866,21 +867,28 @@ function isLikelyAgenticActionObject(
  * @param parsed - The parsed TypeScript file
  * @returns true if any import indicates an agentic framework is in use
  */
+/**
+ * Generic tokens that appear in module paths and suggest agentic code even when
+ * the specific framework isn't matched by ALL_TS_MODULE_TOKENS.
+ */
+const GENERIC_AGENTIC_PATH_TOKENS = [
+  'agent', 'plugin', 'tool', 'runtime', 'action', 'handler', 'command',
+  'workflow', 'orchestrat', '/agents', '/tools', '/actions', '/plugins',
+];
+
+/**
+ * Returns true when the file imports from any known agentic framework module
+ * or from a path containing a generic agentic token.
+ */
 function hasAgenticContext(parsed: ParsedTypeScriptFile): boolean {
-  const AGENTIC_MODULE_TOKENS = [
-    'agent', 'plugin', 'tool', 'runtime', 'action', 'handler', 'command',
-    'workflow', 'orchestrat',
-    'langchain', 'langgraph', 'mastra', 'modelcontextprotocol',
-    'openai', '@ai-sdk', 'anthropic',
-    'elizaos', 'eliza',
-    'crewai', 'autogen', 'smolagents',
-    'llama-index', 'llamaindex', 'haystack', 'pydantic-ai',
-    'google-generativeai', 'bedrock',
-    '/agents', '/tools', '/actions', '/plugins',
-  ];
   return parsed.imports.some(imp => {
     const moduleLower = imp.module.toLowerCase();
-    return AGENTIC_MODULE_TOKENS.some(token => moduleLower.includes(token));
+    // Check against the canonical framework token list from signatures
+    for (const token of ALL_TS_MODULE_TOKENS) {
+      if (moduleLower.includes(token)) return true;
+    }
+    // Fall back to generic path token heuristics
+    return GENERIC_AGENTIC_PATH_TOKENS.some(token => moduleLower.includes(token));
   });
 }
 
