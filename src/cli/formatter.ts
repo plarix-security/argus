@@ -77,6 +77,65 @@ export function printHeader(): void {
 }
 
 /**
+ * Print concise TUI-style quick panel
+ */
+export function printTuiQuickPanel(): void {
+  const title = 'WYSCAN CLI QUICK PANEL';
+  const rows = [
+    'install : wyscan install',
+    'scan  : wyscan scan <path> [-l critical|warning]',
+    'check : wyscan check',
+    'json  : wyscan scan <path> --json',
+    'quiet : wyscan scan <path> --summary',
+  ];
+
+  const contentWidth = Math.max(
+    title.length,
+    ...rows.map((row) => row.length),
+  );
+
+  const top = `  ┌${'─'.repeat(contentWidth + 2)}┐`;
+  const header = `  │ ${styled(title.padEnd(contentWidth, ' '), chalk.white.bold)} │`;
+  const divider = `  ├${'─'.repeat(contentWidth + 2)}┤`;
+  const body = rows.map((row) => `  │ ${row.padEnd(contentWidth, ' ')} │`);
+  const bottom = `  └${'─'.repeat(contentWidth + 2)}┘`;
+
+  const lines = [top, header, divider, ...body, bottom];
+  for (const line of lines) {
+    console.log(isTTY() ? styled(line, chalk.dim) : line);
+  }
+}
+
+export interface InstallDashboardRow {
+  step: string;
+  status: 'ok' | 'fail';
+  detail: string;
+}
+
+export function printInstallDashboard(rows: InstallDashboardRow[]): void {
+  const title = 'WYSCAN INSTALL DASHBOARD';
+  const formattedRows = rows.map((row) => {
+    const mark = row.status === 'ok' ? '✔' : '✖';
+    return `${mark} ${row.step}  ·  ${row.detail}`;
+  });
+  const footer = 'Next: wyscan scan <path>  |  wyscan help';
+  const contentWidth = Math.max(title.length, footer.length, ...formattedRows.map((row) => row.length));
+
+  const top = `  ┌${'─'.repeat(contentWidth + 2)}┐`;
+  const header = `  │ ${styled(title.padEnd(contentWidth, ' '), chalk.white.bold)} │`;
+  const divider = `  ├${'─'.repeat(contentWidth + 2)}┤`;
+  const body = formattedRows.map((row) => `  │ ${row.padEnd(contentWidth, ' ')} │`);
+  const endDivider = `  ├${'─'.repeat(contentWidth + 2)}┤`;
+  const foot = `  │ ${styled(footer.padEnd(contentWidth, ' '), chalk.dim)} │`;
+  const bottom = `  └${'─'.repeat(contentWidth + 2)}┘`;
+
+  const lines = [top, header, divider, ...body, endDivider, foot, bottom];
+  for (const line of lines) {
+    console.log(isTTY() ? styled(line, chalk.dim) : line);
+  }
+}
+
+/**
  * Print scan target
  */
 export function printScanTarget(targetPath: string): void {

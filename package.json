@@ -1,6 +1,6 @@
 {
   "name": "wyscan",
-  "version": "1.5.5",
+  "version": "1.5.8",
   "description": "Agent Failure Boundary Scanner - Detects AFB04 (Unauthorized Action) boundaries in agentic AI codebases through static analysis",
   "main": "dist/app.js",
   "bin": {
@@ -11,6 +11,7 @@
     "link": "npm run build && npm link",
     "start": "node dist/app.js",
     "dev": "npx ts-node src/app.ts",
+    "setup-and-scan": "npm install && npm run build && npm run wyscan -- scan . --summary",
     "lint": "npx eslint src/**/*.ts",
     "test": "npx jest",
     "wyscan": "npx ts-node src/cli/index.ts"

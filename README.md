@@ -2,6 +2,8 @@
 
 Static scanner for Python, TypeScript, and JavaScript agent code that reports reachable operations from detected tool registrations.
 
+Runtime: CLI scanner plus GitHub App webhook backend. No HTML/CSS frontend is shipped.
+
 WyScan is an AFB04 scanner that parses Python, TypeScript, and JavaScript with tree-sitter, resolves tool registrations semantically when the code structure allows it, traces reachable calls across the analyzed file set, and reports matched operations when no credited structural policy gate is detected in that analyzed path.
 
 ```bash
@@ -11,7 +13,7 @@ wyscan scan ./agent-project
 Example output:
 
 ```text
-wyscan v1.5.5  ·  Plarix
+wyscan v1.5.8  ·  Plarix
 
 Scanning  agent-project
 
@@ -54,12 +56,16 @@ npm run build
 npm link
 
 wyscan scan ./my-agent-project
+
+# one-step CLI setup
+wyscan install
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
+| `wyscan install` | Run install/build/link/check and print setup dashboard |
 | `wyscan scan <path>` | Scan a directory or file |
 | `wyscan check` | Verify local scanner dependencies |
 | `wyscan version` | Print the package version |
@@ -130,7 +136,7 @@ Framework detection supports both Python and TypeScript/JavaScript. WyScan uses 
 - OpenAI tool schemas and dispatch maps
 - LlamaIndex
 - MCP
-- Generic Python decorator-style tool registrations
+- Framework-core structural decorator registrations
 
 ### TypeScript/JavaScript Frameworks
 
@@ -140,7 +146,7 @@ Framework detection supports both Python and TypeScript/JavaScript. WyScan uses 
 - MCP SDK
 - Mastra
 - Playwright/Puppeteer browser automation
-- Generic tool registration patterns
+- Framework-core structural registrations only (no generic exported-entry fallback)
 
 Framework labels are derived from structural analysis, not pattern tables.
 
@@ -171,7 +177,7 @@ Current CLI JSON shape:
 
 ```json
 {
-  "version": "1.5.5",
+  "version": "1.5.8",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,

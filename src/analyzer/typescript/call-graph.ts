@@ -316,17 +316,6 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
   { identity: /^fse?\.(readFile|readFileSync|readdir|readdirSync|stat|statSync|pathExists|pathExistsSync)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read via fs-extra', resourceHint: 'file', changesState: false },
   { identity: /^glob(\.sync)?$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Glob file matching', resourceHint: 'file', changesState: false },
 
-  // ============================================
-  // ELIZA / AGENTIC FRAMEWORK RUNTIME OPERATIONS
-  // These are framework-level operations invoked by LLM action handlers that
-  // represent side-effects: calling AI models, persisting memory, sending messages.
-  // ============================================
-  { identity: /^runtime\.useModel$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Eliza runtime LLM model call', resourceHint: 'ai-model', changesState: false },
-  { identity: /^runtime\.(createMemory|updateMemory|deleteMemory)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Eliza runtime memory mutation', resourceHint: 'memory-store', changesState: true },
-  { identity: /^runtime\.sendMessage$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Eliza runtime message send', resourceHint: 'messaging', changesState: true },
-  { identity: /^runtime\.executeAction$/i, category: ExecutionCategory.API_CALL, severity: Severity.CRITICAL, description: 'Eliza runtime action dispatch (recursive LLM control)', resourceHint: 'agent-action', changesState: true },
-  { identity: /^runtime\.(updateWorld|updateEntity|createEntity|deleteEntity)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Eliza runtime world/entity mutation', resourceHint: 'world-state', changesState: true },
-  { identity: /^runtime\.setSetting$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Eliza runtime settings mutation', resourceHint: 'settings', changesState: true },
 ];
 
 /**
@@ -336,33 +325,23 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
 const DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
   // Process/Shell (CRITICAL)
   { identity: /^(exec|execSync|spawn|spawnSync|execFile|execFileSync|fork)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Process execution', changesState: true },
-  { identity: /^(execa|shelljs|zx)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'Shell execution library', changesState: true },
 
   // Code execution (CRITICAL)
   { identity: /^(eval|Function)$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'Code execution', changesState: true },
   { identity: /^(runInContext|runInNewContext|runInThisContext|compileFunction)$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'VM code execution', changesState: true },
-  { identity: /^(evaluate|evaluateHandle|evaluateOnNewDocument|addScriptTag)$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'Browser code execution', changesState: true },
 
   // File operations (CRITICAL/WARNING)
-  { identity: /^(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync|remove|removeSync|rimraf|del)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.CRITICAL, description: 'File deletion', changesState: true },
-  { identity: /^(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|outputFile)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File write', changesState: true },
-  { identity: /^(readFile|readFileSync|createReadStream|readdir|readdirSync)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read', changesState: false },
+  { identity: /^(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.CRITICAL, description: 'File deletion', changesState: true },
+  { identity: /^(writeFile|writeFileSync|appendFile|appendFileSync)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File write', changesState: true },
+  { identity: /^(readFile|readFileSync|readdir|readdirSync)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read', changesState: false },
 
-  // Database (WARNING/CRITICAL)
-  { identity: /^(query|execute|exec|run|prepare)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database operation', changesState: true },
-  { identity: /^(insert|update|delete|destroy|upsert|bulkCreate|deleteMany|updateMany|insertMany)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database mutation', changesState: true },
+  // Database fallback (strict/minimal)
   { identity: /^(executeRaw|executeRawUnsafe|queryRaw|queryRawUnsafe)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.CRITICAL, description: 'Raw SQL execution', changesState: true },
   { identity: /^(flushall|flushdb)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.CRITICAL, description: 'Database flush', changesState: true },
 
-  // HTTP (WARNING)
-  { identity: /^(fetch|axios|got|request|superagent)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request', changesState: false },
-  { identity: /^(post|put|patch|delete|del)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation method', changesState: true },
-
-  // Email (WARNING)
-  { identity: /^(sendMail|send|sendMultiple)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Email send', changesState: true },
-
-  // Browser automation (WARNING)
-  { identity: /^(goto|fill|type|click|screenshot)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Browser automation', changesState: true },
+  // HTTP mutation fallback (strict/minimal)
+  { identity: /^(fetch|axios|got|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request', changesState: false },
+  { identity: /^(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation method', changesState: true },
 ];
 
 /**

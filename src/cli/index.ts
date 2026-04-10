@@ -8,6 +8,8 @@
  * Commands:
  *   wyscan scan <path> [flags]   Scan for AFB exposures
  *   wyscan check                 Verify dependencies
+ *   wyscan install               Install/build/link/check local CLI
+ *   wyscan tui                   Show compact command panel
  *   wyscan version               Print version
  *   wyscan help [command]        Show usage
  *
@@ -20,6 +22,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { spawnSync } from 'child_process';
 import { AFBAnalyzer } from '../analyzer';
 import { AnalysisReport, Severity } from '../types';
 import { VERSION, NAME } from './version';
@@ -35,6 +38,8 @@ import {
   printError,
   printCheckStatus,
   printZeroFindings,
+  printTuiQuickPanel,
+  printInstallDashboard,
   isTTY,
 } from './formatter';
 
@@ -293,6 +298,11 @@ function captureConsoleOutput(run: () => void): string {
  * Print help
  */
 function printHelp(command?: string): void {
+  if (command === 'tui') {
+    printTuiQuickPanel();
+    return;
+  }
+
   if (command === 'scan') {
     console.log(`
   ${NAME} scan <path> [options]
@@ -324,11 +334,13 @@ function printHelp(command?: string): void {
   in agentic AI systems. Detects dangerous operations reachable
   from tool registration points through multi-file call graphs.
 
-  Languages: Python (comprehensive), TypeScript/JavaScript (basic)
+  Languages: Python, TypeScript/JavaScript (framework-core structural detection)
 
   Usage:
+    ${NAME} install         Install/build/link/check local CLI
     ${NAME} scan <path>     Scan a file or directory
     ${NAME} check           Verify scanner dependencies
+    ${NAME} tui             Show compact command panel
     ${NAME} help [command]  Show help
 
   Supported frameworks:
@@ -347,10 +359,13 @@ function printHelp(command?: string): void {
     0 = No issues    1 = Warnings    2 = Critical    3 = Error
 
   Examples:
+    ${NAME} install
     ${NAME} scan .
     ${NAME} scan ./agents -l critical
     ${NAME} scan . -j > report.json
 `);
+  console.log();
+  printTuiQuickPanel();
 }
 
 /**
@@ -404,6 +419,65 @@ async function runCheck(): Promise<number> {
   console.log();
 
   return allOk ? EXIT.CLEAN : EXIT.ERROR;
+}
+
+/**
+ * Run install command
+ */
+async function runInstall(): Promise<number> {
+  printHeader();
+  console.log();
+  console.log('  Preparing local CLI installation...');
+  console.log();
+
+  const steps = [
+    { step: 'npm install', cmd: 'npm', args: ['install'] },
+    { step: 'npm run build', cmd: 'npm', args: ['run', 'build'] },
+    { step: 'npm link', cmd: 'npm', args: ['link'] },
+  ];
+  const rows: Array<{ step: string; status: 'ok' | 'fail'; detail: string }> = [];
+
+  for (const s of steps) {
+    const result = spawnSync(s.cmd, s.args, {
+      cwd: process.cwd(),
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    });
+    if (result.status === 0) {
+      rows.push({ step: s.step, status: 'ok', detail: 'ok' });
+      continue;
+    }
+
+    const detail = (result.stderr || result.stdout || 'failed')
+      .trim()
+      .split('\n')
+      .slice(-1)[0]
+      .slice(0, 120);
+    rows.push({ step: s.step, status: 'fail', detail });
+    printInstallDashboard(rows);
+    return EXIT.ERROR;
+  }
+
+  let checkCode = EXIT.CLEAN;
+  try {
+    const nodeMajor = parseInt(process.version.slice(1).split('.')[0], 10);
+    if (nodeMajor < 18) {
+      checkCode = EXIT.ERROR;
+    } else {
+      const analyzer = new AFBAnalyzer();
+      await analyzer.ensureInitialized();
+    }
+  } catch {
+    checkCode = EXIT.ERROR;
+  }
+
+  rows.push({
+    step: 'wyscan check',
+    status: checkCode === EXIT.CLEAN ? 'ok' : 'fail',
+    detail: checkCode === EXIT.CLEAN ? 'ready' : 'dependency check failed',
+  });
+  printInstallDashboard(rows);
+  return checkCode === EXIT.CLEAN ? EXIT.CLEAN : EXIT.ERROR;
 }
 
 /**
@@ -574,9 +648,19 @@ async function main(): Promise<void> {
     process.exit(EXIT.CLEAN);
   }
 
+  if (command === 'tui') {
+    printTuiQuickPanel();
+    process.exit(EXIT.CLEAN);
+  }
+
   // Commands
   if (command === 'check') {
     const code = await runCheck();
+    process.exit(code);
+  }
+
+  if (command === 'install') {
+    const code = await runInstall();
     process.exit(code);
   }
 
