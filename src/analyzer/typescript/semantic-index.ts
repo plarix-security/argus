@@ -61,43 +61,37 @@ export function extractSemanticInvocationRoots(
   files: Map<string, ParsedTypeScriptFile>
 ): Map<string, SemanticInvocationRoot> {
   const roots = new Map<string, SemanticInvocationRoot>();
+  const addRoots = (newRoots: SemanticInvocationRoot[]) => {
+    for (const root of newRoots) {
+      roots.set(root.nodeId, root);
+    }
+  };
 
   for (const [filePath, parsed] of files) {
     // Check for OpenAI SDK usage
-    const openaiRoots = extractOpenAITools(filePath, parsed);
-    for (const root of openaiRoots) {
-      roots.set(root.nodeId, root);
-    }
+    addRoots(extractOpenAITools(filePath, parsed));
 
     // Check for LangChain.js/LangGraph.js usage
-    const langchainRoots = extractLangChainTools(filePath, parsed);
-    for (const root of langchainRoots) {
-      roots.set(root.nodeId, root);
-    }
+    addRoots(extractLangChainTools(filePath, parsed));
 
     // Check for Vercel AI SDK usage
-    const vercelRoots = extractVercelAITools(filePath, parsed);
-    for (const root of vercelRoots) {
-      roots.set(root.nodeId, root);
-    }
+    addRoots(extractVercelAITools(filePath, parsed));
 
     // Check for MCP SDK usage
-    const mcpRoots = extractMCPTools(filePath, parsed);
-    for (const root of mcpRoots) {
-      roots.set(root.nodeId, root);
-    }
+    addRoots(extractMCPTools(filePath, parsed));
 
     // Check for Mastra usage
-    const mastraRoots = extractMastraTools(filePath, parsed);
-    for (const root of mastraRoots) {
-      roots.set(root.nodeId, root);
-    }
+    addRoots(extractMastraTools(filePath, parsed));
 
     // Check for Playwright browser automation
-    const playwrightRoots = extractPlaywrightTools(filePath, parsed);
-    for (const root of playwrightRoots) {
-      roots.set(root.nodeId, root);
-    }
+    addRoots(extractPlaywrightTools(filePath, parsed));
+
+    // Check framework-core structural patterns (agent-system agnostic)
+    addRoots(extractActionObjectPatterns(filePath, parsed, files));
+    addRoots(extractPluginArrayPatterns(filePath, parsed, files));
+    addRoots(extractRegistrationCallPatterns(filePath, parsed, files));
+    addRoots(extractServiceClassPatterns(filePath, parsed));
+    addRoots(extractEventHandlerPatterns(filePath, parsed));
 
     // Intentionally no generic or exported-entry fallback roots.
     // Root registration must be framework-core and structurally evidenced.
@@ -692,6 +686,8 @@ function extractActionObjectPatterns(
     if (!assignment.isObjectLiteral || !assignment.objectProperties) continue;
 
     const nameProp = assignment.objectProperties.find(p => p.key === 'name');
+    if (!isLikelyAgenticActionObject(parsed, assignment, nameProp?.stringValue)) continue;
+
     const toolName = nameProp?.stringValue || assignment.target;
 
     // Build ordered list: primary props first, then secondary
@@ -760,6 +756,45 @@ function extractActionObjectPatterns(
   }
 
   return roots;
+}
+
+function isLikelyAgenticActionObject(
+  parsed: ParsedTypeScriptFile,
+  assignment: AssignmentInfo,
+  nameValue?: string
+): boolean {
+  if (!assignment.objectProperties) return false;
+
+  const executionProps = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform', 'get', 'validate', 'init', 'dispose']);
+  const hasExecutionProp = assignment.objectProperties.some(prop => executionProps.has(prop.key));
+  if (!hasExecutionProp) return false;
+
+  const typedContext = `${assignment.typeAnnotation || ''} ${assignment.assertedType || ''}`.toLowerCase();
+  const target = assignment.target.toLowerCase();
+  const nameLower = (nameValue || '').toLowerCase();
+
+  const coreTokens = ['action', 'tool', 'plugin', 'handler', 'command', 'provider', 'service', 'capability', 'evaluator', 'agent', 'runtime'];
+  const hasTypeToken = coreTokens.some(token => typedContext.includes(token));
+  const hasTargetToken = coreTokens.some(token => target.includes(token));
+  const hasNameToken = coreTokens.some(token => nameLower.includes(token));
+  const hasAgenticImport = parsed.imports.some(imp => {
+    const moduleLower = imp.module.toLowerCase();
+    return (
+      moduleLower.includes('agent') ||
+      moduleLower.includes('plugin') ||
+      moduleLower.includes('tool') ||
+      moduleLower.includes('runtime') ||
+      moduleLower.includes('langchain') ||
+      moduleLower.includes('langgraph') ||
+      moduleLower.includes('mastra') ||
+      moduleLower.includes('modelcontextprotocol') ||
+      moduleLower.includes('openai') ||
+      moduleLower.includes('/ai')
+    );
+  });
+
+  // Require semantic context to avoid turning arbitrary callback objects into roots.
+  return hasTypeToken || hasTargetToken || hasNameToken || (hasAgenticImport && !!nameValue);
 }
 
 /**

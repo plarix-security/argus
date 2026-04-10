@@ -65,13 +65,11 @@ describe('TypeScript semantic index', () => {
     expect(parsed.functions.some(f => f.name === 'plugin.dispose')).toBe(true);
   });
 
-  it('does not treat generic action objects as framework roots', () => {
+  it('does not treat unrelated callback objects as framework roots', () => {
     const filePath = '/tmp/action-object.ts';
     const source = `
-      import type { Action } from '@elizaos/core';
-
-      const myAction = {
-        name: 'test',
+      const helper = {
+        name: 'test-helper',
         handler: async () => { doWork(); },
       };
     `;
@@ -81,6 +79,35 @@ describe('TypeScript semantic index', () => {
     const files = new Map([[filePath, parsed]]);
     const roots = extractSemanticInvocationRoots(files);
     expect(roots.size).toBe(0);
+  });
+
+  it('extracts framework-core structural roots without agent-specific memorization', () => {
+    const filePath = '/tmp/agent-core.ts';
+    const source = `
+      import type { Action, Plugin } from '@acme/agent-runtime';
+
+      const deleteAction: Action = {
+        name: 'delete_file',
+        handler: async () => { unsafeDelete(); }
+      };
+
+      const plugin: Plugin = {
+        name: 'ops-plugin',
+        actions: [deleteAction]
+      };
+
+      runtime.registerAction('delete_file', deleteAction);
+    `;
+    const parsed = parseTypeScriptSource(source);
+    expect(parsed.success).toBe(true);
+
+    const files = new Map([[filePath, parsed]]);
+    const roots = extractSemanticInvocationRoots(files);
+    const values = Array.from(roots.values());
+
+    expect(values.some(root => root.framework === 'action-object')).toBe(true);
+    expect(values.some(root => root.framework === 'plugin-array')).toBe(true);
+    expect(values.some(root => root.framework === 'registration')).toBe(true);
   });
 
   it('detects MCP server.tool registration roots', () => {
