@@ -8,6 +8,7 @@
  * Commands:
  *   wyscan scan <path> [flags]   Scan for AFB exposures
  *   wyscan check                 Verify dependencies
+ *   wyscan tui                   Show compact command panel
  *   wyscan version               Print version
  *   wyscan help [command]        Show usage
  *
@@ -35,6 +36,7 @@ import {
   printError,
   printCheckStatus,
   printZeroFindings,
+  printTuiQuickPanel,
   isTTY,
 } from './formatter';
 
@@ -293,6 +295,11 @@ function captureConsoleOutput(run: () => void): string {
  * Print help
  */
 function printHelp(command?: string): void {
+  if (command === 'tui') {
+    printTuiQuickPanel();
+    return;
+  }
+
   if (command === 'scan') {
     console.log(`
   ${NAME} scan <path> [options]
@@ -329,6 +336,7 @@ function printHelp(command?: string): void {
   Usage:
     ${NAME} scan <path>     Scan a file or directory
     ${NAME} check           Verify scanner dependencies
+    ${NAME} tui             Show compact command panel
     ${NAME} help [command]  Show help
 
   Supported frameworks:
@@ -351,6 +359,8 @@ function printHelp(command?: string): void {
     ${NAME} scan ./agents -l critical
     ${NAME} scan . -j > report.json
 `);
+  console.log();
+  printTuiQuickPanel();
 }
 
 /**
@@ -571,6 +581,11 @@ async function main(): Promise<void> {
 
   if (command === '-v' || command === '--version' || command === 'version') {
     printVersion();
+    process.exit(EXIT.CLEAN);
+  }
+
+  if (command === 'tui') {
+    printTuiQuickPanel();
     process.exit(EXIT.CLEAN);
   }
 

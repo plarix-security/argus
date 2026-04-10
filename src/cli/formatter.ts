@@ -77,6 +77,25 @@ export function printHeader(): void {
 }
 
 /**
+ * Print concise TUI-style quick panel
+ */
+export function printTuiQuickPanel(): void {
+  const lines = [
+    '  ┌───────────────────────────────────────────────────┐',
+    `  │ ${styled('WYSCAN CLI QUICK PANEL', chalk.white.bold)}                               │`,
+    '  ├───────────────────────────────────────────────────┤',
+    '  │ scan  : wyscan scan <path> [-l critical|warning] │',
+    '  │ check : wyscan check                              │',
+    '  │ json  : wyscan scan <path> --json                │',
+    '  │ quiet : wyscan scan <path> --summary             │',
+    '  └───────────────────────────────────────────────────┘',
+  ];
+  for (const line of lines) {
+    console.log(isTTY() ? styled(line, chalk.dim) : line);
+  }
+}
+
+/**
  * Print scan target
  */
 export function printScanTarget(targetPath: string): void {
