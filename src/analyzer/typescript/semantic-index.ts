@@ -29,6 +29,9 @@ const SECONDARY_ACTION_EXECUTION_PROPS = new Set(['validate', 'init', 'dispose']
 // Token list is used for semantic context scoring (type/target/name),
 // while execution-prop sets are used for callback-shape detection.
 const AGENTIC_CORE_TOKENS = ['action', 'tool', 'plugin', 'handler', 'command', 'provider', 'service', 'capability', 'evaluator', 'agent', 'runtime'];
+const RUNTIME_COMPOSITION_VERBS = ['create', 'compose', 'build', 'bootstrap', 'initialize', 'init', 'start'];
+const RUNTIME_COMPOSITION_NOUNS = ['runtime', 'agent', 'pipeline', 'workflow', 'orchestrator', 'dispatcher'];
+const RUNTIME_REGISTRY_PROPERTY_NAMES = ['actions', 'tools', 'plugins', 'handlers', 'services', 'capabilities', 'evaluators'];
 
 export interface SemanticInvocationRoot {
   /** Node ID (file:function or file:class.method) */
@@ -103,7 +106,8 @@ export function extractSemanticInvocationRoots(
     fileRoots.push(...extractRuntimeCompositionPatterns(filePath, parsed));
 
     // Controlled fallback for unknown frameworks in agentic files.
-    // Allow fallback even when structural roots exist so mixed files can add missed entrypoints.
+    // NOTE: This now runs even when structural roots already exist, so mixed files
+    // can add exported entrypoint roots that were previously skipped by fileRoots.length === 0.
     if (hasAgenticContext(parsed)) {
       fileRoots.push(...extractExportedEntryPoints(filePath, parsed));
     }
@@ -119,19 +123,16 @@ function extractRuntimeCompositionPatterns(
   parsed: ParsedTypeScriptFile
 ): SemanticInvocationRoot[] {
   const roots: SemanticInvocationRoot[] = [];
-  const compositionVerbs = ['create', 'compose', 'build', 'bootstrap', 'initialize', 'init', 'start'];
-  const runtimeTargets = ['runtime', 'agent', 'pipeline', 'workflow', 'orchestrator', 'dispatcher'];
-  const registryKeys = ['actions', 'tools', 'plugins', 'handlers', 'services', 'capabilities', 'evaluators'];
 
   for (const call of parsed.calls) {
     const calleeLower = call.callee.toLowerCase();
-    const hasCompositionVerb = compositionVerbs.some((verb) => calleeLower.includes(verb));
-    const target = runtimeTargets.find((candidate) => calleeLower.includes(candidate));
+    const hasCompositionVerb = RUNTIME_COMPOSITION_VERBS.some((verb) => calleeLower.includes(verb));
+    const target = RUNTIME_COMPOSITION_NOUNS.find((candidate) => calleeLower.includes(candidate));
     if (!hasCompositionVerb || !target) continue;
 
     const hasRegistryShape = call.arguments.some((arg) => {
       const lower = arg.toLowerCase();
-      return registryKeys.some((key) => lower.includes(key));
+      return RUNTIME_REGISTRY_PROPERTY_NAMES.some((key) => lower.includes(key));
     });
     if (!hasRegistryShape) continue;
 

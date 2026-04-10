@@ -135,6 +135,20 @@ export const DEFAULT_IMPORT_CONFIG: ImportResolutionConfig = {
   packageJsonLookup: true,
 };
 
+const MIN_TRAVERSAL_DEPTH = 10;
+const MAX_TRAVERSAL_DEPTH = 20;
+// Add a small bonus so medium/large orchestration graphs are explored deeper
+// while MIN/MAX bounds keep traversal predictable.
+const DEPTH_BONUS = 8;
+
+function normalizePathWithoutExtension(filePath: string): string {
+  return filePath.replace(/\.(tsx?|jsx?|mjs|cjs)$/, '');
+}
+
+function toPosixPath(filePath: string): string {
+  return filePath.replace(/\\/g, '/');
+}
+
 /**
  * Dangerous operation patterns for Node.js/TypeScript
  *
@@ -623,13 +637,12 @@ function resolveModulePath(
   config: ImportResolutionConfig,
   availableFiles?: Set<string>
 ): string | null {
-  const normalizeExt = (p: string): string => p.replace(/\.(tsx?|jsx?|mjs|cjs)$/, '');
-  const toPosix = (p: string): string => p.replace(/\\/g, '/');
   const findBySuffix = (suffixes: string[]): string | null => {
     if (!availableFiles) return null;
+    const normalizedSuffixes = suffixes.map((suffix) => toPosixPath(normalizePathWithoutExtension(suffix)));
     for (const file of availableFiles) {
-      const normalized = toPosix(normalizeExt(file));
-      if (suffixes.some((suffix) => normalized.endsWith(toPosix(normalizeExt(suffix))))) {
+      const normalized = toPosixPath(normalizePathWithoutExtension(file));
+      if (normalizedSuffixes.some((suffix) => normalized.endsWith(suffix))) {
         return file;
       }
     }
@@ -880,7 +893,12 @@ export function buildCallGraph(
   }
 
   // Find exposed paths
-  const traversalDepthBudget = Math.min(20, Math.max(10, Math.ceil(Math.log2(Math.max(nodes.size, 2))) + 8));
+  // Logarithmic scaling increases depth gradually as graph size grows,
+  // while DEPTH_BONUS helps medium-sized orchestration graphs get enough exploration.
+  const traversalDepthBudget = Math.min(
+    MAX_TRAVERSAL_DEPTH,
+    Math.max(MIN_TRAVERSAL_DEPTH, Math.ceil(Math.log2(Math.max(nodes.size, 1))) + DEPTH_BONUS),
+  );
   const exposedPaths = findExposedPaths(nodes, toolRegistrations, files, traversalDepthBudget);
   const dangerousOperationsDiscovered = Array.from(nodes.values()).reduce((sum, node) => sum + node.dangerousOps.length, 0);
 

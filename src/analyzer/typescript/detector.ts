@@ -271,7 +271,7 @@ export function analyzeTypeScriptFiles(inputs: TypeScriptSourceInput[]): FileAna
   }
 
   if (results.length > 0) {
-    results[0].analysisDiagnostics = batchDiagnostics as unknown as Record<string, unknown>;
+    results[0].analysisDiagnostics = Object.fromEntries(Object.entries(batchDiagnostics));
   }
 
   return results;

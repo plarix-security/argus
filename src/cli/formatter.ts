@@ -12,6 +12,23 @@ import { VERSION } from './version';
 
 const DIVIDER = '─'.repeat(53);
 
+interface CoverageDiagnostics {
+  unresolvedCallEdges?: number;
+  depthLimitedExposedPaths?: number;
+  parseFailedFiles?: Array<{ file: string; error: string }>;
+  uniqueEntrypointsWithExposure?: number;
+}
+
+function readCoverageDiagnostics(raw: Record<string, unknown> | undefined): CoverageDiagnostics | null {
+  if (!raw) return null;
+  return {
+    unresolvedCallEdges: typeof raw.unresolvedCallEdges === 'number' ? raw.unresolvedCallEdges : undefined,
+    depthLimitedExposedPaths: typeof raw.depthLimitedExposedPaths === 'number' ? raw.depthLimitedExposedPaths : undefined,
+    parseFailedFiles: Array.isArray(raw.parseFailedFiles) ? raw.parseFailedFiles as Array<{ file: string; error: string }> : undefined,
+    uniqueEntrypointsWithExposure: typeof raw.uniqueEntrypointsWithExposure === 'number' ? raw.uniqueEntrypointsWithExposure : undefined,
+  };
+}
+
 /**
  * Check if stdout is a TTY (supports colors)
  */
@@ -246,7 +263,7 @@ function getCoverageNotes(report: AnalysisReport): string[] {
   const notes: string[] = [];
   const failedFiles = report.metadata.failedFiles;
   const skippedFiles = report.metadata.skippedFiles;
-  const diagnostics = report.metadata.coverageDiagnostics;
+  const diagnostics = readCoverageDiagnostics(report.metadata.coverageDiagnostics);
 
   if (failedFiles.length > 0) {
     const label = failedFiles.length === 1 ? 'file' : 'files';
@@ -259,11 +276,11 @@ function getCoverageNotes(report: AnalysisReport): string[] {
     notes.push(`Skipped ${skippedFiles.length} unsupported ${label}: ${skippedLanguages.join(', ')}.`);
   }
 
-  if (diagnostics && typeof diagnostics === 'object') {
-    const unresolvedEdges = Number(diagnostics['unresolvedCallEdges'] || 0);
-    const depthLimited = Number(diagnostics['depthLimitedExposedPaths'] || 0);
-    const parseFailed = Number(Array.isArray(diagnostics['parseFailedFiles']) ? diagnostics['parseFailedFiles'].length : 0);
-    const uniqueEntrypoints = Number(diagnostics['uniqueEntrypointsWithExposure'] || 0);
+  if (diagnostics) {
+    const unresolvedEdges = diagnostics.unresolvedCallEdges || 0;
+    const depthLimited = diagnostics.depthLimitedExposedPaths || 0;
+    const parseFailed = diagnostics.parseFailedFiles?.length || 0;
+    const uniqueEntrypoints = diagnostics.uniqueEntrypointsWithExposure || 0;
 
     if (uniqueEntrypoints > 0) {
       notes.push(`Unique entrypoints reaching sensitive operations: ${uniqueEntrypoints}.`);
