@@ -6,7 +6,7 @@ describe('TypeScript semantic index', () => {
     await initParser();
   });
 
-  it('adds exported entry-point roots for dangerous files even when other roots exist', () => {
+  it('does not add generic exported-entry fallback roots', () => {
     const openAIFile = '/repo/openai-tool.ts';
     const scriptFile = '/repo/script.ts';
 
@@ -35,7 +35,8 @@ describe('TypeScript semantic index', () => {
 
     const roots = extractSemanticInvocationRoots(files);
 
-    expect(roots.has(`${scriptFile}:processFiles`)).toBe(true);
+    expect(roots.has(`${openAIFile}:lookup`)).toBe(true);
+    expect(roots.has(`${scriptFile}:processFiles`)).toBe(false);
   });
 
   it('extracts typed/as-asserted action-like callbacks from assignments', () => {
@@ -64,15 +65,13 @@ describe('TypeScript semantic index', () => {
     expect(parsed.functions.some(f => f.name === 'plugin.dispose')).toBe(true);
   });
 
-  it('prefers handler over validate when both props are present on the same action object', () => {
-    const filePath = '/tmp/action-priority.ts';
-    // Object has both validate (secondary) and handler (primary) — handler must win
+  it('does not treat generic action objects as framework roots', () => {
+    const filePath = '/tmp/action-object.ts';
     const source = `
       import type { Action } from '@elizaos/core';
 
-      const myAction: Action = {
+      const myAction = {
         name: 'test',
-        validate: async () => { return true; },
         handler: async () => { doWork(); },
       };
     `;
@@ -81,49 +80,25 @@ describe('TypeScript semantic index', () => {
 
     const files = new Map([[filePath, parsed]]);
     const roots = extractSemanticInvocationRoots(files);
-
-    const rootKeys = Array.from(roots.keys());
-    // handler root must be present
-    expect(rootKeys.some(k => k.endsWith(':myAction.handler'))).toBe(true);
-    // validate root must NOT be present (handler takes priority)
-    expect(rootKeys.some(k => k.endsWith(':myAction.validate'))).toBe(false);
+    expect(roots.size).toBe(0);
   });
 
-  it('detects service start, plugin events, and cross-file function references', () => {
-    const runtimeFile = '/tmp/runtime.ts';
-    const pluginFile = '/tmp/plugin.ts';
+  it('detects MCP server.tool registration roots', () => {
+    const filePath = '/tmp/mcp.ts';
+    const parsed = parseTypeScriptSource(`
+      import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+      const server = new Server({ name: 'demo', version: '1.0.0' });
 
-    const runtimeParsed = parseTypeScriptSource(`
-      export async function runAction() {}
-    `);
-    const pluginParsed = parseTypeScriptSource(`
-      import { Service, type PluginEvents, EventType } from '@elizaos/core';
-      import { runAction } from './runtime';
-
-      class AutonomyService extends Service {
-        static async start() {
-          return runAction();
-        }
+      async function readSecret() {
+        return process.env.SECRET || '';
       }
 
-      const events: PluginEvents = {
-        [EventType.MESSAGE_RECEIVED]: [async () => runAction()],
-      };
-
-      const action = { name: 'x', handler: runAction };
+      server.tool('read_secret', {}, readSecret);
     `);
-
-    const files = new Map([
-      [runtimeFile, runtimeParsed],
-      [pluginFile, pluginParsed],
-    ]);
+    expect(parsed.success).toBe(true);
+    const files = new Map([[filePath, parsed]]);
 
     const roots = extractSemanticInvocationRoots(files);
-
-    expect(roots.has(`${pluginFile}:AutonomyService.start`)).toBe(true);
-    expect(
-      Array.from(roots.keys()).some(key => key.startsWith(`${pluginFile}:events.[EventType.MESSAGE_RECEIVED][0]`))
-    ).toBe(true);
-    expect(roots.has(`${runtimeFile}:runAction`)).toBe(true);
+    expect(Array.from(roots.values()).some((root) => root.framework === 'mcp')).toBe(true);
   });
 });

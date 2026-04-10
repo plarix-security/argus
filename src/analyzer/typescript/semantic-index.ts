@@ -12,7 +12,8 @@
  * - MCP SDK (server.tool() registrations)
  * - Mastra (tool definitions)
  * - Playwright (browser automation tools)
- * - Generic patterns (tools arrays passed to agent constructors)
+ * The index intentionally avoids generic name-based registration heuristics.
+ * It only tracks framework-core structural registration patterns.
  */
 
 import {
@@ -98,93 +99,8 @@ export function extractSemanticInvocationRoots(
       roots.set(root.nodeId, root);
     }
 
-    // Check for generic tool patterns
-    const genericRoots = extractGenericTools(filePath, parsed);
-    for (const root of genericRoots) {
-      roots.set(root.nodeId, root);
-    }
-
-    // Check for action object patterns (Eliza, custom frameworks)
-    const actionRoots = extractActionObjectPatterns(filePath, parsed, files);
-    for (const root of actionRoots) {
-      roots.set(root.nodeId, root);
-    }
-
-    // Check for plugin array patterns
-    const pluginRoots = extractPluginArrayPatterns(filePath, parsed, files);
-    for (const root of pluginRoots) {
-      roots.set(root.nodeId, root);
-    }
-
-    // Check for registration call patterns
-    const registrationRoots = extractRegistrationCallPatterns(filePath, parsed, files);
-    for (const root of registrationRoots) {
-      roots.set(root.nodeId, root);
-    }
-
-    // Check for service class lifecycle patterns
-    const serviceRoots = extractServiceClassPatterns(filePath, parsed);
-    for (const root of serviceRoots) {
-      roots.set(root.nodeId, root);
-    }
-
-    // Check for event handler object patterns
-    const eventRoots = extractEventHandlerPatterns(filePath, parsed);
-    for (const root of eventRoots) {
-      roots.set(root.nodeId, root);
-    }
-  }
-
-  // If no roots found, try exported entry points as fallback
-  if (roots.size === 0) {
-    for (const [filePath, parsed] of files) {
-      const exportRoots = extractExportedEntryPoints(filePath, parsed);
-      for (const root of exportRoots) {
-        roots.set(root.nodeId, root);
-      }
-    }
-  }
-
-  // Always add exported entry points that contain dangerous-looking patterns
-  // This ensures files like plugin.ts get analyzed even when other files have framework patterns
-  for (const [filePath, parsed] of files) {
-    // Check if this file has dangerous calls but no roots yet
-    const hasDangerousCalls = parsed.calls.some(call => {
-      const callee = call.callee.toLowerCase();
-      // High-signal process/shell execution
-      return callee === 'spawn' || callee === 'exec' || callee === 'execsync' ||
-             callee === 'execfile' || callee === 'execfilesync' || callee === 'spawnSync' ||
-             callee.endsWith('.spawn') || callee.endsWith('.exec') ||
-             callee === 'eval' ||
-             // File deletion / destructive FS
-             callee === 'unlink' || callee === 'unlinksync' ||
-             callee.endsWith('.unlink') || callee.endsWith('.unlinksync') ||
-             callee === 'rmdir' || callee === 'rmdirSync' ||
-             callee.endsWith('.rmdir') || callee.endsWith('.rmdirSync') ||
-             callee === 'rm' || callee === 'rmsync' ||
-             callee.endsWith('.rm') || callee.endsWith('.rmsync') ||
-             // Specific HTTP clients (avoid generic 'request' which matches too broadly)
-             callee === 'fetch' || callee.endsWith('.fetch') ||
-             callee.startsWith('axios.') ||
-             // Specific file-write operations
-             callee === 'writefile' || callee === 'writefilesync' ||
-             callee.endsWith('.writefile') || callee.endsWith('.writefilesync') ||
-             // Process control
-             callee === 'process.exit' ||
-             // child_process module usage
-             callee.includes('child_process') || callee.includes('childprocess');
-    });
-
-    if (hasDangerousCalls) {
-      const fileHasRoots = [...roots.values()].some(r => r.sourceFile === filePath);
-      if (!fileHasRoots) {
-        // Add exported entry points for this file specifically
-        const exportRoots = extractExportedEntryPoints(filePath, parsed);
-        for (const root of exportRoots) {
-          roots.set(root.nodeId, root);
-        }
-      }
-    }
+    // Intentionally no generic or exported-entry fallback roots.
+    // Root registration must be framework-core and structurally evidenced.
   }
 
   return roots;

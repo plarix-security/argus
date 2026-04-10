@@ -371,16 +371,6 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.rglob$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Recursive file glob' },
   { pattern: /\.iterdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory iteration' },
 
-  // ==================== ELIZAOS / AGENTIC FRAMEWORK ====================
-  // These match method calls on a 'runtime' parameter object (IAgentRuntime interface).
-  // Since 'runtime' is a function parameter (not an imported module), semantic resolution
-  // fails; these heuristic patterns catch it via raw callee matching.
-  { pattern: /^runtime\.use_model$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'ElizaOS runtime LLM model call' },
-  { pattern: /^runtime\.(create_memory|update_memory|delete_memory)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ElizaOS runtime memory mutation' },
-  { pattern: /^runtime\.(send_message|reply)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'ElizaOS runtime message send' },
-  { pattern: /^runtime\.execute_action$/i, category: ExecutionCategory.API_CALL, severity: Severity.CRITICAL, description: 'ElizaOS runtime action dispatch (recursive LLM control)' },
-  { pattern: /^runtime\.(update_world|create_entity|update_entity|delete_entity)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ElizaOS runtime world/entity mutation' },
-  { pattern: /^runtime\.compose_state$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'ElizaOS runtime state composition' },
 ];
 
 const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: {
@@ -502,15 +492,6 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: {
   { identity: /^paramiko\.SSHClient\.(exec_command|invoke_shell)$/i, category: ExecutionCategory.SHELL_EXECUTION, severity: Severity.CRITICAL, description: 'SSH command execution' },
   { identity: /^paramiko\.SFTPClient\.(put|putfo|remove|rmdir|rename)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'SFTP write operation' },
 
-  // ==================== ELIZAOS PYTHON RUNTIME ====================
-  // ElizaOS Python runtime API calls (elizaos.types.IAgentRuntime)
-  // These represent LLM-invoked side-effects from Action handlers
-  { identity: /^runtime\.use_model$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'ElizaOS runtime LLM model call' },
-  { identity: /^runtime\.(create_memory|update_memory|delete_memory)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ElizaOS runtime memory mutation' },
-  { identity: /^runtime\.(send_message|reply)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'ElizaOS runtime message send' },
-  { identity: /^runtime\.execute_action$/i, category: ExecutionCategory.API_CALL, severity: Severity.CRITICAL, description: 'ElizaOS runtime action dispatch (recursive LLM control)' },
-  { identity: /^runtime\.(update_world|create_entity|update_entity|delete_entity)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ElizaOS runtime world/entity mutation' },
-  { identity: /^runtime\.compose_state$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'ElizaOS runtime state composition' },
 ];
 
 /**
