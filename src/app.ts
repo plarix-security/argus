@@ -31,13 +31,13 @@ let appInstance: express.Application | undefined;
 
 function getApp(): express.Application {
   if (!appInstance) {
+    validateEnv();
     appInstance = createApp();
   }
   return appInstance;
 }
 
 function startServer(): void {
-  validateEnv();
   const app = getApp();
   const port = process.env.PORT || 3000;
   app.listen(port, () => console.log(`\n${NAME} ${VERSION}\nRunning on port ${port}\n`));
