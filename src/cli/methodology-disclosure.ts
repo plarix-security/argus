@@ -2,7 +2,7 @@ import { AnalysisReport } from '../types';
 
 export interface MethodologyDisclosure {
   short_answer: string;
-  runtime_surface: 'cli_only';
+  runtime_surfaces: Array<'cli_only' | 'github_app_backend'>;
   regex_main_method: boolean;
   primary_method: string;
   anti_overfit_policy: {
@@ -26,7 +26,7 @@ export function buildMethodologyDisclosure(report: AnalysisReport): MethodologyD
 
   return {
     short_answer: coverageWarning,
-    runtime_surface: 'cli_only',
+    runtime_surfaces: ['cli_only', 'github_app_backend'],
     regex_main_method: false,
     primary_method: 'Tree-sitter AST parsing plus semantic tool-registration and call-path analysis.',
     anti_overfit_policy: {

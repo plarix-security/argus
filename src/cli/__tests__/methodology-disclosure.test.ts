@@ -27,7 +27,8 @@ describe('methodology disclosure', () => {
   it('explicitly states regex is not the main method', () => {
     const disclosure = buildMethodologyDisclosure(createReport(false));
 
-    expect(disclosure.runtime_surface).toBe('cli_only');
+    expect(disclosure.runtime_surfaces).toContain('cli_only');
+    expect(disclosure.runtime_surfaces).toContain('github_app_backend');
     expect(disclosure.regex_main_method).toBe(false);
     expect(disclosure.anti_overfit_policy.hardcoded_agent_schema_rules).toBe(false);
     expect(disclosure.anti_overfit_policy.memorized_framework_schema_rules).toBe(false);
