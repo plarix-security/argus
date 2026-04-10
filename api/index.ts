@@ -1,11 +1,11 @@
-import { getApp } from '../src/app';
+interface ResponseLike {
+  status(code: number): ResponseLike;
+  json(payload: unknown): void;
+}
 
-type App = ReturnType<typeof getApp>;
-type AppRequest = Parameters<App>[0];
-type AppResponse = Parameters<App>[1];
-
-export default function handler(req: AppRequest, res: AppResponse): void {
+export default async function handler(req: unknown, res: ResponseLike): Promise<void> {
   try {
+    const { getApp } = await import('../src/app');
     const app = getApp();
     app(req, res);
   } catch (error) {
