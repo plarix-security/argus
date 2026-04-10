@@ -110,6 +110,23 @@ describe('TypeScript semantic index', () => {
     expect(values.some(root => root.framework === 'registration')).toBe(true);
   });
 
+  it('uses exported-entry fallback only with agentic context', () => {
+    const filePath = '/tmp/custom-agent.ts';
+    const source = `
+      import { Runtime } from '@acme/agent-runtime';
+
+      export async function runTask(input: string) {
+        return input;
+      }
+    `;
+    const parsed = parseTypeScriptSource(source);
+    expect(parsed.success).toBe(true);
+    const files = new Map([[filePath, parsed]]);
+
+    const roots = extractSemanticInvocationRoots(files);
+    expect(Array.from(roots.values()).some(root => root.framework === 'export-entry')).toBe(true);
+  });
+
   it('detects MCP server.tool registration roots', () => {
     const filePath = '/tmp/mcp.ts';
     const parsed = parseTypeScriptSource(`

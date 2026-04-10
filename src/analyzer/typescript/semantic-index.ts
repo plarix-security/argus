@@ -24,6 +24,12 @@ import {
   ImportInfo,
 } from './ast-parser';
 
+const PRIMARY_ACTION_EXECUTION_PROPS = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform']);
+const SECONDARY_ACTION_EXECUTION_PROPS = new Set(['validate', 'init', 'dispose']);
+// Token list is used for semantic context scoring (type/target/name),
+// while execution-prop sets are used for callback-shape detection.
+const AGENTIC_CORE_TOKENS = ['action', 'tool', 'plugin', 'handler', 'command', 'provider', 'service', 'capability', 'evaluator', 'agent', 'runtime'];
+
 export interface SemanticInvocationRoot {
   /** Node ID (file:function or file:class.method) */
   nodeId: string;
@@ -68,33 +74,40 @@ export function extractSemanticInvocationRoots(
   };
 
   for (const [filePath, parsed] of files) {
+    const fileRoots: SemanticInvocationRoot[] = [];
+
     // Check for OpenAI SDK usage
-    addRoots(extractOpenAITools(filePath, parsed));
+    fileRoots.push(...extractOpenAITools(filePath, parsed));
 
     // Check for LangChain.js/LangGraph.js usage
-    addRoots(extractLangChainTools(filePath, parsed));
+    fileRoots.push(...extractLangChainTools(filePath, parsed));
 
     // Check for Vercel AI SDK usage
-    addRoots(extractVercelAITools(filePath, parsed));
+    fileRoots.push(...extractVercelAITools(filePath, parsed));
 
     // Check for MCP SDK usage
-    addRoots(extractMCPTools(filePath, parsed));
+    fileRoots.push(...extractMCPTools(filePath, parsed));
 
     // Check for Mastra usage
-    addRoots(extractMastraTools(filePath, parsed));
+    fileRoots.push(...extractMastraTools(filePath, parsed));
 
     // Check for Playwright browser automation
-    addRoots(extractPlaywrightTools(filePath, parsed));
+    fileRoots.push(...extractPlaywrightTools(filePath, parsed));
 
     // Check framework-core structural patterns (agent-system agnostic)
-    addRoots(extractActionObjectPatterns(filePath, parsed, files));
-    addRoots(extractPluginArrayPatterns(filePath, parsed, files));
-    addRoots(extractRegistrationCallPatterns(filePath, parsed, files));
-    addRoots(extractServiceClassPatterns(filePath, parsed));
-    addRoots(extractEventHandlerPatterns(filePath, parsed));
+    fileRoots.push(...extractActionObjectPatterns(filePath, parsed, files));
+    fileRoots.push(...extractPluginArrayPatterns(filePath, parsed, files));
+    fileRoots.push(...extractRegistrationCallPatterns(filePath, parsed, files));
+    fileRoots.push(...extractServiceClassPatterns(filePath, parsed));
+    fileRoots.push(...extractEventHandlerPatterns(filePath, parsed));
 
-    // Intentionally no generic or exported-entry fallback roots.
-    // Root registration must be framework-core and structurally evidenced.
+    // Controlled fallback for unknown frameworks:
+    // only when the file has clear agentic context and no stronger structural evidence.
+    if (fileRoots.length === 0 && hasAgenticContext(parsed)) {
+      fileRoots.push(...extractExportedEntryPoints(filePath, parsed));
+    }
+
+    addRoots(fileRoots);
   }
 
   return roots;
@@ -765,19 +778,35 @@ function isLikelyAgenticActionObject(
 ): boolean {
   if (!assignment.objectProperties) return false;
 
-  const executionProps = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform', 'get', 'validate', 'init', 'dispose']);
-  const hasExecutionProp = assignment.objectProperties.some(prop => executionProps.has(prop.key));
-  if (!hasExecutionProp) return false;
+  const hasPrimaryExecutionProp = assignment.objectProperties.some(prop => PRIMARY_ACTION_EXECUTION_PROPS.has(prop.key));
+  const hasSecondaryExecutionProp = assignment.objectProperties.some(prop => SECONDARY_ACTION_EXECUTION_PROPS.has(prop.key));
+  if (!hasPrimaryExecutionProp && !hasSecondaryExecutionProp) return false;
 
   const typedContext = `${assignment.typeAnnotation || ''} ${assignment.assertedType || ''}`.toLowerCase();
   const target = assignment.target.toLowerCase();
   const nameLower = (nameValue || '').toLowerCase();
 
-  const coreTokens = ['action', 'tool', 'plugin', 'handler', 'command', 'provider', 'service', 'capability', 'evaluator', 'agent', 'runtime'];
-  const hasTypeToken = coreTokens.some(token => typedContext.includes(token));
-  const hasTargetToken = coreTokens.some(token => target.includes(token));
-  const hasNameToken = coreTokens.some(token => nameLower.includes(token));
-  const hasAgenticImport = parsed.imports.some(imp => {
+  const hasTypeToken = AGENTIC_CORE_TOKENS.some(token => typedContext.includes(token));
+  const hasTargetToken = AGENTIC_CORE_TOKENS.some(token => target.includes(token));
+  const hasNameToken = AGENTIC_CORE_TOKENS.some(token => nameLower.includes(token));
+  const hasAgenticImport = hasAgenticContext(parsed);
+
+  // Require semantic context to avoid turning arbitrary callback objects into roots.
+  // Secondary-only callbacks are common outside agent systems, so require stronger context.
+  if (hasPrimaryExecutionProp) {
+    // Explicit type evidence is strongest. Otherwise require combined shape/context signals
+    // so generic web/service handlers are less likely to be misclassified as agent roots.
+    if (hasTypeToken) return true;
+    if (hasTargetToken && (hasNameToken || hasAgenticImport)) return true;
+    if (hasNameToken && hasAgenticImport) return true;
+    return false;
+  }
+
+  return hasTypeToken || (hasTargetToken && hasNameToken);
+}
+
+function hasAgenticContext(parsed: ParsedTypeScriptFile): boolean {
+  return parsed.imports.some(imp => {
     const moduleLower = imp.module.toLowerCase();
     return (
       moduleLower.includes('agent') ||
@@ -792,9 +821,6 @@ function isLikelyAgenticActionObject(
       moduleLower.includes('/ai')
     );
   });
-
-  // Require semantic context to avoid turning arbitrary callback objects into roots.
-  return hasTypeToken || hasTargetToken || hasNameToken || (hasAgenticImport && !!nameValue);
 }
 
 /**
