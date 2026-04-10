@@ -27,7 +27,7 @@ function createApp(): express.Application {
   return app;
 }
 
-let appInstance: express.Application | null = null;
+let appInstance: express.Application | undefined;
 
 function getApp(): express.Application {
   if (!appInstance) {
@@ -47,7 +47,5 @@ if (require.main === module) {
   startServer();
 }
 
-const app = getApp();
-
 export { createApp, getApp, validateEnv, startServer };
-export default app;
+export default getApp;

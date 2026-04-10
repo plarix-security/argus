@@ -1,3 +1,3 @@
-import app from '../src/app';
+import getApp from '../src/app';
 
-export default app;
+export default getApp();
