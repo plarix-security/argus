@@ -3,6 +3,7 @@ import {
   AssignmentInfo,
   CallArgumentInfo,
   CallSite,
+  ClassDef,
   DecoratorDef,
   FunctionDispatchMapping,
   OpenAIToolSchema,
@@ -11,6 +12,7 @@ import {
   YieldInfo,
   WithBindingInfo,
 } from './ast-parser';
+import { ALL_PYTHON_IMPORT_TOKENS, KNOWN_FRAMEWORKS_PYTHON } from '../frameworks/signatures';
 
 export interface SemanticInvocationRoot {
   nodeId: string;
@@ -212,6 +214,107 @@ export class PythonSemanticIndex {
 
         roots.set(root.nodeId, root);
       }
+    }
+
+    // Class-based tool detection: classes that subclass a known tool base
+    for (const [filePath, parsed] of this.files) {
+      for (const classDef of parsed.classes) {
+        const classRoots = this.extractClassBasedToolRoots(classDef, filePath, parsed);
+        for (const [nodeId, root] of classRoots) {
+          if (!roots.has(nodeId)) {
+            roots.set(nodeId, root);
+          }
+        }
+      }
+    }
+
+    return roots;
+  }
+
+  /**
+   * Detect class-based tool registrations.
+   *
+   * Patterns covered:
+   *   class MyTool(BaseTool):       # crewAI, langchain, smolagents
+   *       def _run(self, ...): ...
+   *   class MyTool(Tool):
+   *       def run(self, ...): ...
+   *   class MyComponent:            # Haystack @component class
+   *       @component
+   *       def run(self, ...): ...
+   *
+   * Each qualifying execution method (_run, run, execute, arun) is registered
+   * as its own SemanticInvocationRoot so the call graph can trace operations
+   * from within those methods.
+   */
+  private extractClassBasedToolRoots(
+    classDef: ClassDef,
+    filePath: string,
+    parsed: ParsedPythonFile
+  ): Map<string, SemanticInvocationRoot> {
+    const roots = new Map<string, SemanticInvocationRoot>();
+
+    // Known tool base class names across all Python frameworks
+    const TOOL_BASE_CLASSES = new Set([
+      'BaseTool', 'Tool', 'StructuredTool', 'DynamicTool', 'FunctionTool',
+      'QueryEngineTool', 'BaseToolMixin',
+      // smolagents
+      'PipelineTool', 'CodeAgent',
+      // semantic kernel
+      'KernelFunction', 'KernelPlugin',
+      // haystack component marker
+      'Component',
+    ]);
+
+    // Execution method names for class-based tools
+    const EXECUTION_METHODS = new Set(['_run', 'run', 'execute', 'arun', '_arun', 'ainvoke', '__call__', 'call']);
+
+    // Determine if this class inherits from a known tool base
+    const matchedBase = classDef.bases.find(base => {
+      const simpleName = base.split('.').pop() || base;
+      return TOOL_BASE_CLASSES.has(simpleName) || TOOL_BASE_CLASSES.has(base);
+    });
+
+    // Also check if it's a Haystack @component class (has @component decorator)
+    const isHaystackComponent = classDef.decorators.some(d => d === 'component' || d.endsWith('.component'));
+
+    if (!matchedBase && !isHaystackComponent) {
+      return roots;
+    }
+
+    // Determine framework from the matched base and file imports
+    let framework = 'class-based-tool';
+    if (matchedBase) {
+      for (const fw of KNOWN_FRAMEWORKS_PYTHON) {
+        if (fw.toolConstructors.some(c => c === matchedBase || c.endsWith(`.${matchedBase}`))) {
+          framework = fw.name;
+          break;
+        }
+      }
+    }
+    if (isHaystackComponent) framework = 'haystack';
+
+    // Register each execution method as a separate root
+    for (const method of parsed.functions) {
+      if (method.className !== classDef.name) continue;
+      if (!EXECUTION_METHODS.has(method.name)) continue;
+
+      const nodeId = `${filePath}:${classDef.name}.${method.name}`;
+      roots.set(nodeId, {
+        nodeId,
+        framework,
+        evidence: `class ${classDef.name} extends ${matchedBase || 'component'}, method ${method.name} is tool executor`,
+      });
+    }
+
+    // If no execution method found, register the class itself as a root
+    if (roots.size === 0) {
+      const nodeId = `${filePath}:${classDef.name}`;
+      roots.set(nodeId, {
+        nodeId,
+        framework,
+        evidence: `class ${classDef.name} extends ${matchedBase || 'component'}, registered as tool class`,
+      });
     }
 
     return roots;
