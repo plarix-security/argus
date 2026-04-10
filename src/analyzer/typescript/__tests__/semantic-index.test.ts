@@ -19,7 +19,7 @@ describe('TypeScript semantic index', () => {
     const scriptSource = `
       import * as fs from 'fs';
       export function processFiles() {
-        fs.readFileSync('/tmp/demo.txt', 'utf8');
+        fs.unlinkSync('/tmp/demo.txt');
       }
     `;
 
@@ -62,6 +62,31 @@ describe('TypeScript semantic index', () => {
     expect(parsed.functions.some(f => f.name === 'provider.get')).toBe(true);
     expect(parsed.functions.some(f => f.name === 'plugin.init')).toBe(true);
     expect(parsed.functions.some(f => f.name === 'plugin.dispose')).toBe(true);
+  });
+
+  it('prefers handler over validate when both props are present on the same action object', () => {
+    const filePath = '/tmp/action-priority.ts';
+    // Object has both validate (secondary) and handler (primary) — handler must win
+    const source = `
+      import type { Action } from '@elizaos/core';
+
+      const myAction: Action = {
+        name: 'test',
+        validate: async () => { return true; },
+        handler: async () => { doWork(); },
+      };
+    `;
+    const parsed = parseTypeScriptSource(source);
+    expect(parsed.success).toBe(true);
+
+    const files = new Map([[filePath, parsed]]);
+    const roots = extractSemanticInvocationRoots(files);
+
+    const rootKeys = Array.from(roots.keys());
+    // handler root must be present
+    expect(rootKeys.some(k => k.endsWith(':myAction.handler'))).toBe(true);
+    // validate root must NOT be present (handler takes priority)
+    expect(rootKeys.some(k => k.endsWith(':myAction.validate'))).toBe(false);
   });
 
   it('detects service start, plugin events, and cross-file function references', () => {

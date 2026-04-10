@@ -315,6 +315,18 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
   { identity: /^fs\/promises\.(readFile|readdir|stat|lstat|access)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Async file read', resourceHint: 'file', changesState: false },
   { identity: /^fse?\.(readFile|readFileSync|readdir|readdirSync|stat|statSync|pathExists|pathExistsSync)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read via fs-extra', resourceHint: 'file', changesState: false },
   { identity: /^glob(\.sync)?$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Glob file matching', resourceHint: 'file', changesState: false },
+
+  // ============================================
+  // ELIZA / AGENTIC FRAMEWORK RUNTIME OPERATIONS
+  // These are framework-level operations invoked by LLM action handlers that
+  // represent side-effects: calling AI models, persisting memory, sending messages.
+  // ============================================
+  { identity: /^runtime\.useModel$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Eliza runtime LLM model call', resourceHint: 'ai-model', changesState: false },
+  { identity: /^runtime\.(createMemory|updateMemory|deleteMemory)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Eliza runtime memory mutation', resourceHint: 'memory-store', changesState: true },
+  { identity: /^runtime\.sendMessage$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Eliza runtime message send', resourceHint: 'messaging', changesState: true },
+  { identity: /^runtime\.executeAction$/i, category: ExecutionCategory.API_CALL, severity: Severity.CRITICAL, description: 'Eliza runtime action dispatch (recursive LLM control)', resourceHint: 'agent-action', changesState: true },
+  { identity: /^runtime\.(updateWorld|updateEntity|createEntity|deleteEntity)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Eliza runtime world/entity mutation', resourceHint: 'world-state', changesState: true },
+  { identity: /^runtime\.setSetting$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Eliza runtime settings mutation', resourceHint: 'settings', changesState: true },
 ];
 
 /**

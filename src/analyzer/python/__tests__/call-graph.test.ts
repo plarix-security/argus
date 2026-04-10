@@ -5,11 +5,18 @@ describe('Python Call Graph - Dangerous Operation Detection', () => {
   describe('HTTP Client Detection', () => {
     it('should detect requests.get as dangerous HTTP operation', () => {
       const parsedFile: ParsedPythonFile = {
-        imports: [{
-          module: 'requests',
-          names: [{ name: 'get' }],
-          isFrom: true,
-        }],
+        imports: [
+          {
+            module: 'requests',
+            names: [{ name: 'get' }],
+            isFrom: true,
+          },
+          {
+            module: 'langchain_core.tools',
+            names: [{ name: 'tool' }],
+            isFrom: true,
+          },
+        ],
         functions: [{
           name: 'make_request',
           decorators: ['tool'],
@@ -41,11 +48,7 @@ describe('Python Call Graph - Dangerous Operation Detection', () => {
         returns: [],
         yields: [],
         withBindings: [],
-        decoratorDefs: [{
-          name: 'tool',
-          startLine: 3,
-          isStructuralGate: false,
-        }],
+        decoratorDefs: [],
         openaiToolSchemas: [],
         dispatchMappings: [],
         success: true,
@@ -67,11 +70,18 @@ describe('Python Call Graph - Dangerous Operation Detection', () => {
   describe('Database Client Detection', () => {
     it('should detect sqlite3.Connection.execute as dangerous SQL operation', () => {
       const parsedFile: ParsedPythonFile = {
-        imports: [{
-          module: 'sqlite3',
-          names: [{ name: 'connect' }],
-          isFrom: true,
-        }],
+        imports: [
+          {
+            module: 'sqlite3',
+            names: [{ name: 'connect' }],
+            isFrom: true,
+          },
+          {
+            module: 'langchain_core.tools',
+            names: [{ name: 'tool' }],
+            isFrom: true,
+          },
+        ],
         functions: [{
           name: 'run_query',
           decorators: ['tool'],
@@ -135,11 +145,7 @@ describe('Python Call Graph - Dangerous Operation Detection', () => {
         returns: [],
         yields: [],
         withBindings: [],
-        decoratorDefs: [{
-          name: 'tool',
-          startLine: 3,
-          isStructuralGate: false,
-        }],
+        decoratorDefs: [],
         openaiToolSchemas: [],
         dispatchMappings: [],
         success: true,
@@ -161,11 +167,18 @@ describe('Python Call Graph - Dangerous Operation Detection', () => {
   describe('Shell Execution Detection', () => {
     it('should detect subprocess.run as dangerous shell operation', () => {
       const parsedFile: ParsedPythonFile = {
-        imports: [{
-          module: 'subprocess',
-          names: [{ name: 'run' }],
-          isFrom: true,
-        }],
+        imports: [
+          {
+            module: 'subprocess',
+            names: [{ name: 'run' }],
+            isFrom: true,
+          },
+          {
+            module: 'langchain_core.tools',
+            names: [{ name: 'tool' }],
+            isFrom: true,
+          },
+        ],
         functions: [{
           name: 'run_command',
           decorators: ['tool'],
@@ -197,11 +210,7 @@ describe('Python Call Graph - Dangerous Operation Detection', () => {
         returns: [],
         yields: [],
         withBindings: [],
-        decoratorDefs: [{
-          name: 'tool',
-          startLine: 3,
-          isStructuralGate: false,
-        }],
+        decoratorDefs: [],
         openaiToolSchemas: [],
         dispatchMappings: [],
         success: true,
@@ -223,7 +232,11 @@ describe('Python Call Graph - Dangerous Operation Detection', () => {
   describe('Call Graph Construction', () => {
     it('should build a valid call graph', () => {
       const parsedFile: ParsedPythonFile = {
-        imports: [],
+        imports: [{
+          module: 'langchain_core.tools',
+          names: [{ name: 'tool' }],
+          isFrom: true,
+        }],
         functions: [{
           name: 'check_access',
           decorators: ['tool'],
@@ -247,11 +260,7 @@ describe('Python Call Graph - Dangerous Operation Detection', () => {
         returns: [],
         yields: [],
         withBindings: [],
-        decoratorDefs: [{
-          name: 'tool',
-          startLine: 1,
-          isStructuralGate: false,
-        }],
+        decoratorDefs: [],
         openaiToolSchemas: [],
         dispatchMappings: [],
         success: true,

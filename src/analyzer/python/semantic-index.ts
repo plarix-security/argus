@@ -3,6 +3,7 @@ import {
   AssignmentInfo,
   CallArgumentInfo,
   CallSite,
+  DecoratorDef,
   FunctionDispatchMapping,
   OpenAIToolSchema,
   ParsedPythonFile,
@@ -204,7 +205,7 @@ export class PythonSemanticIndex {
 
     for (const [filePath, parsed] of this.files) {
       for (const func of parsed.functions) {
-        const root = this.extractDecoratorRoot(func.decorators, filePath, func.className, func.name);
+        const root = this.extractDecoratorRoot(func.decorators, filePath, func.className, func.name, parsed.decoratorDefs);
         if (!root || roots.has(root.nodeId)) {
           continue;
         }
@@ -249,23 +250,34 @@ export class PythonSemanticIndex {
       };
     }
 
-    if (call.baseExpression) {
-      const moduleBinding = this.resolveImportedSymbol(call.baseExpression, filePath);
-      if (moduleBinding?.modulePath && memberChain.length > 0) {
+    // Derive baseExpression from callee when not explicitly provided.
+    // Real AST parser always sets baseExpression for attribute calls, but
+    // test data and some edge cases may omit it. Handle: "conn.execute" with
+    // no baseExpression by splitting on the first dot.
+    const effectiveBase = call.baseExpression ?? (call.callee.includes('.') ? call.callee.split('.')[0] : undefined);
+    const effectiveMemberChain = call.baseExpression
+      ? memberChain
+      : (call.callee.includes('.') ? call.callee.split('.').slice(1) : memberChain);
+
+    if (effectiveBase) {
+      const moduleBinding = this.resolveImportedSymbol(effectiveBase, filePath);
+      if (moduleBinding?.modulePath && effectiveMemberChain.length > 0) {
         return {
-          identity: `${moduleBinding.modulePath}.${memberChain.join('.')}`,
+          identity: `${moduleBinding.modulePath}.${effectiveMemberChain.join('.')}`,
           kind: 'semantic',
-          evidence: `resolved module alias ${call.baseExpression}`,
+          evidence: `resolved module alias ${effectiveBase}`,
         };
       }
 
-      const receiverReference = this.buildReceiverReference(call, 1);
+      // Build a synthetic call for receiver resolution when baseExpression is derived
+      const syntheticCall = call.baseExpression ? call : { ...call, baseExpression: effectiveBase, memberChain: effectiveMemberChain };
+      const receiverReference = this.buildReceiverReference(syntheticCall, 1);
       const constructor = this.resolveAssignedConstructor(receiverReference, context);
       if (constructor.identity) {
         const receiverSegments = splitReferenceSegments(receiverReference);
         const matchedSegments = splitReferenceSegments(constructor.matchedReference);
         const trailingSegments = receiverSegments.slice(matchedSegments.length);
-        const lastMember = memberChain[memberChain.length - 1];
+        const lastMember = effectiveMemberChain[effectiveMemberChain.length - 1];
 
         return {
           identity: [constructor.identity, ...trailingSegments, lastMember].filter(Boolean).join('.'),
@@ -274,9 +286,9 @@ export class PythonSemanticIndex {
         };
       }
 
-      const inlineConstructor = this.resolveInlineConstructor(call.baseExpression, filePath);
+      const inlineConstructor = this.resolveInlineConstructor(effectiveBase, filePath);
       if (inlineConstructor.identity) {
-        const lastMember = memberChain[memberChain.length - 1];
+        const lastMember = effectiveMemberChain[effectiveMemberChain.length - 1];
         return {
           identity: `${inlineConstructor.identity}.${lastMember}`,
           kind: 'semantic',
@@ -419,39 +431,99 @@ export class PythonSemanticIndex {
       const toolArg = getCallArgument(call, 'tools');
       this.addRootsFromOpenAITools(toolArg, context, `chat.completions.create at line ${call.startLine}`, roots);
     }
+
+    // ElizaOS / generic agent framework: Action(handler=func) or ActionDefinition(handler=func)
+    // Matches Action imported from framework modules (elizaos, eliza) OR any Action() call
+    // that has a 'handler' kwarg paired with a 'name' kwarg (both required to reduce false positives).
+    if (call.callee === 'Action' || call.callee === 'ActionDefinition') {
+      const handlerArg = getCallArgument(call, 'handler');
+      const nameArg = getCallArgument(call, 'name');
+      const isFrameworkImport = directImport?.modulePath.includes('eliza') ||
+                                directImport?.modulePath.includes('elizaos') ||
+                                directImport?.modulePath.includes('action');
+      // Require either a framework import OR both name+handler kwargs (strict heuristic)
+      if (handlerArg && (isFrameworkImport || nameArg)) {
+        const framework = directImport?.modulePath?.includes('eliza') ? 'elizaos' : 'action-object';
+        this.addRootsFromArgument(handlerArg, context, framework, `Action(handler=...) at line ${call.startLine}`, roots);
+        return;
+      }
+    }
   }
 
-  private extractDecoratorRoot(decorators: string[], filePath: string, className: string | undefined, functionName: string): SemanticInvocationRoot | null {
+  private extractDecoratorRoot(decorators: string[], filePath: string, className: string | undefined, functionName: string, decoratorDefs: DecoratorDef[] = []): SemanticInvocationRoot | null {
+    // Build a set of locally-defined decorator names to avoid false positives:
+    // a decorator defined in the same file is not a framework tool-registration decorator.
+    const locallyDefinedNames = new Set(decoratorDefs.map(d => d.name));
+
+    let heuristicResult: SemanticInvocationRoot | null = null;
+
     for (const decorator of decorators) {
       const baseName = decorator.split('(')[0].trim();
       const imported = this.resolveImportedSymbol(baseName, filePath);
-      if (!imported?.importedName) {
-        continue;
+
+      if (imported?.importedName) {
+        if (
+          imported.importedName === 'tool' &&
+          (imported.modulePath === 'langchain_core.tools' || imported.modulePath === 'langchain.tools')
+        ) {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return {
+            nodeId: makeNodeId(filePath, localId),
+            framework: 'langchain',
+            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
+          };
+        }
+
+        if (imported.importedName === 'tool' && imported.modulePath === 'crewai.tools') {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return {
+            nodeId: makeNodeId(filePath, localId),
+            framework: 'crewai',
+            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
+          };
+        }
+
+        if (imported.importedName === 'tool' && matchesFrameworkModule(imported.modulePath, 'smolagents')) {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return {
+            nodeId: makeNodeId(filePath, localId),
+            framework: 'smolagents',
+            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
+          };
+        }
+
+        // Any resolved 'tool' import from any framework module
+        if (imported.importedName === 'tool') {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return {
+            nodeId: makeNodeId(filePath, localId),
+            framework: imported.modulePath.split('.')[0] || 'unknown',
+            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
+          };
+        }
       }
 
+      // Heuristic: bare @tool, @function_tool, or @tool_call decorators that are not imported
+      // from any resolvable module are common in many agent frameworks and custom wrappers.
+      // Only apply when the decorator is NOT locally defined in the same file (to avoid
+      // treating user-defined utility decorators as tool registrations).
+      // Record as heuristic fallback but keep looking for a structural match.
       if (
-        imported.importedName === 'tool' &&
-        (imported.modulePath === 'langchain_core.tools' || imported.modulePath === 'langchain.tools')
+        !heuristicResult &&
+        !locallyDefinedNames.has(baseName) &&
+        (baseName === 'tool' || baseName === 'function_tool' || baseName === 'tool_call' ||
+         baseName === 'mcp_tool' || baseName === 'agent_tool' || baseName === 'register_tool')
       ) {
         const localId = className ? `${className}.${functionName}` : functionName;
-        return {
+        heuristicResult = {
           nodeId: makeNodeId(filePath, localId),
-          framework: 'langchain',
-          evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
-        };
-      }
-
-      if (imported.importedName === 'tool' && imported.modulePath === 'crewai.tools') {
-        const localId = className ? `${className}.${functionName}` : functionName;
-        return {
-          nodeId: makeNodeId(filePath, localId),
-          framework: 'crewai',
-          evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
+          framework: 'unknown',
+          evidence: `heuristic: @${baseName} decorator (unresolved import)`,
         };
       }
     }
 
-    return null;
+    return heuristicResult;
   }
 
   private addRootsFromArgument(
@@ -465,9 +537,62 @@ export class PythonSemanticIndex {
       return;
     }
 
-    for (const nodeId of this.expandExpressionToFunctionNodes(argument.value, context, new Set<string>())) {
-      if (!roots.has(nodeId)) {
-        roots.set(nodeId, { nodeId, framework, evidence });
+    const nodeIds = this.expandExpressionToFunctionNodes(argument.value, context, new Set<string>());
+
+    if (nodeIds.size > 0) {
+      for (const nodeId of nodeIds) {
+        if (!roots.has(nodeId)) {
+          roots.set(nodeId, { nodeId, framework, evidence });
+        }
+      }
+      return;
+    }
+
+    // Fallback: when tool references cannot be resolved to known function nodes
+    // (e.g., tools defined in external packages not yet in the analysis corpus),
+    // create synthetic roots so the framework is still detected.
+
+    // Special case: ClassName().method_name pattern - common in frameworks like ElizaOS Python
+    // where handlers are instance methods passed by reference: Action(handler=MyClass().handler)
+    const instanceMethodMatch = argument.value.text?.match(/^(\w+)\(\)\.(\w+)$/);
+    if (instanceMethodMatch) {
+      const [, className, methodName] = instanceMethodMatch;
+      const qualifiedId = `${className}.${methodName}`;
+      const syntheticNodeId = makeNodeId(context.filePath, qualifiedId);
+      if (!roots.has(syntheticNodeId)) {
+        roots.set(syntheticNodeId, {
+          nodeId: syntheticNodeId,
+          framework,
+          evidence: `${evidence} (instance method reference: ${qualifiedId})`,
+        });
+      }
+      return;
+    }
+
+    // Special case: ClassName.method_name (unbound method reference)
+    const unboundMethodMatch = argument.value.text?.match(/^(\w+)\.(\w+)$/);
+    if (unboundMethodMatch) {
+      const [, className, methodName] = unboundMethodMatch;
+      const qualifiedId = `${className}.${methodName}`;
+      const syntheticNodeId = makeNodeId(context.filePath, qualifiedId);
+      if (!roots.has(syntheticNodeId)) {
+        roots.set(syntheticNodeId, {
+          nodeId: syntheticNodeId,
+          framework,
+          evidence: `${evidence} (unbound method reference: ${qualifiedId})`,
+        });
+      }
+      return;
+    }
+
+    for (const ref of argument.value.references) {
+      const syntheticNodeId = makeNodeId(context.filePath, ref);
+      if (!roots.has(syntheticNodeId)) {
+        roots.set(syntheticNodeId, {
+          nodeId: syntheticNodeId,
+          framework,
+          evidence: `${evidence} (unresolved reference: ${ref})`,
+        });
       }
     }
   }

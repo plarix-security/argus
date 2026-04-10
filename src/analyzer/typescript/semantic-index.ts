@@ -151,27 +151,28 @@ export function extractSemanticInvocationRoots(
     // Check if this file has dangerous calls but no roots yet
     const hasDangerousCalls = parsed.calls.some(call => {
       const callee = call.callee.toLowerCase();
-      return callee.includes('spawn') ||
-             callee.includes('exec') ||
-             callee.includes('eval') ||
-             callee.includes('unlink') ||
-             callee.includes('rmdir') ||
-             callee.includes('delete') ||
-             callee.includes('read') ||
-             callee.includes('write') ||
-             callee.includes('mkdir') ||
-             callee.includes('readdir') ||
-             callee.includes('stat') ||
-             callee.includes('open') ||
-             callee.includes('fetch') ||
-             callee.includes('request') ||
-             callee.includes('post') ||
-             callee.includes('put') ||
-             callee.includes('patch') ||
-             callee.includes('query') ||
-             callee.includes('execute') ||
-             callee.includes('shell') ||
-             callee.includes('command');
+      // High-signal process/shell execution
+      return callee === 'spawn' || callee === 'exec' || callee === 'execsync' ||
+             callee === 'execfile' || callee === 'execfilesync' || callee === 'spawnSync' ||
+             callee.endsWith('.spawn') || callee.endsWith('.exec') ||
+             callee === 'eval' ||
+             // File deletion / destructive FS
+             callee === 'unlink' || callee === 'unlinksync' ||
+             callee.endsWith('.unlink') || callee.endsWith('.unlinksync') ||
+             callee === 'rmdir' || callee === 'rmdirSync' ||
+             callee.endsWith('.rmdir') || callee.endsWith('.rmdirSync') ||
+             callee === 'rm' || callee === 'rmsync' ||
+             callee.endsWith('.rm') || callee.endsWith('.rmsync') ||
+             // Specific HTTP clients (avoid generic 'request' which matches too broadly)
+             callee === 'fetch' || callee.endsWith('.fetch') ||
+             callee.startsWith('axios.') ||
+             // Specific file-write operations
+             callee === 'writefile' || callee === 'writefilesync' ||
+             callee.endsWith('.writefile') || callee.endsWith('.writefilesync') ||
+             // Process control
+             callee === 'process.exit' ||
+             // child_process module usage
+             callee.includes('child_process') || callee.includes('childprocess');
     });
 
     if (hasDangerousCalls) {
@@ -752,6 +753,10 @@ function extractPlaywrightTools(
  *
  * This pattern is used by Eliza, custom agent frameworks, and plugin systems.
  * Detects: { name: "myAction", handler: async () => { ... } }
+ *
+ * Priority order for execution properties: handler, execute, run, action, handle, invoke,
+ * call, perform (these are primary execution callbacks). Gating/lifecycle props like
+ * validate, init, dispose are lower priority and are only used when no execution prop exists.
  */
 function extractActionObjectPatterns(
   filePath: string,
@@ -760,16 +765,34 @@ function extractActionObjectPatterns(
 ): SemanticInvocationRoot[] {
   const roots: SemanticInvocationRoot[] = [];
 
-  // Action-like property names that indicate callback functions
-  const actionPropertyNames = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform', 'get', 'validate', 'init', 'dispose']);
+  // Primary execution callback names (preferred as roots)
+  const primaryExecutionProps = ['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform'];
+  // Secondary props (used only if no primary prop found)
+  const secondaryExecutionProps = ['get', 'validate', 'init', 'dispose'];
+  const allActionPropertyNames = new Set([...primaryExecutionProps, ...secondaryExecutionProps]);
 
   for (const assignment of parsed.assignments) {
     // Only check object literals
     if (!assignment.isObjectLiteral || !assignment.objectProperties) continue;
 
-    // Look for action-like callback properties
-    for (const prop of assignment.objectProperties) {
-      if (!actionPropertyNames.has(prop.key)) continue;
+    const nameProp = assignment.objectProperties.find(p => p.key === 'name');
+    const toolName = nameProp?.stringValue || assignment.target;
+
+    // Build ordered list: primary props first, then secondary
+    const propsToCheck: Array<typeof assignment.objectProperties[0]> = [];
+    for (const key of primaryExecutionProps) {
+      const found = assignment.objectProperties.find(p => p.key === key);
+      if (found) propsToCheck.push(found);
+    }
+    if (propsToCheck.length === 0) {
+      for (const key of secondaryExecutionProps) {
+        const found = assignment.objectProperties.find(p => p.key === key);
+        if (found) propsToCheck.push(found);
+      }
+    }
+
+    for (const prop of propsToCheck) {
+      if (!allActionPropertyNames.has(prop.key)) continue;
 
       // Case 1: Inline function - { handler: async () => { ... } }
       if (prop.valueType === 'function') {
@@ -779,10 +802,6 @@ function extractActionObjectPatterns(
         const nodeId = assignment.enclosingFunction
           ? `${filePath}:${assignment.enclosingFunction}`
           : `${filePath}:${syntheticFuncName}`;
-
-        // Try to get a name from the object
-        const nameProp = assignment.objectProperties.find(p => p.key === 'name');
-        const toolName = nameProp?.stringValue || assignment.target;
 
         if (!roots.some(r => r.nodeId === nodeId)) {
           roots.push({
@@ -794,7 +813,7 @@ function extractActionObjectPatterns(
             line: assignment.line,
           });
         }
-        break; // Only add once per object
+        break; // Only add once per object (highest-priority prop wins)
       }
 
       // Case 2: Function reference - { handler: myHandlerFunc }
@@ -804,9 +823,6 @@ function extractActionObjectPatterns(
         const resolvedFilePath = resolved?.filePath || filePath;
 
         if (func) {
-          const nameProp = assignment.objectProperties.find(p => p.key === 'name');
-          const toolName = nameProp?.stringValue || prop.value;
-
           const nodeId = func.className
             ? `${resolvedFilePath}:${func.className}.${func.name}`
             : `${resolvedFilePath}:${func.name}`;

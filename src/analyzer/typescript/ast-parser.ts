@@ -438,14 +438,48 @@ function findEnclosingFunction(node: Parser.SyntaxNode): string | undefined {
       if (nameNode) {
         return nameNode.text;
       }
-      // For arrow functions assigned to variables
+
       const parent = current.parent;
+
+      // For arrow functions assigned to object properties:
+      // const action = { handler: async () => { ... } }
+      // Walk up: arrow_function -> pair -> object -> variable_declarator
+      if (parent?.type === 'pair') {
+        const keyNode = parent.childForFieldName('key');
+        const propName = keyNode?.text?.replace(/['"]/g, '');
+        const objectNode = parent.parent; // object
+        if (objectNode && (objectNode.type === 'object' || objectNode.type === 'object_pattern')) {
+          const varDecl = objectNode.parent; // variable_declarator (or may have 'as' expression)
+          const actualVarDecl = varDecl?.type === 'as_expression' ? varDecl.parent : varDecl;
+          if (actualVarDecl?.type === 'variable_declarator') {
+            const varName = actualVarDecl.childForFieldName('name');
+            if (varName && propName) {
+              return `${varName.text}.${propName}`;
+            }
+          }
+        }
+      }
+
+      // For arrow functions assigned to variables
       if (parent?.type === 'variable_declarator') {
         const varName = parent.childForFieldName('name');
         if (varName) {
           return varName.text;
         }
       }
+
+      // For arrow functions inside variable declarations (const/let/var)
+      if (parent?.type === 'lexical_declaration' || parent?.type === 'variable_declaration') {
+        // walk siblings to find variable_declarator
+        for (let i = 0; i < (parent?.childCount ?? 0); i++) {
+          const child = parent?.child(i);
+          if (child?.type === 'variable_declarator') {
+            const varName = child.childForFieldName('name');
+            if (varName) return varName.text;
+          }
+        }
+      }
+
       return '<anonymous>';
     }
     current = current.parent;
