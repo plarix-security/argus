@@ -4,8 +4,7 @@ FROM node:20-alpine
 RUN apk add --no-cache \
     python3 \
     make \
-    g++ \
-    git
+    g++
 
 WORKDIR /app
 
@@ -26,19 +25,8 @@ RUN npm run build
 # Prune dev dependencies
 RUN npm prune --production
 
-# Create temp directory for repo clones
-RUN mkdir -p /tmp/wyscan-scans
-
 # Set environment
 ENV NODE_ENV=production
-ENV PORT=3000
 
-# Expose webhook port
-EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
-
-# Run the server
-CMD ["node", "dist/app.js"]
+# Run CLI
+CMD ["node", "dist/cli/index.js", "help"]
