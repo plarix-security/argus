@@ -430,10 +430,121 @@ export class PythonSemanticIndex {
     if (this.isOpenAIChatCompletionCreate(call, context)) {
       const toolArg = getCallArgument(call, 'tools');
       this.addRootsFromOpenAITools(toolArg, context, `chat.completions.create at line ${call.startLine}`, roots);
+      return;
+    }
+
+    // Pydantic AI: Agent() with tools list
+    if (
+      directImport?.importedName === 'Agent' &&
+      (matchesFrameworkModule(modulePath, 'pydantic_ai') || matchesFrameworkModule(modulePath, 'pydantic-ai'))
+    ) {
+      const toolArg = getCallArgument(call, 'tools', 1);
+      this.addRootsFromArgument(toolArg, context, 'pydantic-ai', `Pydantic AI Agent tools at line ${call.startLine}`, roots);
+      return;
+    }
+
+    // LlamaIndex: FunctionTool.from_defaults(), QueryEngineTool
+    if (
+      matchesFrameworkModule(modulePath, 'llama_index') ||
+      matchesFrameworkModule(modulePath, 'llama-index-core') ||
+      modulePath.includes('llama_index')
+    ) {
+      if (directImport?.importedName === 'FunctionTool' || call.callee.includes('FunctionTool')) {
+        const toolArg = getCallArgument(call, 'fn', 0);
+        this.addRootsFromArgument(toolArg, context, 'llama-index', `LlamaIndex FunctionTool at line ${call.startLine}`, roots);
+        return;
+      }
+      if (directImport?.importedName === 'QueryEngineTool' || call.callee.includes('QueryEngineTool')) {
+        const toolArg = getCallArgument(call, 'query_engine', 0);
+        this.addRootsFromArgument(toolArg, context, 'llama-index', `LlamaIndex QueryEngineTool at line ${call.startLine}`, roots);
+        return;
+      }
+    }
+
+    // AutoGen v0.4: AssistantAgent with tools, FunctionTool
+    if (
+      matchesFrameworkModule(modulePath, 'autogen_agentchat') ||
+      matchesFrameworkModule(modulePath, 'autogen') ||
+      modulePath.includes('autogen')
+    ) {
+      if (['AssistantAgent', 'ConversableAgent', 'Agent'].includes(directImport?.importedName || '')) {
+        const toolArg = getCallArgument(call, 'tools');
+        this.addRootsFromArgument(toolArg, context, 'autogen', `AutoGen ${directImport?.importedName} tools at line ${call.startLine}`, roots);
+        return;
+      }
+      if (directImport?.importedName === 'FunctionTool' || call.callee.includes('FunctionTool')) {
+        const toolArg = getCallArgument(call, 'func', 0);
+        this.addRootsFromArgument(toolArg, context, 'autogen', `AutoGen FunctionTool at line ${call.startLine}`, roots);
+        return;
+      }
+    }
+
+    // Haystack: Pipeline component registration
+    if (
+      matchesFrameworkModule(modulePath, 'haystack') ||
+      modulePath.includes('haystack')
+    ) {
+      if (call.memberChain?.[call.memberChain.length - 1] === 'add_component') {
+        const compArg = getCallArgument(call, 'component', 1);
+        this.addRootsFromArgument(compArg, context, 'haystack', `Haystack add_component at line ${call.startLine}`, roots);
+        return;
+      }
+    }
+
+    // Google ADK: Agent() with tools list
+    if (
+      matchesFrameworkModule(modulePath, 'google.adk') ||
+      modulePath.includes('google.adk') ||
+      modulePath.includes('google_adk')
+    ) {
+      if (directImport?.importedName === 'Agent' || call.callee.includes('Agent')) {
+        const toolArg = getCallArgument(call, 'tools');
+        this.addRootsFromArgument(toolArg, context, 'google-adk', `Google ADK Agent tools at line ${call.startLine}`, roots);
+        return;
+      }
+    }
+
+    // LangChain/LangGraph bind_tools (any LLM)
+    if (call.memberChain?.[call.memberChain.length - 1] === 'bind_tools') {
+      const toolArg = getCallArgument(call, 'tools', 0);
+      if (toolArg) {
+        this.addRootsFromArgument(toolArg, context, 'langchain', `bind_tools at line ${call.startLine}`, roots);
+      }
+      return;
+    }
+
+    // OpenAI Swarm / agents SDK: function tools
+    if (
+      modulePath.includes('agents') ||
+      modulePath === 'swarm'
+    ) {
+      if (['Agent', 'function_to_schema'].includes(directImport?.importedName || '')) {
+        const toolArg = getCallArgument(call, 'tools', 0) || getCallArgument(call, 'functions', 0);
+        if (toolArg) {
+          this.addRootsFromArgument(toolArg, context, 'openai-agents', `OpenAI Swarm/Agents at line ${call.startLine}`, roots);
+        }
+        return;
+      }
     }
 
   }
 
+  /**
+   * Extract a semantic invocation root from a function's decorator list.
+   *
+   * Handles all known framework tool-registration decorators:
+   * - @tool from langchain, crewai, smolagents, pydantic_ai, autogen, llama_index
+   * - @agent.tool (Pydantic AI pattern: method on Agent instance)
+   * - @component (Haystack pipeline components)
+   * - Any resolved @tool decorator from ANY module (generic framework detection)
+   *
+   * @param decorators - List of decorator strings from the function definition
+   * @param filePath - Source file path
+   * @param className - Enclosing class name if applicable
+   * @param functionName - Function name
+   * @param decoratorDefs - Local decorator definitions (to exclude locally-defined decorators)
+   * @returns A SemanticInvocationRoot if a tool-registration decorator is found, null otherwise
+   */
   private extractDecoratorRoot(decorators: string[], filePath: string, className: string | undefined, functionName: string, decoratorDefs: DecoratorDef[] = []): SemanticInvocationRoot | null {
     // Build a set of locally-defined decorator names to avoid false positives:
     // a decorator defined in the same file is not a framework tool-registration decorator.
@@ -444,48 +555,73 @@ export class PythonSemanticIndex {
       const imported = this.resolveImportedSymbol(baseName, filePath);
 
       if (imported?.importedName) {
+        // LangChain @tool
         if (
           imported.importedName === 'tool' &&
           (imported.modulePath === 'langchain_core.tools' || imported.modulePath === 'langchain.tools')
         ) {
           const localId = className ? `${className}.${functionName}` : functionName;
-          return {
-            nodeId: makeNodeId(filePath, localId),
-            framework: 'langchain',
-            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
-          };
+          return { nodeId: makeNodeId(filePath, localId), framework: 'langchain', evidence: `decorator ${baseName} imported from ${imported.modulePath}` };
         }
 
+        // CrewAI @tool
         if (imported.importedName === 'tool' && imported.modulePath === 'crewai.tools') {
           const localId = className ? `${className}.${functionName}` : functionName;
-          return {
-            nodeId: makeNodeId(filePath, localId),
-            framework: 'crewai',
-            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
-          };
+          return { nodeId: makeNodeId(filePath, localId), framework: 'crewai', evidence: `decorator ${baseName} imported from ${imported.modulePath}` };
         }
 
+        // Smolagents @tool
         if (imported.importedName === 'tool' && matchesFrameworkModule(imported.modulePath, 'smolagents')) {
           const localId = className ? `${className}.${functionName}` : functionName;
-          return {
-            nodeId: makeNodeId(filePath, localId),
-            framework: 'smolagents',
-            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
-          };
+          return { nodeId: makeNodeId(filePath, localId), framework: 'smolagents', evidence: `decorator ${baseName} imported from ${imported.modulePath}` };
         }
 
-        // Any resolved 'tool' import from any framework module
+        // Pydantic AI @agent.tool or @tool from pydantic_ai
+        if (imported.importedName === 'tool' &&
+            (matchesFrameworkModule(imported.modulePath, 'pydantic_ai') || matchesFrameworkModule(imported.modulePath, 'pydantic-ai'))) {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return { nodeId: makeNodeId(filePath, localId), framework: 'pydantic-ai', evidence: `decorator ${baseName} imported from ${imported.modulePath}` };
+        }
+
+        // AutoGen @tool
+        if (imported.importedName === 'tool' &&
+            (matchesFrameworkModule(imported.modulePath, 'autogen') || imported.modulePath.includes('autogen'))) {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return { nodeId: makeNodeId(filePath, localId), framework: 'autogen', evidence: `decorator ${baseName} imported from ${imported.modulePath}` };
+        }
+
+        // LlamaIndex @tool
+        if (imported.importedName === 'tool' &&
+            (matchesFrameworkModule(imported.modulePath, 'llama_index') || imported.modulePath.includes('llama_index'))) {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return { nodeId: makeNodeId(filePath, localId), framework: 'llama-index', evidence: `decorator ${baseName} imported from ${imported.modulePath}` };
+        }
+
+        // Haystack @component
+        if (imported.importedName === 'component' && imported.modulePath.includes('haystack')) {
+          const localId = className ? `${className}.${functionName}` : functionName;
+          return { nodeId: makeNodeId(filePath, localId), framework: 'haystack', evidence: `decorator ${baseName} (Haystack @component) imported from ${imported.modulePath}` };
+        }
+
+        // Generic: ANY resolved @tool import from ANY module
         if (imported.importedName === 'tool') {
           const localId = className ? `${className}.${functionName}` : functionName;
-          return {
-            nodeId: makeNodeId(filePath, localId),
-            framework: imported.modulePath.split('.')[0] || 'unknown',
-            evidence: `decorator ${baseName} imported from ${imported.modulePath}`,
-          };
+          const framework = imported.modulePath.split('.')[0] || 'unknown';
+          return { nodeId: makeNodeId(filePath, localId), framework, evidence: `decorator ${baseName} imported from ${imported.modulePath}` };
         }
       }
 
-      // Skip unresolved decorators and local decorators to avoid heuristic root inflation.
+      // Pydantic AI @agent.tool pattern (not a simple name, is a dotted expression like agent.tool)
+      if (baseName.includes('.') && (baseName.endsWith('.tool') || baseName.endsWith('.run_tool'))) {
+        const localId = className ? `${className}.${functionName}` : functionName;
+        return {
+          nodeId: makeNodeId(filePath, localId),
+          framework: 'pydantic-ai',
+          evidence: `decorator ${baseName} matches agent.tool pattern`,
+        };
+      }
+
+      // Skip locally-defined decorators and unresolved names
       if (locallyDefinedNames.has(baseName)) {
         continue;
       }
