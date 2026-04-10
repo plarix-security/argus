@@ -27,9 +27,18 @@ function createApp(): express.Application {
   return app;
 }
 
+let appInstance: express.Application | null = null;
+
+function getApp(): express.Application {
+  if (!appInstance) {
+    appInstance = createApp();
+  }
+  return appInstance;
+}
+
 function startServer(): void {
   validateEnv();
-  const app = createApp();
+  const app = getApp();
   const port = process.env.PORT || 3000;
   app.listen(port, () => console.log(`\n${NAME} ${VERSION}\nRunning on port ${port}\n`));
 }
@@ -38,7 +47,7 @@ if (require.main === module) {
   startServer();
 }
 
-const app = createApp();
+const app = getApp();
 
-export { createApp, validateEnv, startServer };
+export { createApp, getApp, validateEnv, startServer };
 export default app;
