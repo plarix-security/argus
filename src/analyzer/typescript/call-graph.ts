@@ -215,15 +215,35 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
   { identity: /^fse?\.(writeFile|writeFileSync|outputFile|outputFileSync|copy|copySync|move|moveSync|ensureDir|ensureDirSync|mkdirp|mkdirpSync)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File write via fs-extra', resourceHint: 'file', changesState: true },
 
   // ============================================
-  // HTTP MUTATIONS (WARNING)
+  // HTTP/NETWORK (API_CALL category)
   // ============================================
   { identity: /^fetch$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via fetch', resourceHint: 'http', changesState: false },
-  { identity: /^axios(\.(post|put|patch|delete|request))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via axios', resourceHint: 'http', changesState: true },
-  { identity: /^got(\.(post|put|patch|delete))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via got', resourceHint: 'http', changesState: true },
-  { identity: /^superagent\.(post|put|patch|delete|del)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via superagent', resourceHint: 'http', changesState: true },
+  { identity: /^axios(\.(get|post|put|patch|delete|request|head|options))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via axios', resourceHint: 'http', changesState: true },
+  { identity: /^got(\.(get|post|put|patch|delete|stream))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via got', resourceHint: 'http', changesState: true },
+  { identity: /^superagent\.(get|post|put|patch|delete|del|head)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via superagent', resourceHint: 'http', changesState: true },
   { identity: /^node-fetch$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via node-fetch', resourceHint: 'http', changesState: false },
-  { identity: /^undici\.(fetch|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via undici', resourceHint: 'http', changesState: false },
-  { identity: /^request(\.(post|put|patch|delete|del))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via request', resourceHint: 'http', changesState: true },
+  { identity: /^undici\.(fetch|request|stream|pipeline)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via undici', resourceHint: 'http', changesState: false },
+  { identity: /^request(\.(get|post|put|patch|delete|del|head))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via request', resourceHint: 'http', changesState: true },
+  { identity: /^ky\.(get|post|put|patch|delete|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via ky', resourceHint: 'http', changesState: true },
+  { identity: /^needle\.(get|post|put|patch|delete|head|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via needle', resourceHint: 'http', changesState: true },
+  // cross-fetch, isomorphic-fetch
+  { identity: /^(crossFetch|isomorphicFetch)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via cross/isomorphic fetch', resourceHint: 'http', changesState: false },
+  // Generic HTTP client patterns: client.get(), api.post(), httpClient.request()
+  { identity: /^(client|api|httpClient|apiClient|http|https)\.(get|post|put|patch|delete|request|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via client object', resourceHint: 'http', changesState: true },
+  // ElizaOS runtime.fetch() pattern
+  { identity: /^runtime\.(fetch|useModel|generateText|generateObject|call|invoke)$/i, category: ExecutionCategory.TOOL_CALL, severity: Severity.WARNING, description: 'ElizaOS runtime invocation', resourceHint: 'runtime', changesState: true },
+  // ElizaOS memory operations
+  { identity: /^runtime\.(createMemory|updateMemory|deleteMemory|getMemory|searchMemories)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ElizaOS memory operation', changesState: true },
+  // LangChain/LangGraph agent runtime calls
+  { identity: /^(agent|chain|model|llm)\.(invoke|ainvoke|run|arun|stream|astream|predict|apredict|call|acall)$/i, category: ExecutionCategory.TOOL_CALL, severity: Severity.WARNING, description: 'LangChain/agent invocation', changesState: true },
+  // LlamaIndex LLM calls
+  { identity: /^llm\.(complete|acomplete|chat|achat|stream_chat|stream_complete)$/i, category: ExecutionCategory.TOOL_CALL, severity: Severity.WARNING, description: 'LlamaIndex LLM invocation', changesState: true },
+  // OpenAI client calls
+  { identity: /^(openai|client)\.(chat\.completions\.create|completions\.create|embeddings\.create|images\.generate)$/i, category: ExecutionCategory.TOOL_CALL, severity: Severity.WARNING, description: 'OpenAI API invocation', changesState: false },
+  // Anthropic client calls
+  { identity: /^(anthropic|client)\.messages\.create$/i, category: ExecutionCategory.TOOL_CALL, severity: Severity.WARNING, description: 'Anthropic API invocation', changesState: false },
+  // Generic HTTP verbs on any object (broader fallback)
+  { identity: /\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation method call', resourceHint: 'http', changesState: true },
 
   // ============================================
   // ORM/DATABASE - Prisma (WARNING/CRITICAL)

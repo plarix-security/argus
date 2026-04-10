@@ -300,76 +300,67 @@ const DANGEROUS_OPERATION_PATTERNS: {
   // zipfile/tarfile extraction
   { pattern: /\.extractall$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'Archive extract all' },
 
-  // HTTP methods that transmit data externally (various client styles)
-  { pattern: /^requests\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP write request' },
-  { pattern: /^httpx\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP write request' },
-  { pattern: /^aiohttp\.ClientSession\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Async HTTP write' },
-  { pattern: /^urllib\.request\.(urlopen|Request|urlretrieve)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'URL request' },
-  // NOTE: Generic .post()/.put()/.patch()/.delete() removed in v1.2.2 - too broad.
-  // Match only explicit HTTP client methods (requests, httpx, aiohttp, urllib).
+  // HTTP methods - full coverage of all Python HTTP clients
+  { pattern: /^requests\.(get|post|put|patch|delete|request|head|options|Session\.get|Session\.post|Session\.put|Session\.patch|Session\.delete|Session\.request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via requests' },
+  { pattern: /^httpx\.(get|post|put|patch|delete|request|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via httpx' },
+  { pattern: /^httpx\.(AsyncClient|Client)\.(get|post|put|patch|delete|request|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via httpx client' },
+  { pattern: /^aiohttp\.ClientSession\.(get|post|put|patch|delete|request|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Async HTTP request via aiohttp' },
+  { pattern: /^urllib\.request\.(urlopen|Request|urlretrieve)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'URL request via urllib' },
+  { pattern: /^urllib3\.(PoolManager|HTTPConnectionPool|HTTPSConnectionPool)\.(request|urlopen)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via urllib3' },
+  // AWS boto3 - any client method call is an external API call
+  { pattern: /^boto3\.client\.[a-z_]+$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'AWS SDK call via boto3' },
+  { pattern: /^boto3\.resource\.[a-z_]+$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'AWS resource operation via boto3' },
+  // Generic http/api object calls
+  { pattern: /\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation method call' },
 
-  // ORM write operations - use explicit patterns, not generic .save()/.create()
-  { pattern: /\.session\.(add|add_all|delete|merge|commit|flush)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM write operation' },
-  // NOTE: Generic .save()/.create() removed in v1.2.2 - too broad. Use qualified patterns.
-  { pattern: /\.objects\.update$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM queryset update' },
-  { pattern: /\.objects\.create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM queryset create' },
-  { pattern: /\.objects\.delete$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM queryset delete' },
-  { pattern: /\.filter\([^)]*\)\.update$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM filtered update' },
-  { pattern: /\.bulk_create$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM bulk create' },
-  { pattern: /\.bulk_update$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM bulk update' },
-  { pattern: /\.insert$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database insert' },
-  // MongoDB specific
-  { pattern: /\.insert_one$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'MongoDB insert' },
-  { pattern: /\.insert_many$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'MongoDB bulk insert' },
-  { pattern: /\.update_one$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'MongoDB update' },
-  { pattern: /\.update_many$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'MongoDB bulk update' },
-  { pattern: /\.delete_one$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'MongoDB delete' },
-  { pattern: /\.delete_many$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'MongoDB bulk delete' },
-  // SQL operations
+  // Database: SQLite3
+  { pattern: /^sqlite3\.(Connection|Cursor)\.(execute|executemany|executescript)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'SQLite3 database execution' },
+  { pattern: /\.execute$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database execute' },
+  { pattern: /\.executemany$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Batch database execution' },
   { pattern: /\.executescript$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.CRITICAL, description: 'SQL script execution' },
-  { pattern: /\.executemany$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Batch SQL execution' },
-  // NOTE: Redis/cache wildcard patterns removed in v1.2.2 - use SEMANTIC patterns instead.
+  // Database: PostgreSQL (psycopg2, asyncpg)
+  { pattern: /^psycopg2\.(cursor|connection)\.(execute|executemany)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'PostgreSQL execution via psycopg2' },
+  { pattern: /^asyncpg\.Connection\.(execute|executemany|fetch|fetchrow|fetchval)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Async PostgreSQL operation via asyncpg' },
+  // Database: SQLAlchemy
+  { pattern: /\.session\.(add|add_all|delete|merge|commit|flush|execute)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'SQLAlchemy ORM write' },
+  { pattern: /\.objects\.(update|create|delete|get_or_create|bulk_create|bulk_update)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM queryset write' },
+  { pattern: /\.objects\.(filter|all|get|first|last|select_related|prefetch_related)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'ORM queryset read' },
+  { pattern: /\.(bulk_create|bulk_update)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ORM bulk write' },
+  // Database: MongoDB
+  { pattern: /\.(insert_one|insert_many|update_one|update_many|delete_one|delete_many|replace_one|bulk_write)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'MongoDB mutation' },
+  { pattern: /\.(find_one|find|aggregate|count_documents|distinct)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'MongoDB read' },
+  // Database: Redis
+  { pattern: /\.(set|hset|lpush|rpush|sadd|zadd|delete|hdel|expire|setex|incr|decr|append|mset|msetnx)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Redis write' },
+  { pattern: /\.(get|hget|hgetall|lrange|smembers|zrange|keys|exists|ttl|mget)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Redis read' },
+  { pattern: /\.(flushdb|flushall)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.CRITICAL, description: 'Redis flush' },
+  // Database: misc inserts
+  { pattern: /\.insert$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'Database insert' },
+
+  // File: open() with write modes
+  { pattern: /^open$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File open' },
+  // pathlib write operations
+  { pattern: /\.(write_text|write_bytes)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File write' },
+  { pattern: /\.mkdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'Directory creation' },
+  { pattern: /\.touch$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File create' },
+  { pattern: /\.(write|writelines)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File handle write' },
+  { pattern: /^shutil\.(copy|copy2|copyfile|copyfileobj|copytree|move|make_archive)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File copy/move' },
+  { pattern: /^os\.(rename|renames|replace|link|symlink)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File rename/link' },
+  { pattern: /^os\.(makedirs|mkdir)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'Directory creation' },
+  { pattern: /^os\.(chmod|chown)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File permission change' },
+  { pattern: /\.extractall$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'Archive extraction' },
+
+  // File: read operations
+  { pattern: /\.(read_text|read_bytes)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read' },
+  { pattern: /\.(read|readline|readlines)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read' },
+  { pattern: /\.(glob|rglob|iterdir)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory listing' },
+  { pattern: /^os\.(listdir|scandir|walk)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory listing' },
 
   // Email sending
   { pattern: /^smtplib\.SMTP$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'SMTP connection' },
-  { pattern: /\.send_message$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Send message/email' },
-  { pattern: /\.send_email$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Send email' },
-  { pattern: /smtp.*\.sendmail$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'SMTP send' },
-  { pattern: /\.sendmail$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Email send via SMTP' },
+  { pattern: /\.(sendmail|send_message|send_email)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Email send' },
 
-  // ==================== INFO ====================
-  // File reads - read-only access to sensitive data
-  { pattern: /^open$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File open (read)' },
-  { pattern: /\.read_text$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read' },
-  { pattern: /\.read_bytes$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Binary file read' },
-  { pattern: /\.read$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read' },
-  { pattern: /\.readline$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read line' },
-  { pattern: /\.readlines$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File read lines' },
-
-  // HTTP GET - outbound API calls can exfiltrate data, elevated to WARNING
-  { pattern: /^requests\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP GET request' },
-  { pattern: /^httpx\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP GET request' },
-  { pattern: /^urllib\.request\.(urlopen|urlretrieve)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'URL fetch' },
-  { pattern: /^aiohttp\.ClientSession\.get$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Async HTTP GET' },
-  // Generic .get() is too common (dict.get, etc.) - don't match it
-
-  // Database reads - use specific patterns; generic .execute/.query removed as too broad
-  // Semantic patterns provide coverage for sqlite3, psycopg2, etc.
-  { pattern: /\.fetchall$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database fetch' },
-  { pattern: /\.fetchone$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database fetch' },
-  { pattern: /\.fetchmany$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database fetch' },
-  // MongoDB read
-  { pattern: /\.find_one$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'MongoDB find' },
-  { pattern: /\.aggregate$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'MongoDB aggregate' },
-
-  // Directory operations (read-only)
-  { pattern: /\.listdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory listing' },
-  { pattern: /^os\.listdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory listing' },
-  { pattern: /^os\.scandir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory scan' },
-  { pattern: /^os\.walk$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory walk' },
-  { pattern: /\.glob$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'File glob' },
-  { pattern: /\.rglob$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Recursive file glob' },
-  { pattern: /\.iterdir$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.INFO, description: 'Directory iteration' },
+  // Database reads - fetchall/fetchone still included
+  { pattern: /\.(fetchall|fetchone|fetchmany)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.INFO, description: 'Database fetch' },
 
 ];
 
