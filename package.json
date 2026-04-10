@@ -6,8 +6,13 @@
   "bin": {
     "wyscan": "./dist/cli/index.js"
   },
+  "files": [
+    "dist",
+    "wasm"
+  ],
   "scripts": {
     "build": "tsc",
+    "prepack": "npm run build",
     "link": "npm run build && npm link",
     "start": "node dist/app.js",
     "dev": "npx ts-node src/app.ts",
