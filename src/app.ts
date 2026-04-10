@@ -38,5 +38,7 @@ if (require.main === module) {
   startServer();
 }
 
+const app = createApp();
+
 export { createApp, validateEnv, startServer };
-export default createApp();
+export default app;
