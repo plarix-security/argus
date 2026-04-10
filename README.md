@@ -1,50 +1,98 @@
-# <a href="https://plarix.dev">WyScan</a>
+# [WyScan](https://plarix.dev)
 
-Static scanner for Python, TypeScript, and JavaScript agent code that reports reachable operations from detected tool registrations.
+> Static scanner for Python, TypeScript, and JavaScript agent code that reports dangerous operations reachable from detected tool registrations.
 
-Runtime: CLI scanner plus GitHub App webhook backend. No HTML/CSS frontend is shipped.
-
-WyScan is an AFB04 scanner that parses Python, TypeScript, and JavaScript with tree-sitter, resolves tool registrations semantically when the code structure allows it, traces reachable calls across the analyzed file set, and reports matched operations when no credited structural policy gate is detected in that analyzed path.
+**WyScan is an AFB04 scanner.** It parses source files with tree-sitter, resolves tool registrations through semantic analysis of framework code structure, traces reachable calls across the analyzed file set, and reports matched operations when no structural policy gate is detected in that path.
 
 ```bash
 wyscan scan ./agent-project
 ```
 
-Example output:
+---
 
-```text
-wyscan v1.6.1  ·  Plarix
+## Output
 
-Scanning  agent-project
+```
+  wyscan v1.6.1  ·  Plarix
+  ─────────────────────────────────────────────────────
 
------------------------------------------------------
-1 critical  ·  1 warning
------------------------------------------------------
+  Scanning  agent-project
 
-CRITICAL  tools/setup.py:60
-shutil.rmtree(agent_dir)
-Detected reachable call from tool registration to shutil.rmtree. No policy gate detected in the analyzed call path.
+  ─────────────────────────────────────────────────────
+  1 critical  ·  1 warning
+  4 cees detected
+  ─────────────────────────────────────────────────────
 
-WARNING   tools/api.py:42
-requests.post(url, data)
-Detected reachable call from tool registration to requests.post. No policy gate detected in the analyzed call path.
+  ● CRITICAL  setup.py:60:5
+    shutil.rmtree(agent_dir)
+    Detected reachable call from tool "setup_agent" (langchain) to shutil.rmtree through 1 intermediate call. No policy gate detected.
+    tool: tools/setup.py:12
+    path: cross-file
+
+  ● WARNING   api.py:42:12
+    requests.post(url, data)
+    Detected reachable call from tool "api_tool" (langchain) to requests.post. No policy gate detected.
+
+  ─────────────────────────────────────────────────────
+  34 files  ·  1.2s
 ```
 
-## Scope
+**`--summary` flag** (one-liner for CI):
 
-WyScan currently does all of the following:
+```
+1 critical  ·  1 warning  ·  4 cees  ·  34 files  ·  1.2s
+```
 
-- Parses Python and TypeScript/JavaScript source with tree-sitter.
-- Resolves tool registrations from framework-specific code structure through semantic analysis.
-- Matches reachable operations such as shell execution, file mutation, file reads, HTTP requests, email sends, and common database calls.
-- Suppresses findings when a structural policy gate is detected in the analyzed path.
-- Carries supporting evidence such as traced input flow, resource hints, and structural versus semantic registration evidence into CEEs.
+**`wyscan check`**:
 
-WyScan currently does not do any of the following:
+```
+  wyscan v1.6.1  ·  Plarix
+  ─────────────────────────────────────────────────────
 
-- Execute your code.
-- Trace into third-party package internals.
-- Detect AFB01, AFB02, or AFB03.
+  Checking dependencies...
+
+  ✓ Node.js                   v20.11.0
+  ✓ tree-sitter-python.wasm   found
+  ✓ Parser initialization     ok
+
+  All checks passed. Ready to scan.
+```
+
+**`wyscan tui`**:
+
+```
+  ┌─────────────────────────────────────────────────┐
+  │ WYSCAN CLI QUICK PANEL                          │
+  ├─────────────────────────────────────────────────┤
+  │ install : wyscan install                         │
+  │ scan  : wyscan scan <path> [-l critical|warning] │
+  │ check : wyscan check                             │
+  │ json  : wyscan scan <path> --json                │
+  │ quiet : wyscan scan <path> --summary             │
+  └─────────────────────────────────────────────────┘
+```
+
+**`wyscan install`**:
+
+```
+  wyscan v1.6.1  ·  Plarix
+  ─────────────────────────────────────────────────────
+
+  Preparing local CLI installation...
+
+  ┌──────────────────────────────────────────────────────┐
+  │ WYSCAN INSTALL DASHBOARD                             │
+  ├──────────────────────────────────────────────────────┤
+  │ ✔ npm install    ·  ok                               │
+  │ ✔ npm run build  ·  ok                               │
+  │ ✔ npm link       ·  ok                               │
+  │ ✔ check          ·  all checks passed                │
+  ├──────────────────────────────────────────────────────┤
+  │ Next: wyscan scan <path>  |  wyscan help             │
+  └──────────────────────────────────────────────────────┘
+```
+
+---
 
 ## Quick Start
 
@@ -56,132 +104,147 @@ npm run build
 npm link
 
 wyscan scan ./my-agent-project
-
-# one-step CLI setup
-wyscan install
 ```
+
+One-step installer:
+
+```bash
+git clone https://github.com/plarix-security/wyscan.git
+cd wyscan
+npm install && node dist/cli/index.js install
+```
+
+---
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `wyscan install` | Run install/build/link/check and print setup dashboard |
-| `wyscan scan <path>` | Scan a directory or file |
-| `wyscan check` | Verify local scanner dependencies |
-| `wyscan version` | Print the package version |
-| `wyscan help` | Show CLI help |
+| `wyscan install` | Run npm install + build + link + check, print setup dashboard |
+| `wyscan scan <path>` | Scan a file or directory |
+| `wyscan check` | Verify scanner dependencies and parser initialization |
+| `wyscan tui` | Print the quick command panel |
+| `wyscan version` | Print version |
+| `wyscan help [scan]` | Show help, optionally for a subcommand |
+
+---
 
 ## Scan Flags
 
-| Flag | Short | Current behavior |
-|------|-------|------------------|
-| `--level <severity>` | `-l` | Filters detailed findings by `critical`, `warning`, or `info` |
-| `--output <file>` | `-o` | Writes terminal or JSON output to a file |
-| `--json` | `-j` | Emits structured JSON |
-| `--summary` | `-s` | Prints a one-line summary |
-| `--quiet` | `-q` | Suppresses output and relies on exit code |
-| `--debug` | `-d` | Prints thrown errors during failures |
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--level <severity>` | `-l` | Filter findings to `critical`, `warning`, or `info` (default: `info`) |
+| `--output <file>` | `-o` | Write output to file |
+| `--json` | `-j` | Structured JSON output |
+| `--summary` | `-s` | One-line count only |
+| `--quiet` | `-q` | No output, rely on exit code |
+| `--debug` | `-d` | Print thrown errors on scan failure |
+
+---
 
 ## Exit Codes
 
-| Code | Current meaning |
-|------|-----------------|
-| 0 | No critical or warning findings were reported |
-| 1 | At least one warning finding was reported and no critical finding was reported |
-| 2 | At least one critical finding was reported |
-| 3 | Scanner initialization failed, the target path was invalid, or one or more files failed to analyze |
+| Code | Meaning |
+|------|---------|
+| 0 | No findings at or above the filtered level |
+| 1 | At least one warning, no critical |
+| 2 | At least one critical |
+| 3 | Initialization failed, invalid path, or parse failure |
 
-Exit codes follow the filtered report level. For example, `--level critical` ignores warning-only results when computing the exit code.
+Exit codes follow the filtered level. `--level critical` ignores warning-only results when computing the exit code.
+
+---
 
 ## Detection Model
 
-WyScan reports matched operations reachable from detected tool registrations.
+WyScan reports operations reachable from a detected tool registration with no structural policy gate in the analyzed call path.
 
-Severity is determined by operation category:
+### Severity
 
-- Irreversible operations such as `subprocess.run`, `eval`, `exec`, and file deletion are `CRITICAL`.
-- State-modifying operations such as file writes and HTTP POST requests are `WARNING`.
-- Read-only operations such as file reads and HTTP GET requests are `INFO`.
+| Severity | Condition | Examples |
+|----------|-----------|---------|
+| `CRITICAL` | Irreversible or arbitrary execution | `subprocess.run`, `os.system`, `eval`, `exec`, `shutil.rmtree`, `os.remove`, `fs.rm`, `child_process.exec`, `cursor.executescript`, Redis flush |
+| `WARNING` | State-modifying writes | File writes, `requests.post`, `axios.post`, `httpx.put`, DB INSERT/UPDATE/DELETE, email sends |
+| `INFO` | Read-only external access | `requests.get`, `axios.get`, file reads, `.read_text()`, DB SELECT, Redis `get` |
 
-### Operation Categories
+HTTP severity is method-aware: `GET`, `HEAD`, and `OPTIONS` resolve to `INFO`; `POST`, `PUT`, `PATCH`, and `DELETE` resolve to `WARNING`. Generic `fetch` calls (where the method is in the options object) are conservatively `WARNING`.
 
-`CRITICAL`
+### Policy Gate Detection
 
-- Shell execution such as `subprocess.run`, `subprocess.Popen`, `os.system`, and similar process spawns
-- Dynamic code execution such as `eval`, `exec`, unsafe deserialization, and native library loading
-- File or directory deletion such as `shutil.rmtree`, `os.remove`, or `.unlink()`
-- `cursor.executescript()` and Redis flush operations
+A gate is credited only when the analyzed path contains a function with conditional branches that check parameters and raise an authorization-like exception, or a decorator whose wrapper logic is structurally analyzed as a gate.
 
-`WARNING`
+**Not credited:** logging calls, `try/except` around the operation, generic exceptions without authorization semantics, decorator names alone without structural proof.
 
-- File writes and directory creation such as `.write_text()`, `.mkdir()`, `shutil.copy()`, and `open(..., "w")`
-- HTTP requests that match write-style calls such as `requests.post()` and `httpx.patch()`
-- HTTP GET calls currently matched by the shipped detector, such as `requests.get()` and `httpx.get()`
-- Common database write-style calls such as `.save()`, `.create()`, `.commit()`, Mongo insert or update calls, and email sends
+---
 
-`INFO`
+## Supported Frameworks
 
-- File reads such as `.read_text()`, `open(..., "r")`, and directory listing or glob operations
-- Generic database reads such as `.execute()`, `.fetchone()`, `.fetchall()`, `.query()`, and Redis `get` or `keys`
+### Python
 
-## Framework Labels
+| Framework | Detection |
+|-----------|-----------|
+| LangChain / LangGraph | `@tool` decorator, `bind_tools`, `create_react_agent`, `StructuredTool.from_function` |
+| CrewAI | `@tool` decorator, `class MyTool(BaseTool)` subclasses |
+| AutoGen v0.2 / v0.4 | `register_function`, `ConversableAgent`, `AssistantAgent` tool lists |
+| OpenAI / Swarm | `tools=` argument, dispatch maps, `Agent` tool parameter |
+| Pydantic AI | `@agent.tool`, `@agent.tool_plain` |
+| LlamaIndex | `FunctionTool`, `QueryEngineTool` |
+| Haystack | `@component`, `Pipeline.add_component` |
+| Google ADK | `Agent`, `LlmAgent`, `tool` parameter |
+| Smolagents / HF Agents | `@tool`, `ToolCollection`, `PipelineTool` |
+| Semantic Kernel (Python) | `@kernel_function`, plugin classes |
+| MCP Python SDK | `@server.call_tool`, `@mcp.tool` |
+| Generic `@tool` | Any `@tool`-shaped import from any package |
 
-Framework detection supports both Python and TypeScript/JavaScript. WyScan uses semantic extraction from framework code structure such as decorator imports, tool lists, helper-returned tool bundles, `create_react_agent(...)`, `bind_tools(...)`, and `function_map` style registrations.
+### TypeScript / JavaScript
 
-### Python Frameworks
+| Framework | Detection |
+|-----------|-----------|
+| ElizaOS | `Action` typed objects with `handler`, plugin arrays, `runtime.registerAction` |
+| OpenAI Agents SDK | `tool()`, `Agent` constructor `tools=` |
+| LangChain.js / LangGraph.js | `DynamicTool`, `StructuredTool`, `createReactAgent` |
+| Vercel AI SDK | `tool()`, `streamText tools=`, `generateText tools=` |
+| MCP SDK | `server.tool()`, `server.setRequestHandler` |
+| Mastra | `createTool`, `Agent`, workflow step tools |
+| Anthropic SDK | `messages.create` with `tools=` |
+| Inngest | `inngest.createFunction` |
+| Temporal | Workflow activity registrations |
+| Playwright / Puppeteer | Browser automation action roots |
 
-- LangChain/LangGraph
-- CrewAI (decorator and class-based `BaseTool` subclasses)
-- AutoGen (v0.2 and v0.4)
-- OpenAI tool schemas and dispatch maps / Swarm
-- Pydantic AI (`Agent.tool`, `@agent.tool_plain`)
-- LlamaIndex (`FunctionTool`, `QueryEngineTool`)
-- Haystack (`@component`, `Pipeline.add_component`)
-- Google ADK (`Agent`, `LlmAgent`)
-- Smolagents / HuggingFace Agents
-- Semantic Kernel (Python)
-- MCP Python SDK
-- Generic `@tool` decorators from any import
+Framework labels come from structural analysis of imports and code shape, not string matching against known project names.
 
-### TypeScript/JavaScript Frameworks
+---
 
-- ElizaOS (`Action`, `Plugin`, handler functions)
-- OpenAI Agents SDK
-- LangChain.js/LangGraph.js
-- Vercel AI SDK
-- MCP SDK
-- Mastra (`createTool`, `Agent`, `Workflow`)
-- Anthropic SDK
-- Inngest / Temporal workflow steps
-- Playwright/Puppeteer browser automation
-- Framework-core structural registrations only (no generic exported-entry fallback)
+## Benchmarks
 
-Framework labels are derived from structural analysis, not pattern tables.
+Scanned on real production agentic repositories (v1.6.1, method-aware HTTP severity).
 
-## Policy Gate Detection
+| Repository | Language | Files | CEEs | Critical | Warning | Info |
+|------------|----------|------:|-----:|---------:|--------:|-----:|
+| [AutoGPT](https://github.com/Significant-Gravitas/AutoGPT) | Python | 1,735 | **556** | 3 | 92 | 272 |
+| [MetaGPT](https://github.com/geekan/MetaGPT) | Python | 660 | **455** | 10 | 191 | 175 |
+| [crewAI](https://github.com/crewAIInc/crewAI) | Python | 786 | **391** | 0 | 106 | 180 |
+| [agno](https://github.com/agno-agi/agno) | Python | 2,715 | **239** | 2 | 90 | 60 |
+| [elizaos/eliza](https://github.com/elizaos/eliza) | TypeScript | 508 | **195** | 2 | 76 | 20 |
+| [OpenHands](https://github.com/All-Hands-AI/OpenHands) | Python | 1,702 | **80** | 0 | 5 | 10 |
+| [letta](https://github.com/letta-ai/letta) | Python | 804 | 20 | 0 | 0 | 0 |
+| [aider](https://github.com/paul-gauthier/aider) | Python | 121 | 20 | 0 | 0 | 0 |
+| [SWE-agent](https://github.com/SWE-agent/SWE-agent) | Python | 89 | 0 | 0 | 0 | 0 |
+| [open-interpreter](https://github.com/OpenInterpreter/open-interpreter) | Python | 141 | 0 | 0 | 0 | 0 |
 
-WyScan credits a policy gate only when the analyzed path contains code it recognizes as a structural authorization gate.
+**Zero-result systems** (SWE-agent, open-interpreter): These do not use standard tool-registration patterns — no `@tool` decorators, no `BaseTool` subclasses, no recognized framework registrations. WyScan correctly emits nothing rather than guessing.
 
-Current gate credit comes from:
+**Low-finding systems** (aider, letta): Tool roots are detected (20 CEEs each) but all are INFO-level reads with no policy-absent AFB04 findings. Not every tool-having system has exposed dangerous operations.
 
-- A function with conditional branches that check parameters and raise an authorization-like exception
-- Decorators that are structurally analyzed as wrappers that can prevent execution
-- Imported decorators whose wrapper logic is structurally analyzed as gates
+**CEEs vs. findings:** `cees` is the full canonical execution event inventory. `findings` is the AFB04-classified subset (operations where no gate was detected in the traced path). CEE count reflects scanner coverage depth; finding count reflects actual exposure.
 
-Current non-gates:
-
-- Logging calls
-- `try/except` around an operation
-- Generic exceptions that do not look authorization-related
-- Decorator or function naming alone without structural proof
+---
 
 ## JSON Output
 
 ```bash
 wyscan scan ./project --json
 ```
-
-Current CLI JSON shape:
 
 ```json
 {
@@ -205,19 +268,19 @@ Current CLI JSON shape:
         "/absolute/path/tools/setup.py:setup_agent",
         "/absolute/path/helpers/files.py:delete_workspace"
       ],
-       "involves_cross_file": true,
-       "unresolved_calls": [],
-       "depth_limit_hit": false,
-       "evidence_kind": "semantic",
-       "supporting_evidence": [
-         "Tool registration evidence: decorator tool imported from langchain.tools",
-         "Operation evidence: resolved module alias shutil"
-       ],
-       "resource": "agent_dir",
-       "changes_state": true,
-       "description": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). No policy gate detected in the analyzed call path.",
-       "code_snippet": "shutil.rmtree(agent_dir)",
-       "category": "file_operation"
+      "involves_cross_file": true,
+      "unresolved_calls": [],
+      "depth_limit_hit": false,
+      "evidence_kind": "semantic",
+      "supporting_evidence": [
+        "Tool registration evidence: decorator tool imported from langchain.tools",
+        "Operation evidence: resolved module alias shutil"
+      ],
+      "resource": "agent_dir",
+      "changes_state": true,
+      "description": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). No policy gate detected in the analyzed call path.",
+      "code_snippet": "shutil.rmtree(agent_dir)",
+      "category": "file_operation"
     }
   ],
   "cees": [
@@ -237,19 +300,19 @@ Current CLI JSON shape:
       ],
       "gate_status": "absent",
       "afb_type": "AFB04",
-       "classification_note": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path.",
-       "involves_cross_file": true,
-       "unresolved_calls": [],
-       "depth_limit_hit": false,
-       "evidence_kind": "semantic",
-       "supporting_evidence": [
-         "Tool registration evidence: decorator tool imported from langchain.tools",
-         "Operation evidence: resolved module alias shutil"
-       ],
-       "resource": "agent_dir",
-       "changes_state": true,
-       "code_snippet": "shutil.rmtree(agent_dir)",
-       "category": "file_operation"
+      "classification_note": "Detected reachable call from tool \"setup_agent\" (langchain) to shutil.rmtree through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected.",
+      "involves_cross_file": true,
+      "unresolved_calls": [],
+      "depth_limit_hit": false,
+      "evidence_kind": "semantic",
+      "supporting_evidence": [
+        "Tool registration evidence: decorator tool imported from langchain.tools",
+        "Operation evidence: resolved module alias shutil"
+      ],
+      "resource": "agent_dir",
+      "changes_state": true,
+      "code_snippet": "shutil.rmtree(agent_dir)",
+      "category": "file_operation"
     }
   ],
   "summary": {
@@ -260,7 +323,7 @@ Current CLI JSON shape:
     "suppressed": 0
   },
   "coverage": {
-    "languages_scanned": ["python", "typescript", "javascript"],
+    "languages_scanned": ["python", "typescript"],
     "languages_skipped": [],
     "frameworks_detected": ["langchain", "openai"],
     "files_analyzed": 34,
@@ -269,11 +332,11 @@ Current CLI JSON shape:
     "skipped_files": [],
     "partial": false,
     "total_files_discovered": 34,
-    "file_limit": 9007199254740991,
+    "file_limit": null,
     "file_limit_hit": false,
-      "limitations": [
-        "The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage."
-      ]
+    "limitations": [
+      "The analyzed file set is graphed together per language. Changed-file scans do not guarantee full repository coverage."
+    ]
   },
   "methodology": {
     "runtime_surfaces": ["cli_only", "github_app_backend"],
@@ -294,43 +357,51 @@ Current CLI JSON shape:
 }
 ```
 
-Notes:
+**Field notes:**
 
-- `files_analyzed` at the top level is the report file count used by the current CLI output.
-- `coverage.files_analyzed` counts all analyzed files across languages.
-- `cees` is the full detected execution-event inventory for the analyzed path set.
-- `findings` is the AFB04 subset of `cees`.
-- `call_path` lists the traced function path in the analyzed file set.
-- `evidence_kind`, `supporting_evidence`, `resource`, and `changes_state` expose the current proof and action summary for each finding or CEE.
-- `methodology` includes the detection method, anti-overfitting policy, evidence integrity policy, and a coverage note for the scan.
-- The repository does not currently promise a separately versioned stable JSON schema.
+- `findings` — AFB04-classified subset; operations with `gate_status: absent`. Drives the exit code.
+- `cees` — full canonical execution event inventory across all analyzed paths.
+- `call_path` — traced function chain from tool registration to matched operation.
+- `evidence_kind` — `semantic` (framework import resolved), `structural` (code shape), or `heuristic`.
+- `depth_limit_hit` — call tracing reached the configured depth ceiling; result is lower confidence.
+- `coverage_note` — plain-language scope note for this scan.
+
+---
+
+## Scope
+
+WyScan currently does all of the following:
+
+- Parses Python and TypeScript/JavaScript source with tree-sitter.
+- Resolves tool registrations from framework-specific code structure through semantic analysis.
+- Matches reachable operations: shell execution, file mutation, file reads, HTTP requests, email sends, and common database calls.
+- Classifies HTTP severity by method.
+- Suppresses findings when a structural policy gate is detected in the analyzed path.
+- Carries supporting evidence (resource hints, structural vs. semantic registration evidence) into CEEs.
+
+WyScan currently does not do any of the following:
+
+- Execute your code.
+- Trace into third-party package internals.
+- Detect AFB01, AFB02, or AFB03.
+- Support Rust.
+
+---
 
 ## GitHub App
 
 WyScan can run as a GitHub App for supported webhook events.
 
-Current behavior:
-
-- Push events run only on the repository default branch.
+- Push events run on the repository default branch only.
 - Pull request events run on `opened` and `synchronize`.
-- Push scans the repository working tree.
-- Pull request scans changed analyzable files.
-- Findings appear in a GitHub Check.
-- Pull requests receive an updated issue comment only when findings are present.
+- Findings appear in a GitHub Check run.
+- Pull requests receive an updated comment only when findings are present.
 
-Failure and partial-coverage reporting are being tightened further in the implementation. For current details, see `docs/github-app.md` and the CLI output itself.
+### Deployment
 
-## GitHub App Deployment
-
-### Quick Start
-
-1. **Build Docker Image**
 ```bash
 docker build -t wyscan-github-app .
-```
 
-2. **Run Container**
-```bash
 docker run -d \
   --name wyscan-app \
   -p 3000:3000 \
@@ -340,68 +411,32 @@ docker run -d \
   wyscan-github-app
 ```
 
-### Environment Variables
-
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GITHUB_APP_ID` | Yes | GitHub App ID from app settings page |
-| `GITHUB_PRIVATE_KEY` | Yes | Private key PEM content (use newlines as `\n` in env) |
-| `GITHUB_WEBHOOK_SECRET` | Yes | Secret for webhook signature verification |
+| `GITHUB_APP_ID` | Yes | GitHub App ID from app settings |
+| `GITHUB_PRIVATE_KEY` | Yes | PEM content (`\n` for newlines in env) |
+| `GITHUB_WEBHOOK_SECRET` | Yes | Webhook signature secret |
 | `PORT` | No | Server port (default: 3000) |
-
-### How It Works
-
-When the Wyscan GitHub App is installed on a repository:
-
-1. **Installation Event** (`installation.created`)
-   - Automatically scans all repositories in the installation
-   - Posts a security issue to each repo with AFB04 scan results
-   - Creates and applies "security" label
-
-2. **Push Events** (default branch only)
-   - Scans the entire repository at the new commit
-   - Creates a GitHub Check run
-   - Posts a new security issue with findings
-
-3. **Pull Request Events** (`opened`, `synchronize`)
-   - Scans only changed files
-   - Creates a GitHub Check run
-   - Posts/updates PR comment with findings
-
-### Issue Format
-
-Security issues are titled: `[Wyscan] Security Scan Report — <commit_sha>`
-
-Each issue contains:
-- **Summary table** with files analyzed, CEEs detected, findings by severity
-- **Detailed findings** organized by severity (Critical, Warning, Info)
-- **Coverage notes** explaining analysis scope and limitations
-- **Terminal-style formatting** with dividers and emoji severity indicators
-
-### Health Check
 
 ```bash
 curl http://localhost:3000/health
-# Response: {"status":"ok"}
+# {"status":"ok"}
 ```
 
-### Logs
+For full setup, see `docs/GITHUB_APP_SETUP.md`.
 
-```bash
-docker logs -f wyscan-app
-```
-
-For complete setup instructions including GitHub App registration, see `docs/GITHUB_APP_SETUP.md`.
+---
 
 ## Current Limitations
 
-- Directory scans graph the analyzed file set together per language. Changed-file scans still do not guarantee full repository coverage.
+- Directory scans graph the analyzed file set per language. Changed-file scans do not guarantee full repository coverage.
 - External packages are not traced.
 - Dynamic runtime tool registration is not guaranteed to be detected.
-- Framework labels and sink matching are not complete runtime framework models and are not guaranteed to cover all CEEs in large-scale systems.
+- Framework labels and sink matching are not complete runtime framework models.
 - Validation-helper severity downgrades are heuristic only.
 - AFB01, AFB02, and AFB03 are not implemented.
-- Rust support is not yet implemented.
+
+---
 
 ## Development
 
@@ -412,6 +447,22 @@ npm test
 npm run wyscan -- scan ./project
 ```
 
+### Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| `make build` | Build TypeScript |
+| `make test` | Run tests |
+| `make lint` | Run linter |
+| `make check` | Run wyscan self-check |
+| `make install` | Build and npm link globally |
+| `make clean` | Remove build artifacts |
+| `make typecheck` | Type check without emit |
+| `make watch` | Watch mode |
+| `make benchmark-N` | Scan benchmark fixture N |
+
+---
+
 ## Documentation
 
 - `docs/install.md`
@@ -419,6 +470,9 @@ npm run wyscan -- scan ./project
 - `docs/detection.md`
 - `docs/github-app.md`
 - `docs/limitations.md`
+- `docs/GITHUB_APP_SETUP.md`
+
+---
 
 ## License
 
