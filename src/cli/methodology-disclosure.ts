@@ -2,8 +2,15 @@ import { AnalysisReport } from '../types';
 
 export interface MethodologyDisclosure {
   short_answer: string;
+  runtime_surface: 'cli_only';
   regex_main_method: boolean;
   primary_method: string;
+  anti_overfit_policy: {
+    hardcoded_agent_schema_rules: boolean;
+    memorized_framework_schema_rules: boolean;
+    note: string;
+  };
+  evidence_integrity_policy: string[];
   large_scale_agentic_readiness: {
     ready: boolean;
     verdict: string;
@@ -19,8 +26,19 @@ export function buildMethodologyDisclosure(report: AnalysisReport): MethodologyD
 
   return {
     short_answer: coverageWarning,
+    runtime_surface: 'cli_only',
     regex_main_method: false,
     primary_method: 'Tree-sitter AST parsing plus semantic tool-registration and call-path analysis.',
+    anti_overfit_policy: {
+      hardcoded_agent_schema_rules: false,
+      memorized_framework_schema_rules: false,
+      note: 'Detection should rely on language/framework first principles and observed code structure, not memorized project-specific schemas.',
+    },
+    evidence_integrity_policy: [
+      'No fake findings: only report operations tied to parsed code and traced evidence.',
+      'No hardcoded repository-specific shortcuts in detector logic.',
+      'No mock-only claims in scanner output; uncertainty must remain explicit.',
+    ],
     large_scale_agentic_readiness: {
       ready: false,
       verdict: 'Not nearly ready for complete coverage of all CEEs in large-scale agentic systems.',
