@@ -369,7 +369,7 @@ function extractMemberChain(node: Parser.SyntaxNode): { baseExpression?: string;
       current = object;
     } else {
       baseExpression = object.text;
-      chain.unshift(baseExpression);
+      chain.unshift(baseExpression ?? '');
       break;
     }
   }

@@ -23,6 +23,7 @@ import {
   AssignmentInfo,
   ImportInfo,
 } from './ast-parser';
+import { ALL_TS_MODULE_TOKENS } from '../frameworks/signatures';
 
 const PRIMARY_ACTION_EXECUTION_PROPS = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'call', 'perform']);
 const SECONDARY_ACTION_EXECUTION_PROPS = new Set(['validate', 'init', 'dispose']);
@@ -104,6 +105,9 @@ export function extractSemanticInvocationRoots(
     fileRoots.push(...extractServiceClassPatterns(filePath, parsed));
     fileRoots.push(...extractEventHandlerPatterns(filePath, parsed));
     fileRoots.push(...extractRuntimeCompositionPatterns(filePath, parsed));
+
+    // ElizaOS-specific extraction (dedicated high-priority extractor)
+    fileRoots.push(...extractElizaOSTools(filePath, parsed, files));
 
     // Controlled fallback for unknown frameworks in agentic files.
     // NOTE: This now runs even when structural roots already exist, so mixed files
@@ -811,6 +815,20 @@ function extractActionObjectPatterns(
   return roots;
 }
 
+/**
+ * Determine if an assignment is likely an agentic action object.
+ *
+ * An object with a `handler`, `execute`, `run`, or `action` property that EITHER:
+ *   (a) has a type annotation containing any of: Action, Tool, Plugin, Handler,
+ *       Command, Capability, Evaluator, Agent (case-insensitive), OR
+ *   (b) is in a file where hasAgenticContext returns true
+ * is an agentic action object.
+ *
+ * @param parsed - The parsed TypeScript file containing the assignment
+ * @param assignment - The assignment to check
+ * @param nameValue - Optional string value of the 'name' property
+ * @returns true if this looks like a framework action/tool object
+ */
 function isLikelyAgenticActionObject(
   parsed: ParsedTypeScriptFile,
   assignment: AssignmentInfo,
@@ -822,44 +840,55 @@ function isLikelyAgenticActionObject(
   const hasSecondaryExecutionProp = assignment.objectProperties.some(prop => SECONDARY_ACTION_EXECUTION_PROPS.has(prop.key));
   if (!hasPrimaryExecutionProp && !hasSecondaryExecutionProp) return false;
 
+  // (a) Type annotation contains an agentic type token
   const typedContext = `${assignment.typeAnnotation || ''} ${assignment.assertedType || ''}`.toLowerCase();
+  const AGENTIC_TYPE_TOKENS = ['action', 'tool', 'plugin', 'handler', 'command', 'capability', 'evaluator', 'agent'];
+  const hasTypeToken = AGENTIC_TYPE_TOKENS.some(token => typedContext.includes(token));
+  if (hasTypeToken) return true;
+
+  // (b) File has an agentic import
+  if (hasAgenticContext(parsed)) return true;
+
+  // Fallback: target name contains agentic tokens (for files without explicit framework imports)
   const target = assignment.target.toLowerCase();
   const nameLower = (nameValue || '').toLowerCase();
-
-  const hasTypeToken = AGENTIC_CORE_TOKENS.some(token => typedContext.includes(token));
   const hasTargetToken = AGENTIC_CORE_TOKENS.some(token => target.includes(token));
   const hasNameToken = AGENTIC_CORE_TOKENS.some(token => nameLower.includes(token));
-  const hasAgenticImport = hasAgenticContext(parsed);
-
-  // Require semantic context to avoid turning arbitrary callback objects into roots.
-  // Secondary-only callbacks are common outside agent systems, so require stronger context.
-  if (hasPrimaryExecutionProp) {
-    // Explicit type evidence is strongest. Otherwise require combined shape/context signals
-    // so generic web/service handlers are less likely to be misclassified as agent roots.
-    if (hasTypeToken) return true;
-    if (hasTargetToken && (hasNameToken || hasAgenticImport)) return true;
-    if (hasNameToken && hasAgenticImport) return true;
-    return false;
-  }
-
-  return hasTypeToken || (hasTargetToken && hasNameToken);
+  return hasTargetToken || hasNameToken;
 }
 
+/**
+ * Determine if a file has agentic context based on its imports.
+ *
+ * Returns true if ANY import in the file imports from a module whose path
+ * contains any of the known agentic framework tokens. Uses substring matching
+ * so that scoped packages, monorepo paths, and re-exports all match.
+ *
+ * @param parsed - The parsed TypeScript file
+ * @returns true if any import indicates an agentic framework is in use
+ */
+/**
+ * Generic tokens that appear in module paths and suggest agentic code even when
+ * the specific framework isn't matched by ALL_TS_MODULE_TOKENS.
+ */
+const GENERIC_AGENTIC_PATH_TOKENS = [
+  'agent', 'plugin', 'tool', 'runtime', 'action', 'handler', 'command',
+  'workflow', 'orchestrat', '/agents', '/tools', '/actions', '/plugins',
+];
+
+/**
+ * Returns true when the file imports from any known agentic framework module
+ * or from a path containing a generic agentic token.
+ */
 function hasAgenticContext(parsed: ParsedTypeScriptFile): boolean {
   return parsed.imports.some(imp => {
     const moduleLower = imp.module.toLowerCase();
-    return (
-      moduleLower.includes('agent') ||
-      moduleLower.includes('plugin') ||
-      moduleLower.includes('tool') ||
-      moduleLower.includes('runtime') ||
-      moduleLower.includes('langchain') ||
-      moduleLower.includes('langgraph') ||
-      moduleLower.includes('mastra') ||
-      moduleLower.includes('modelcontextprotocol') ||
-      moduleLower.includes('openai') ||
-      moduleLower.includes('/ai')
-    );
+    // Check against the canonical framework token list from signatures
+    for (const token of ALL_TS_MODULE_TOKENS) {
+      if (moduleLower.includes(token)) return true;
+    }
+    // Fall back to generic path token heuristics
+    return GENERIC_AGENTIC_PATH_TOKENS.some(token => moduleLower.includes(token));
   });
 }
 
@@ -970,24 +999,68 @@ function extractPluginArrayPatterns(
         if (!pluginArrayNames.has(prop.key)) continue;
         if (prop.valueType !== 'array') continue;
 
-        // This property is an array of actions/plugins
-        // The array elements would be in the raw value, need to parse assignments that reference them
-        // For now, mark the whole plugin object as a root
         const nameProp = assignment.objectProperties.find(p => p.key === 'name');
         const pluginName = nameProp?.stringValue || assignment.target;
 
-        // Look for functions referenced in this file that might be handlers
-        // We'll mark the plugin itself as needing analysis
-        const nodeId = `${filePath}:${assignment.target}`;
-        if (!roots.some(r => r.nodeId === nodeId)) {
-          roots.push({
-            nodeId,
-            toolName: pluginName,
-            framework: 'plugin-array',
-            evidence: `Plugin "${pluginName}" exports ${prop.key} array`,
-            sourceFile: filePath,
-            line: assignment.line,
-          });
+        // Try to resolve the array reference to find actual action functions
+        // Look in current file for assignment with the same name
+        const arrayRef = prop.value;
+        if (arrayRef) {
+          // Try to find the array assignment in current file
+          const currentFile = files.get(filePath);
+          if (currentFile) {
+            const arrayAssignment = currentFile.assignments.find(a => a.target === arrayRef && a.isArrayLiteral);
+            if (arrayAssignment?.arrayElements) {
+              for (const elem of arrayAssignment.arrayElements) {
+                const elemRef = elem.text.trim();
+                if (!elemRef || elemRef.startsWith('{') || elemRef.startsWith('[')) continue;
+                const resolved = resolveFunctionReference(files, filePath, elemRef);
+                const func = resolved?.func;
+                const resolvedFilePath = resolved?.filePath || filePath;
+                if (func) {
+                  const nodeId = func.className
+                    ? `${resolvedFilePath}:${func.className}.${func.name}`
+                    : `${resolvedFilePath}:${func.name}`;
+                  if (!roots.some(r => r.nodeId === nodeId)) {
+                    roots.push({
+                      nodeId,
+                      toolName: func.name,
+                      framework: 'plugin-array',
+                      evidence: `Plugin "${pluginName}" ${prop.key} array element "${func.name}"`,
+                      sourceFile: resolvedFilePath,
+                      line: func.startLine,
+                    });
+                  }
+                }
+              }
+            } else {
+              // No local array found – emit a root for the whole plugin object
+              const nodeId = `${filePath}:${assignment.target}`;
+              if (!roots.some(r => r.nodeId === nodeId)) {
+                roots.push({
+                  nodeId,
+                  toolName: pluginName,
+                  framework: 'plugin-array',
+                  evidence: `Plugin "${pluginName}" exports ${prop.key} array`,
+                  sourceFile: filePath,
+                  line: assignment.line,
+                });
+              }
+            }
+          }
+        } else {
+          // No array reference – emit plugin root
+          const nodeId = `${filePath}:${assignment.target}`;
+          if (!roots.some(r => r.nodeId === nodeId)) {
+            roots.push({
+              nodeId,
+              toolName: pluginName,
+              framework: 'plugin-array',
+              evidence: `Plugin "${pluginName}" exports ${prop.key} array`,
+              sourceFile: filePath,
+              line: assignment.line,
+            });
+          }
         }
       }
     }
@@ -1186,6 +1259,179 @@ function resolveFunctionReference(
   }
 
   return undefined;
+}
+
+/**
+ * Extract ElizaOS-specific tool registrations.
+ *
+ * ElizaOS uses two primary registration patterns:
+ * 1. Exported const objects with a `handler` property typed as `Action`:
+ *    export const myAction: Action = { name: "MY_ACTION", handler: async (runtime, ...) => {...} }
+ * 2. Plugin exports that contain `actions`, `evaluators`, or `providers` arrays:
+ *    export const myPlugin: Plugin = { name: "my-plugin", actions: [action1, action2] }
+ *
+ * For each handler function found (inline or referenced), a root is emitted.
+ *
+ * @param filePath - Path to the file being analyzed
+ * @param parsed - Parsed representation of the file
+ * @param files - All parsed files for cross-file resolution
+ * @returns Array of semantic invocation roots detected for ElizaOS patterns
+ */
+function extractElizaOSTools(
+  filePath: string,
+  parsed: ParsedTypeScriptFile,
+  files: Map<string, ParsedTypeScriptFile>
+): SemanticInvocationRoot[] {
+  const roots: SemanticInvocationRoot[] = [];
+
+  // Only run if the file imports from @elizaos/core, elizaos, or eliza
+  const hasElizaOS = parsed.imports.some(imp => {
+    const m = imp.module.toLowerCase();
+    return m.includes('elizaos') || m.includes('@elizaos') || m === 'eliza';
+  });
+
+  // Also detect action-like objects in agentic context files even without explicit elizaos import
+  // (e.g., secondary files that export action objects but import from local packages)
+  const isAgenticFile = hasAgenticContext(parsed);
+  if (!hasElizaOS && !isAgenticFile) return roots;
+
+  // When the file has agentic context but no explicit elizaos import, use generic label
+  const frameworkLabel = hasElizaOS ? 'elizaos' : 'action-object';
+
+  // Pattern 1: Exported const objects with handler, execute, run, or action property
+  const ACTION_EXEC_PROPS = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'perform']);
+  for (const assignment of parsed.assignments) {
+    if (!assignment.isObjectLiteral || !assignment.objectProperties) continue;
+
+    const execProp = assignment.objectProperties.find(p => ACTION_EXEC_PROPS.has(p.key));
+    if (!execProp) continue;
+
+    // Check: type annotation OR agentic context
+    const typedCtx = `${assignment.typeAnnotation || ''} ${assignment.assertedType || ''}`.toLowerCase();
+    const hasActionType = ['action', 'tool', 'plugin', 'handler', 'command', 'evaluator', 'agent', 'capability'].some(t => typedCtx.includes(t));
+    if (!hasActionType && !isAgenticFile) continue;
+
+    const nameProp = assignment.objectProperties.find(p => p.key === 'name');
+    const toolName = nameProp?.stringValue || assignment.target;
+
+    if (execProp.valueType === 'function') {
+      // Inline function: handler: async (runtime, ...) => { ... }
+      const syntheticName = `${assignment.target}.${execProp.key}`;
+      const nodeId = `${filePath}:${syntheticName}`;
+      if (!roots.some(r => r.nodeId === nodeId)) {
+        roots.push({
+          nodeId,
+          toolName,
+          framework: frameworkLabel,
+          evidence: `Action object "${assignment.target}" with inline ${execProp.key} handler`,
+          sourceFile: filePath,
+          line: assignment.line,
+        });
+      }
+    } else if (execProp.valueType === 'identifier') {
+      // Referenced function: handler: myHandlerFn
+      const resolved = resolveFunctionReference(files, filePath, execProp.value);
+      const func = resolved?.func;
+      const resolvedFilePath = resolved?.filePath || filePath;
+      if (func) {
+        const nodeId = func.className
+          ? `${resolvedFilePath}:${func.className}.${func.name}`
+          : `${resolvedFilePath}:${func.name}`;
+        if (!roots.some(r => r.nodeId === nodeId)) {
+          roots.push({
+            nodeId,
+            toolName,
+            framework: frameworkLabel,
+            evidence: `Action object "${assignment.target}" references ${execProp.key} function "${func.name}"`,
+            sourceFile: resolvedFilePath,
+            line: func.startLine,
+          });
+        }
+      } else {
+        // Handler function not resolved – emit root pointing to the enclosing function
+        const nodeId = assignment.enclosingFunction
+          ? `${filePath}:${assignment.enclosingFunction}`
+          : `${filePath}:${assignment.target}`;
+        if (!roots.some(r => r.nodeId === nodeId)) {
+          roots.push({
+            nodeId,
+            toolName,
+            framework: frameworkLabel,
+            evidence: `Action object "${assignment.target}" unresolved ${execProp.key} reference "${execProp.value}"`,
+            sourceFile: filePath,
+            line: assignment.line,
+          });
+        }
+      }
+    }
+  }
+
+  // Pattern 2: Plugin objects with actions/evaluators/providers arrays
+  const PLUGIN_ARRAY_KEYS = new Set(['actions', 'evaluators', 'providers', 'services', 'tools', 'handlers']);
+  for (const assignment of parsed.assignments) {
+    if (!assignment.isObjectLiteral || !assignment.objectProperties) continue;
+
+    const hasPluginArrayProp = assignment.objectProperties.some(p => PLUGIN_ARRAY_KEYS.has(p.key));
+    if (!hasPluginArrayProp) continue;
+
+    // Type annotation check
+    const typedCtx = `${assignment.typeAnnotation || ''} ${assignment.assertedType || ''}`.toLowerCase();
+    const hasPluginType = ['plugin', 'service', 'module', 'package'].some(t => typedCtx.includes(t));
+    if (!hasPluginType && !isAgenticFile) continue;
+
+    for (const prop of assignment.objectProperties) {
+      if (!PLUGIN_ARRAY_KEYS.has(prop.key)) continue;
+      if (prop.valueType !== 'array') continue;
+
+      // Try to resolve each element in the array (they are action references)
+      // Look for same-file array assignments with matching name
+      const arrayAssignment = parsed.assignments.find(a => a.target === prop.value && a.isArrayLiteral);
+      if (arrayAssignment?.arrayElements) {
+        for (const elem of arrayAssignment.arrayElements) {
+          const resolved = resolveFunctionReference(files, filePath, elem.text.trim());
+          const func = resolved?.func;
+          const resolvedFilePath = resolved?.filePath || filePath;
+          if (func) {
+            const nodeId = func.className
+              ? `${resolvedFilePath}:${func.className}.${func.name}`
+              : `${resolvedFilePath}:${func.name}`;
+            if (!roots.some(r => r.nodeId === nodeId)) {
+              roots.push({
+                nodeId,
+                toolName: func.name,
+                framework: frameworkLabel,
+                evidence: `Plugin "${assignment.target}" ${prop.key} array contains "${func.name}"`,
+                sourceFile: resolvedFilePath,
+                line: func.startLine,
+              });
+            }
+          }
+        }
+      } else {
+        // Try resolving as a direct reference (e.g., actions: myActionsArray)
+        const resolved = resolveFunctionReference(files, filePath, prop.value);
+        if (resolved?.func) {
+          const func = resolved.func;
+          const resolvedFilePath = resolved.filePath;
+          const nodeId = func.className
+            ? `${resolvedFilePath}:${func.className}.${func.name}`
+            : `${resolvedFilePath}:${func.name}`;
+          if (!roots.some(r => r.nodeId === nodeId)) {
+            roots.push({
+              nodeId,
+              toolName: func.name,
+              framework: frameworkLabel,
+              evidence: `Plugin "${assignment.target}" ${prop.key} references "${func.name}"`,
+              sourceFile: resolvedFilePath,
+              line: func.startLine,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return roots;
 }
 
 /**

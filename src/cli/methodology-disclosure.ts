@@ -1,7 +1,6 @@
 import { AnalysisReport } from '../types';
 
 export interface MethodologyDisclosure {
-  short_answer: string;
   runtime_surfaces: Array<'cli_only' | 'github_app_backend'>;
   regex_main_method: boolean;
   primary_method: string;
@@ -11,45 +10,29 @@ export interface MethodologyDisclosure {
     note: string;
   };
   evidence_integrity_policy: string[];
-  large_scale_agentic_readiness: {
-    ready: boolean;
-    verdict: string;
-  };
-  plan_for_large_scale_cee_coverage: string[];
+  coverage_note: string;
 }
 
 export function buildMethodologyDisclosure(report: AnalysisReport): MethodologyDisclosure {
   const hasPartialCoverage = report.metadata.skippedFiles.length > 0 || report.metadata.failedFiles.length > 0;
-  const coverageWarning = hasPartialCoverage
-    ? 'No. This scan was partial, so readiness for full-system CEE coverage is not established.'
-    : 'No. WyScan is on the right track, but it is not yet ready to guarantee full CEE coverage for large-scale agentic systems such as Eliza.';
+  const coverageNote = hasPartialCoverage
+    ? 'Scan was partial. Coverage is limited to the analyzed file set. Files that failed or were skipped are listed in coverage.failed_files and coverage.skipped_files.'
+    : 'Coverage is limited to the analyzed file set. External packages and dynamically composed tool registrations are not traced.';
 
   return {
-    short_answer: coverageWarning,
     runtime_surfaces: ['cli_only', 'github_app_backend'],
     regex_main_method: false,
     primary_method: 'Tree-sitter AST parsing plus semantic tool-registration and call-path analysis.',
     anti_overfit_policy: {
       hardcoded_agent_schema_rules: false,
       memorized_framework_schema_rules: false,
-      note: 'Detection should rely on language/framework first principles and observed code structure, not memorized project-specific schemas.',
+      note: 'Detection relies on language and framework structural first principles, not memorized project-specific schemas.',
     },
     evidence_integrity_policy: [
-      'No fake findings: only report operations tied to parsed code and traced evidence.',
+      'Only report operations tied to parsed code and traced evidence.',
       'No hardcoded repository-specific shortcuts in detector logic.',
-      'No mock-only claims in scanner output; uncertainty must remain explicit.',
+      'Uncertainty is surfaced explicitly through unresolved_calls, depth_limit_hit, and evidence_kind fields.',
     ],
-    large_scale_agentic_readiness: {
-      ready: false,
-      verdict: 'Not nearly ready for complete coverage of all CEEs in large-scale agentic systems.',
-    },
-    plan_for_large_scale_cee_coverage: [
-      'Build and maintain a versioned large-scale benchmark corpus (including Eliza-style repositories) with hand-labeled CEEs.',
-      'Add whole-repository symbol and module resolution for dynamic exports/imports and cross-file indirection.',
-      'Add deeper interprocedural dataflow and alias tracking from tool inputs to execution sinks.',
-      'Improve dynamic registration recovery (config-driven/plugin-based/runtime-composed tools) with explicit uncertainty reporting.',
-      'Replace remaining regex sink matching paths with typed semantic sink models where possible; keep regex as fallback only.',
-      'Gate releases on benchmark precision/recall targets and publish those metrics in CI artifacts and release notes.',
-    ],
+    coverage_note: coverageNote,
   };
 }

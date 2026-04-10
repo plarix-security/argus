@@ -186,14 +186,11 @@ export function analyzePythonFile(
     const cee = createCEEFromPath(filePath, exposed, parsed);
     cees.push(cee);
 
-    if (cee.afbType === AFBType.UNAUTHORIZED_ACTION) {
+    // Only emit AFBFinding for non-registration-only, non-gated paths with AFB04 type
+    if (cee.afbType === AFBType.UNAUTHORIZED_ACTION && !isRegistrationOnlyPath(exposed)) {
       findings.push(createFindingFromCEE(cee, parsed));
     }
   }
-
-  // NOTE: Removed tool-registration-only findings.
-  // If a tool doesn't reach any dangerous operation, it's not a finding.
-  // This avoids noise from tools that just return strings or do safe operations.
 
   // Sort findings by severity, then line
   findings.sort((a, b) => {
@@ -282,15 +279,22 @@ export function analyzePythonFiles(inputs: PythonSourceInput[]): FileAnalysisRes
     }
     seenEvents.add(eventKey);
 
-    const cee = createCEEFromPath(operationFile, exposed, parsed);
-    const fileCEEs = ceesByFile.get(operationFile) || [];
-    fileCEEs.push(cee);
-    ceesByFile.set(operationFile, fileCEEs);
+    // For registration-only paths, attribute to the tool's source file
+    const targetFile = isRegistrationOnlyPath(exposed)
+      ? (exposed.tool.sourceFile || operationFile)
+      : operationFile;
+    const parsedForFile = parsedByFile.get(targetFile);
+    if (!parsedForFile) continue;
 
-    if (cee.afbType === AFBType.UNAUTHORIZED_ACTION) {
-      const fileFindings = findingsByFile.get(operationFile) || [];
-      fileFindings.push(createFindingFromCEE(cee, parsed));
-      findingsByFile.set(operationFile, fileFindings);
+    const cee = createCEEFromPath(targetFile, exposed, parsedForFile);
+    const fileCEEs = ceesByFile.get(targetFile) || [];
+    fileCEEs.push(cee);
+    ceesByFile.set(targetFile, fileCEEs);
+
+    if (cee.afbType === AFBType.UNAUTHORIZED_ACTION && !isRegistrationOnlyPath(exposed)) {
+      const fileFindings = findingsByFile.get(targetFile) || [];
+      fileFindings.push(createFindingFromCEE(cee, parsedForFile));
+      findingsByFile.set(targetFile, fileFindings);
     }
   }
 
@@ -343,12 +347,50 @@ function buildCEEKey(filePath: string, exposed: ExposedPath): string {
   ].join(':');
 }
 
+/**
+ * Determine if an exposed path is a registration-only entry (no real dangerous op traced).
+ * These are emitted when no dangerous operation is found in the call graph traversal.
+ */
+function isRegistrationOnlyPath(exposed: ExposedPath): boolean {
+  return exposed.operation.callee.startsWith('agent-tool-registration:');
+}
+
 function createCEEFromPath(
   filePath: string,
   exposed: ExposedPath,
   parsed: ParsedPythonFile
 ): CEERecord {
   const op = exposed.operation;
+
+  if (isRegistrationOnlyPath(exposed)) {
+    // Registration-only CEE: INFO severity, no AFB type, tool file as location
+    const toolFile = exposed.tool.sourceFile || filePath;
+    return {
+      file: toolFile,
+      line: exposed.tool.startLine,
+      column: 0,
+      operation: `Agent tool registration: ${exposed.tool.name}`,
+      codeSnippet: exposed.tool.name,
+      category: ExecutionCategory.TOOL_CALL,
+      severity: Severity.INFO,
+      tool: exposed.tool.name,
+      framework: exposed.tool.framework,
+      toolFile: exposed.tool.sourceFile,
+      toolLine: exposed.tool.startLine,
+      callPath: [exposed.tool.id],
+      gateStatus: exposed.hasGateInPath ? 'present' : 'absent',
+      afbType: null,
+      classificationNote: `Tool registration detected. No external operations traced from this entry point.`,
+      evidenceKind: 'semantic',
+      supportingEvidence: exposed.supportingEvidence,
+      resource: undefined,
+      changesState: false,
+      involvesCrossFile: false,
+      unresolvedCalls: exposed.unresolvedCrossFileCalls,
+      depthLimitHit: false,
+    };
+  }
+
   const severity = calculateSeverity(op.severity, op, exposed);
   const callPath = exposed.path.map((nodeId) => nodeId.includes(':') ? nodeId : `${filePath}:${nodeId}`);
 

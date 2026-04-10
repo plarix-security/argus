@@ -152,16 +152,14 @@ export function analyzeTypeScriptFile(
   const cees: CEERecord[] = [];
 
   for (const exposed of callGraph.exposedPaths) {
-    // Skip if has policy gate
-    if (exposed.hasGate) {
-      continue;
-    }
-
     const cee = createCEEFromPath(filePath, exposed, parsed);
     cees.push(cee);
 
-    const finding = createFindingFromCEE(cee, parsed);
-    findings.push(finding);
+    // Only emit AFBFinding for non-registration-only, non-gated paths
+    if (!exposed.hasGate && !isRegistrationOnlyCEE(exposed) && cee.afbType) {
+      const finding = createFindingFromCEE(cee, parsed);
+      findings.push(finding);
+    }
   }
 
   return {
@@ -234,19 +232,21 @@ export function analyzeTypeScriptFiles(inputs: TypeScriptSourceInput[]): FileAna
 
     // Find exposed paths involving this file
     for (const exposed of callGraph.exposedPaths) {
-      if (exposed.operation.sourceFile !== filePath) {
-        continue;
-      }
-
-      if (exposed.hasGate) {
+      // For registration-only CEEs, attribute to the tool's source file
+      const isRegOnly = isRegistrationOnlyCEE(exposed);
+      const targetFile = isRegOnly ? (exposed.tool.sourceFile || filePath) : (exposed.operation.sourceFile || filePath);
+      if (targetFile !== filePath) {
         continue;
       }
 
       const cee = createCEEFromPath(filePath, exposed, parsed);
       cees.push(cee);
 
-      const finding = createFindingFromCEE(cee, parsed);
-      findings.push(finding);
+      // Only emit AFBFinding for non-registration-only, non-gated paths
+      if (!exposed.hasGate && !isRegOnly && cee.afbType) {
+        const finding = createFindingFromCEE(cee, parsed);
+        findings.push(finding);
+      }
     }
 
     results.push({
@@ -285,7 +285,18 @@ function buildCEEKey(filePath: string, exposed: ExposedPath): string {
 }
 
 /**
- * Create CEE from exposed path
+ * Determine if an exposed path is a registration-only entry (no real dangerous op traced).
+ * These are emitted by Step 5 logic in findExposedPaths when no dangerous op is found.
+ */
+function isRegistrationOnlyCEE(exposed: ExposedPath): boolean {
+  return exposed.operation.callee.startsWith('agent-tool-registration:');
+}
+
+/**
+ * Create CEE from exposed path.
+ *
+ * For registration-only entries (callee starts with 'agent-tool-registration:'), the CEE
+ * is INFO severity and has no AFB type. For all other entries, normal AFB04 logic applies.
  */
 function createCEEFromPath(
   filePath: string,
@@ -294,6 +305,35 @@ function createCEEFromPath(
 ): CEERecord {
   const op = exposed.operation;
   const tool = exposed.tool;
+
+  if (isRegistrationOnlyCEE(exposed)) {
+    // Registration-only CEE: INFO severity, no AFB type
+    return {
+      file: tool.sourceFile || filePath,
+      line: tool.startLine,
+      column: 0,
+      operation: `Agent tool registration: ${tool.name}`,
+      tool: tool.name,
+      framework: tool.framework,
+      toolFile: tool.sourceFile,
+      toolLine: tool.startLine,
+      callPath: [tool.id],
+      gateStatus: exposed.hasGate ? 'present' : 'absent',
+      afbType: null,
+      severity: Severity.INFO,
+      category: ExecutionCategory.TOOL_CALL,
+      classificationNote: `Tool registration detected. No external operations traced from this entry point.`,
+      codeSnippet: tool.name,
+      involvesCrossFile: false,
+      unresolvedCalls: exposed.unresolvedCalls,
+      depthLimitHit: false,
+      evidenceKind: 'semantic',
+      supportingEvidence: exposed.supportingEvidence,
+      resource: undefined,
+      changesState: false,
+    };
+  }
+
   const finalSeverity = calculateSeverity(op.severity, op);
 
   return {

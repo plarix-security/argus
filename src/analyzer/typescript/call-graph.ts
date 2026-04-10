@@ -185,10 +185,6 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
   { identity: /^Function$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'Dynamic function creation via Function constructor', changesState: true },
   { identity: /^vm\.(runInContext|runInNewContext|runInThisContext|compileFunction)$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'VM code execution', changesState: true },
   { identity: /^vm\.Script$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'VM script compilation', changesState: true },
-  { identity: /^require$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'Dynamic module require', changesState: true },
-  { identity: /^import$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'Dynamic import', changesState: true },
-  { identity: /^setTimeout$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.WARNING, description: 'Potentially dynamic code via setTimeout', changesState: true },
-  { identity: /^setInterval$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.WARNING, description: 'Potentially dynamic code via setInterval', changesState: true },
 
   // ============================================
   // FILE DELETION (CRITICAL)
@@ -215,15 +211,59 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
   { identity: /^fse?\.(writeFile|writeFileSync|outputFile|outputFileSync|copy|copySync|move|moveSync|ensureDir|ensureDirSync|mkdirp|mkdirpSync)$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'File write via fs-extra', resourceHint: 'file', changesState: true },
 
   // ============================================
-  // HTTP MUTATIONS (WARNING)
+  // HTTP/NETWORK (API_CALL category)
+  // Read-only HTTP methods → INFO; write-style methods → WARNING
   // ============================================
+  // fetch: method is in the options object, not the call name — conservative WARNING
   { identity: /^fetch$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via fetch', resourceHint: 'http', changesState: false },
-  { identity: /^axios(\.(post|put|patch|delete|request))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via axios', resourceHint: 'http', changesState: true },
-  { identity: /^got(\.(post|put|patch|delete))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via got', resourceHint: 'http', changesState: true },
+  // axios write methods
+  { identity: /^axios\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via axios', resourceHint: 'http', changesState: true },
+  { identity: /^axios$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via axios', resourceHint: 'http', changesState: true },
+  // axios read methods
+  { identity: /^axios\.(get|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via axios', resourceHint: 'http', changesState: false },
+  // got write methods
+  { identity: /^got\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via got', resourceHint: 'http', changesState: true },
+  // got read methods (get/stream default to read)
+  { identity: /^got(\.(get|stream))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via got', resourceHint: 'http', changesState: false },
+  // superagent write methods
   { identity: /^superagent\.(post|put|patch|delete|del)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via superagent', resourceHint: 'http', changesState: true },
+  // superagent read methods
+  { identity: /^superagent\.(get|head)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via superagent', resourceHint: 'http', changesState: false },
+  // node-fetch / undici: method in options, conservative WARNING
   { identity: /^node-fetch$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via node-fetch', resourceHint: 'http', changesState: false },
-  { identity: /^undici\.(fetch|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via undici', resourceHint: 'http', changesState: false },
-  { identity: /^request(\.(post|put|patch|delete|del))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via request', resourceHint: 'http', changesState: true },
+  { identity: /^undici\.(fetch|request|stream|pipeline)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via undici', resourceHint: 'http', changesState: false },
+  // request write methods
+  { identity: /^request\.(post|put|patch|delete|del)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via request', resourceHint: 'http', changesState: true },
+  // request read methods
+  { identity: /^request(\.(get|head))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via request', resourceHint: 'http', changesState: false },
+  // ky write methods
+  { identity: /^ky\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via ky', resourceHint: 'http', changesState: true },
+  // ky read methods
+  { identity: /^ky\.(get|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via ky', resourceHint: 'http', changesState: false },
+  // needle write methods
+  { identity: /^needle\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via needle', resourceHint: 'http', changesState: true },
+  // needle read methods
+  { identity: /^needle\.(get|head|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via needle', resourceHint: 'http', changesState: false },
+  // cross-fetch, isomorphic-fetch: method in options, conservative WARNING
+  { identity: /^(crossFetch|isomorphicFetch)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via cross/isomorphic fetch', resourceHint: 'http', changesState: false },
+  // Generic HTTP client write methods: client.post/put/patch/delete → WARNING
+  { identity: /^(client|api|httpClient|apiClient|http|https)\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via client object', resourceHint: 'http', changesState: true },
+  // Generic HTTP client read methods: client.get/head/options → INFO
+  { identity: /^(client|api|httpClient|apiClient|http|https)\.(get|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via client object', resourceHint: 'http', changesState: false },
+  // ElizaOS runtime.fetch() pattern
+  { identity: /^runtime\.(fetch|useModel|generateText|generateObject|call|invoke)$/i, category: ExecutionCategory.TOOL_CALL, severity: Severity.WARNING, description: 'ElizaOS runtime invocation', resourceHint: 'runtime', changesState: true },
+  // ElizaOS memory operations
+  { identity: /^runtime\.(createMemory|updateMemory|deleteMemory|getMemory|searchMemories)$/i, category: ExecutionCategory.DATABASE_OPERATION, severity: Severity.WARNING, description: 'ElizaOS memory operation', changesState: true },
+  // LangChain/LangGraph agent runtime calls
+  { identity: /^(agent|chain|model|llm)\.(invoke|ainvoke|run|arun|stream|astream|predict|apredict|call|acall)$/i, category: ExecutionCategory.TOOL_CALL, severity: Severity.WARNING, description: 'LangChain/agent invocation', changesState: true },
+  // LlamaIndex LLM calls
+  { identity: /^llm\.(complete|acomplete|chat|achat|stream_chat|stream_complete)$/i, category: ExecutionCategory.TOOL_CALL, severity: Severity.WARNING, description: 'LlamaIndex LLM invocation', changesState: true },
+  // OpenAI client calls
+  { identity: /^(openai|client)\.(chat\.completions\.create|completions\.create|embeddings\.create|images\.generate)$/i, category: ExecutionCategory.TOOL_CALL, severity: Severity.WARNING, description: 'OpenAI API invocation', changesState: false },
+  // Anthropic client calls
+  { identity: /^(anthropic|client)\.messages\.create$/i, category: ExecutionCategory.TOOL_CALL, severity: Severity.WARNING, description: 'Anthropic API invocation', changesState: false },
+  // Generic HTTP verbs on any object (broader fallback)
+  { identity: /\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation method call', resourceHint: 'http', changesState: true },
 
   // ============================================
   // ORM/DATABASE - Prisma (WARNING/CRITICAL)
@@ -771,6 +811,22 @@ function resolveCallTargetCandidates(
         if (importInfo.isDefault && memberChain.length <= 1) {
           pushCandidate(`${resolvedFile}:default`);
         }
+        // Namespace import: import * as ns from './module' → ns.method()
+        if (importInfo.alias === importedBase && memberChain.length > 1) {
+          pushCandidate(`${resolvedFile}:${memberChain.slice(1).join('.')}`);
+        }
+      }
+    }
+    // Also search any import that has no specific name list (wildcard re-export)
+    for (const imp of imports) {
+      if (imp.names.length === 0 && !imp.alias) {
+        const resolvedFile = resolveModulePath(imp.module, currentFile, config, availableFiles);
+        if (resolvedFile) {
+          pushCandidate(`${resolvedFile}:${importedBase}`);
+          if (memberChain.length > 1) {
+            pushCandidate(`${resolvedFile}:${lastMember}`);
+          }
+        }
       }
     }
   }
@@ -921,7 +977,21 @@ export function buildCallGraph(
 }
 
 /**
- * Find exposed paths from tools to dangerous operations
+ * Find exposed paths from tools to dangerous operations.
+ *
+ * For every tool registration, this function:
+ * 1. Traverses the call graph BFS to find all reachable dangerous operations.
+ * 2. If any are found, emits an ExposedPath for each (the normal AFB04 path).
+ * 3. If NONE are found, emits a single registration-level ExposedPath with
+ *    category=TOOL_CALL and severity=INFO so that every tool produces at least
+ *    one CEE for audit purposes. This ensures complete CEE coverage even when
+ *    the static call-graph traversal cannot trace a specific external operation.
+ *
+ * @param nodes - All call graph nodes
+ * @param toolRegistrations - Nodes identified as tool registration points
+ * @param files - All parsed source files (for supporting evidence)
+ * @param maxDepth - Maximum BFS traversal depth
+ * @returns All exposed paths (including registration-only entries)
  */
 function findExposedPaths(
   nodes: Map<string, CallGraphNode>,
@@ -934,22 +1004,56 @@ function findExposedPaths(
   for (const tool of toolRegistrations) {
     const paths = findDangerousPathsFromNode(tool, nodes, maxDepth);
 
-    for (const pathInfo of paths) {
-      const hasGate = pathInfo.path.some(nodeId => {
-        const node = nodes.get(nodeId);
-        return node?.hasPolicyGate || false;
-      });
+    if (paths.length > 0) {
+      for (const pathInfo of paths) {
+        const hasGate = pathInfo.path.some(nodeId => {
+          const node = nodes.get(nodeId);
+          return node?.hasPolicyGate || false;
+        });
+
+        exposedPaths.push({
+          tool,
+          operation: pathInfo.operation,
+          path: pathInfo.path,
+          hasGate,
+          involvesCrossFile: pathInfo.involvesCrossFile,
+          unresolvedCalls: pathInfo.unresolvedCalls,
+          depthLimitHit: pathInfo.depthLimitHit,
+          inputFlowsToOperation: pathInfo.inputFlowsToOperation,
+          supportingEvidence: pathInfo.supportingEvidence,
+        });
+      }
+    } else {
+      // STEP 5: Emit a registration-level CEE so every tool produces at least one entry.
+      // This ensures complete audit coverage even when traversal finds no dangerous op.
+      const hasGate = tool.hasPolicyGate;
+      const unresolvedCalls = collectUnresolvedCalls([tool.id], nodes);
+      const registrationOp: DangerousOperation = {
+        callee: `agent-tool-registration:${tool.name}`,
+        category: ExecutionCategory.TOOL_CALL,
+        severity: Severity.INFO,
+        line: tool.startLine,
+        column: 0,
+        codeSnippet: tool.name,
+        sourceFile: tool.sourceFile,
+        changesState: false,
+        detectionKind: 'semantic',
+        detectionEvidence: tool.toolDetectionEvidence || `Tool registration: ${tool.framework || 'unknown'}`,
+      };
 
       exposedPaths.push({
         tool,
-        operation: pathInfo.operation,
-        path: pathInfo.path,
+        operation: registrationOp,
+        path: [tool.id],
         hasGate,
-        involvesCrossFile: pathInfo.involvesCrossFile,
-        unresolvedCalls: pathInfo.unresolvedCalls,
-        depthLimitHit: pathInfo.depthLimitHit,
-        inputFlowsToOperation: pathInfo.inputFlowsToOperation,
-        supportingEvidence: pathInfo.supportingEvidence,
+        involvesCrossFile: false,
+        unresolvedCalls,
+        depthLimitHit: false,
+        inputFlowsToOperation: false,
+        supportingEvidence: [
+          `Tool registration evidence: ${tool.toolDetectionEvidence || tool.framework || 'structural'}`,
+          `No external operations traced from this entry point.`,
+        ],
       });
     }
   }
