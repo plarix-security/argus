@@ -193,6 +193,11 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
       frameworks.add(finding.context.framework);
     }
   }
+  for (const cee of report.cees) {
+    if (cee.framework) {
+      frameworks.add(cee.framework);
+    }
+  }
 
   const output = {
     version: VERSION,

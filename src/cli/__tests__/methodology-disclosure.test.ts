@@ -34,14 +34,18 @@ describe('methodology disclosure', () => {
     expect(disclosure.anti_overfit_policy.hardcoded_agent_schema_rules).toBe(false);
     expect(disclosure.anti_overfit_policy.memorized_framework_schema_rules).toBe(false);
     expect(disclosure.evidence_integrity_policy.length).toBeGreaterThanOrEqual(3);
-    expect(disclosure.large_scale_agentic_readiness.ready).toBe(false);
-    expect(disclosure.plan_for_large_scale_cee_coverage.length).toBeGreaterThanOrEqual(6);
   });
 
-  it('marks partial scans as not ready with a direct short answer', () => {
+  it('marks partial scans with a coverage note', () => {
     const disclosure = buildMethodologyDisclosure(createReport(true));
 
-    expect(disclosure.short_answer).toMatch(/^No\./);
-    expect(disclosure.short_answer).toContain('partial');
+    expect(disclosure.coverage_note).toContain('partial');
+  });
+
+  it('non-partial scans include a standard coverage note', () => {
+    const disclosure = buildMethodologyDisclosure(createReport(false));
+
+    expect(disclosure.coverage_note).toBeTruthy();
+    expect(disclosure.coverage_note).not.toContain('partial');
   });
 });

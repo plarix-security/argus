@@ -301,10 +301,16 @@ const DANGEROUS_OPERATION_PATTERNS: {
   { pattern: /\.extractall$/i, category: ExecutionCategory.FILE_OPERATION, severity: Severity.WARNING, description: 'Archive extract all' },
 
   // HTTP methods - full coverage of all Python HTTP clients
-  { pattern: /^requests\.(get|post|put|patch|delete|request|head|options|Session\.get|Session\.post|Session\.put|Session\.patch|Session\.delete|Session\.request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via requests' },
-  { pattern: /^httpx\.(get|post|put|patch|delete|request|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via httpx' },
-  { pattern: /^httpx\.(AsyncClient|Client)\.(get|post|put|patch|delete|request|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via httpx client' },
-  { pattern: /^aiohttp\.ClientSession\.(get|post|put|patch|delete|request|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Async HTTP request via aiohttp' },
+  // Read-only methods (GET/HEAD/OPTIONS) → INFO; write-style methods → WARNING
+  { pattern: /^requests\.(post|put|patch|delete|request|Session\.post|Session\.put|Session\.patch|Session\.delete|Session\.request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via requests' },
+  { pattern: /^requests\.(get|head|options|Session\.get|Session\.head|Session\.options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via requests' },
+  { pattern: /^httpx\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via httpx' },
+  { pattern: /^httpx\.(get|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via httpx' },
+  { pattern: /^httpx\.(AsyncClient|Client)\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via httpx client' },
+  { pattern: /^httpx\.(AsyncClient|Client)\.(get|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via httpx client' },
+  { pattern: /^aiohttp\.ClientSession\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'Async HTTP mutation via aiohttp' },
+  { pattern: /^aiohttp\.ClientSession\.(get|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'Async HTTP read via aiohttp' },
+  // urllib/urllib3: method is in the args, conservative WARNING
   { pattern: /^urllib\.request\.(urlopen|Request|urlretrieve)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'URL request via urllib' },
   { pattern: /^urllib3\.(PoolManager|HTTPConnectionPool|HTTPSConnectionPool)\.(request|urlopen)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via urllib3' },
   // AWS boto3 - any client method call is an external API call

@@ -1295,6 +1295,9 @@ function extractElizaOSTools(
   const isAgenticFile = hasAgenticContext(parsed);
   if (!hasElizaOS && !isAgenticFile) return roots;
 
+  // When the file has agentic context but no explicit elizaos import, use generic label
+  const frameworkLabel = hasElizaOS ? 'elizaos' : 'action-object';
+
   // Pattern 1: Exported const objects with handler, execute, run, or action property
   const ACTION_EXEC_PROPS = new Set(['handler', 'execute', 'run', 'action', 'handle', 'invoke', 'perform']);
   for (const assignment of parsed.assignments) {
@@ -1319,8 +1322,8 @@ function extractElizaOSTools(
         roots.push({
           nodeId,
           toolName,
-          framework: 'elizaos',
-          evidence: `ElizaOS action "${assignment.target}" with inline ${execProp.key} handler`,
+          framework: frameworkLabel,
+          evidence: `Action object "${assignment.target}" with inline ${execProp.key} handler`,
           sourceFile: filePath,
           line: assignment.line,
         });
@@ -1338,8 +1341,8 @@ function extractElizaOSTools(
           roots.push({
             nodeId,
             toolName,
-            framework: 'elizaos',
-            evidence: `ElizaOS action "${assignment.target}" references ${execProp.key} function "${func.name}"`,
+            framework: frameworkLabel,
+            evidence: `Action object "${assignment.target}" references ${execProp.key} function "${func.name}"`,
             sourceFile: resolvedFilePath,
             line: func.startLine,
           });
@@ -1353,8 +1356,8 @@ function extractElizaOSTools(
           roots.push({
             nodeId,
             toolName,
-            framework: 'elizaos',
-            evidence: `ElizaOS action "${assignment.target}" unresolved ${execProp.key} reference "${execProp.value}"`,
+            framework: frameworkLabel,
+            evidence: `Action object "${assignment.target}" unresolved ${execProp.key} reference "${execProp.value}"`,
             sourceFile: filePath,
             line: assignment.line,
           });
@@ -1396,8 +1399,8 @@ function extractElizaOSTools(
               roots.push({
                 nodeId,
                 toolName: func.name,
-                framework: 'elizaos',
-                evidence: `ElizaOS plugin "${assignment.target}" ${prop.key} array contains "${func.name}"`,
+                framework: frameworkLabel,
+                evidence: `Plugin "${assignment.target}" ${prop.key} array contains "${func.name}"`,
                 sourceFile: resolvedFilePath,
                 line: func.startLine,
               });
@@ -1417,8 +1420,8 @@ function extractElizaOSTools(
             roots.push({
               nodeId,
               toolName: func.name,
-              framework: 'elizaos',
-              evidence: `ElizaOS plugin "${assignment.target}" ${prop.key} references "${func.name}"`,
+              framework: frameworkLabel,
+              evidence: `Plugin "${assignment.target}" ${prop.key} references "${func.name}"`,
               sourceFile: resolvedFilePath,
               line: func.startLine,
             });

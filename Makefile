@@ -17,7 +17,7 @@ lint:
 
 ## Run wyscan on itself (self-check)
 check:
-	node dist/cli/index.js check --target $(CURDIR)
+	node dist/cli/index.js check
 
 ## Install globally (requires npm link permissions)
 install: build
@@ -38,7 +38,7 @@ benchmark:
 
 ## Run a specific benchmark by number
 benchmark-%:
-	node dist/cli/index.js check --target benchmark/$*-*/
+	node dist/cli/index.js scan benchmark/$*-*/
 
 ## Type check without emitting
 typecheck:

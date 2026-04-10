@@ -13,7 +13,7 @@ wyscan scan ./agent-project
 Example output:
 
 ```text
-wyscan v1.6.0  ·  Plarix
+wyscan v1.6.1  ·  Plarix
 
 Scanning  agent-project
 
@@ -185,7 +185,7 @@ Current CLI JSON shape:
 
 ```json
 {
-  "version": "1.6.0",
+  "version": "1.6.1",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,
@@ -276,21 +276,20 @@ Current CLI JSON shape:
       ]
   },
   "methodology": {
-    "short_answer": "No. WyScan is on the right track, but it is not yet ready to guarantee full CEE coverage for large-scale agentic systems such as Eliza.",
+    "runtime_surfaces": ["cli_only", "github_app_backend"],
     "regex_main_method": false,
     "primary_method": "Tree-sitter AST parsing plus semantic tool-registration and call-path analysis.",
-    "large_scale_agentic_readiness": {
-      "ready": false,
-      "verdict": "Not nearly ready for complete coverage of all CEEs in large-scale agentic systems."
+    "anti_overfit_policy": {
+      "hardcoded_agent_schema_rules": false,
+      "memorized_framework_schema_rules": false,
+      "note": "Detection relies on language and framework structural first principles, not memorized project-specific schemas."
     },
-    "plan_for_large_scale_cee_coverage": [
-      "Build and maintain a versioned large-scale benchmark corpus (including Eliza-style repositories) with hand-labeled CEEs.",
-      "Add whole-repository symbol and module resolution for dynamic exports/imports and cross-file indirection.",
-      "Add deeper interprocedural dataflow and alias tracking from tool inputs to execution sinks.",
-      "Improve dynamic registration recovery (config-driven/plugin-based/runtime-composed tools) with explicit uncertainty reporting.",
-      "Replace remaining regex sink matching paths with typed semantic sink models where possible; keep regex as fallback only.",
-      "Gate releases on benchmark precision/recall targets and publish those metrics in CI artifacts and release notes."
-    ]
+    "evidence_integrity_policy": [
+      "Only report operations tied to parsed code and traced evidence.",
+      "No hardcoded repository-specific shortcuts in detector logic.",
+      "Uncertainty is surfaced explicitly through unresolved_calls, depth_limit_hit, and evidence_kind fields."
+    ],
+    "coverage_note": "Coverage is limited to the analyzed file set. External packages and dynamically composed tool registrations are not traced."
   }
 }
 ```
@@ -303,7 +302,7 @@ Notes:
 - `findings` is the AFB04 subset of `cees`.
 - `call_path` lists the traced function path in the analyzed file set.
 - `evidence_kind`, `supporting_evidence`, `resource`, and `changes_state` expose the current proof and action summary for each finding or CEE.
-- `methodology` includes a blunt readiness verdict, whether regex is the main method, and the concrete plan for large-scale CEE coverage.
+- `methodology` includes the detection method, anti-overfitting policy, evidence integrity policy, and a coverage note for the scan.
 - The repository does not currently promise a separately versioned stable JSON schema.
 
 ## GitHub App

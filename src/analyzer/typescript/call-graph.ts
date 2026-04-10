@@ -185,10 +185,6 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
   { identity: /^Function$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'Dynamic function creation via Function constructor', changesState: true },
   { identity: /^vm\.(runInContext|runInNewContext|runInThisContext|compileFunction)$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'VM code execution', changesState: true },
   { identity: /^vm\.Script$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'VM script compilation', changesState: true },
-  { identity: /^require$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'Dynamic module require', changesState: true },
-  { identity: /^import$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.CRITICAL, description: 'Dynamic import', changesState: true },
-  { identity: /^setTimeout$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.WARNING, description: 'Potentially dynamic code via setTimeout', changesState: true },
-  { identity: /^setInterval$/i, category: ExecutionCategory.CODE_EXECUTION, severity: Severity.WARNING, description: 'Potentially dynamic code via setInterval', changesState: true },
 
   // ============================================
   // FILE DELETION (CRITICAL)
@@ -216,20 +212,44 @@ const SEMANTIC_DANGEROUS_OPERATION_PATTERNS: DangerousOperationPattern[] = [
 
   // ============================================
   // HTTP/NETWORK (API_CALL category)
+  // Read-only HTTP methods → INFO; write-style methods → WARNING
   // ============================================
+  // fetch: method is in the options object, not the call name — conservative WARNING
   { identity: /^fetch$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via fetch', resourceHint: 'http', changesState: false },
-  { identity: /^axios(\.(get|post|put|patch|delete|request|head|options))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via axios', resourceHint: 'http', changesState: true },
-  { identity: /^got(\.(get|post|put|patch|delete|stream))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via got', resourceHint: 'http', changesState: true },
-  { identity: /^superagent\.(get|post|put|patch|delete|del|head)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via superagent', resourceHint: 'http', changesState: true },
+  // axios write methods
+  { identity: /^axios\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via axios', resourceHint: 'http', changesState: true },
+  { identity: /^axios$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via axios', resourceHint: 'http', changesState: true },
+  // axios read methods
+  { identity: /^axios\.(get|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via axios', resourceHint: 'http', changesState: false },
+  // got write methods
+  { identity: /^got\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via got', resourceHint: 'http', changesState: true },
+  // got read methods (get/stream default to read)
+  { identity: /^got(\.(get|stream))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via got', resourceHint: 'http', changesState: false },
+  // superagent write methods
+  { identity: /^superagent\.(post|put|patch|delete|del)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via superagent', resourceHint: 'http', changesState: true },
+  // superagent read methods
+  { identity: /^superagent\.(get|head)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via superagent', resourceHint: 'http', changesState: false },
+  // node-fetch / undici: method in options, conservative WARNING
   { identity: /^node-fetch$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via node-fetch', resourceHint: 'http', changesState: false },
   { identity: /^undici\.(fetch|request|stream|pipeline)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via undici', resourceHint: 'http', changesState: false },
-  { identity: /^request(\.(get|post|put|patch|delete|del|head))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via request', resourceHint: 'http', changesState: true },
-  { identity: /^ky\.(get|post|put|patch|delete|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via ky', resourceHint: 'http', changesState: true },
-  { identity: /^needle\.(get|post|put|patch|delete|head|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via needle', resourceHint: 'http', changesState: true },
-  // cross-fetch, isomorphic-fetch
+  // request write methods
+  { identity: /^request\.(post|put|patch|delete|del)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via request', resourceHint: 'http', changesState: true },
+  // request read methods
+  { identity: /^request(\.(get|head))?$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via request', resourceHint: 'http', changesState: false },
+  // ky write methods
+  { identity: /^ky\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via ky', resourceHint: 'http', changesState: true },
+  // ky read methods
+  { identity: /^ky\.(get|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via ky', resourceHint: 'http', changesState: false },
+  // needle write methods
+  { identity: /^needle\.(post|put|patch|delete)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via needle', resourceHint: 'http', changesState: true },
+  // needle read methods
+  { identity: /^needle\.(get|head|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via needle', resourceHint: 'http', changesState: false },
+  // cross-fetch, isomorphic-fetch: method in options, conservative WARNING
   { identity: /^(crossFetch|isomorphicFetch)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via cross/isomorphic fetch', resourceHint: 'http', changesState: false },
-  // Generic HTTP client patterns: client.get(), api.post(), httpClient.request()
-  { identity: /^(client|api|httpClient|apiClient|http|https)\.(get|post|put|patch|delete|request|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP request via client object', resourceHint: 'http', changesState: true },
+  // Generic HTTP client write methods: client.post/put/patch/delete → WARNING
+  { identity: /^(client|api|httpClient|apiClient|http|https)\.(post|put|patch|delete|request)$/i, category: ExecutionCategory.API_CALL, severity: Severity.WARNING, description: 'HTTP mutation via client object', resourceHint: 'http', changesState: true },
+  // Generic HTTP client read methods: client.get/head/options → INFO
+  { identity: /^(client|api|httpClient|apiClient|http|https)\.(get|head|options)$/i, category: ExecutionCategory.API_CALL, severity: Severity.INFO, description: 'HTTP read via client object', resourceHint: 'http', changesState: false },
   // ElizaOS runtime.fetch() pattern
   { identity: /^runtime\.(fetch|useModel|generateText|generateObject|call|invoke)$/i, category: ExecutionCategory.TOOL_CALL, severity: Severity.WARNING, description: 'ElizaOS runtime invocation', resourceHint: 'runtime', changesState: true },
   // ElizaOS memory operations
