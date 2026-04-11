@@ -1,0 +1,648 @@
+  Loading files: 100/362...  Loading files: 200/362...  Loading files: 300/362...  Loaded 362 files. Building call graph...
+  Analyzing TypeScript/JS (56 files)...
+  wyscan v1.6.2  ·  Plarix
+  ─────────────────────────────────────────────────────
+
+  Scanning  ../agent-repos/superagi
+
+  ─────────────────────────────────────────────────────
+  2 critical  ·  48 warning  ·  35 info
+  125 cees detected
+  ─────────────────────────────────────────────────────
+
+  ● CRITICAL delete_file.py:61:17
+    os.remove(final_path)
+    Detected reachable call from tool "_execute" (langchain) to os.remove. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: final_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/delete_file.py:36
+
+  ● CRITICAL read_file.py:99:13
+    os.remove(temporary_file_path)
+    Detected reachable call from tool "_execute" (langchain) to os.remove. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: temporary_file_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/read_file.py:43
+
+  ● WARNING  DashboardService.js:56:9
+    api.post
+    Detected reachable call from tool "handleAddTool" (registration) to ./apiConfig.post through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: http.
+    tool: /home/user/agent-repos/superagi/gui/pages/Content/Toolkits/AddTool.js:14
+    path: cross-file
+    unresolved: githubURL.replace, toast.error, setAddClickable
+
+  ● WARNING  DashboardService.js:132:9
+    api.post
+    Detected reachable call from tool "installFromMarketplace" (registration) to ./apiConfig.post through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: http.
+    tool: /home/user/agent-repos/superagi/gui/pages/_app.js:65
+    path: cross-file
+    unresolved: localStorage.getItem, installKnowledgeTemplate(knowledgeTemplateName, knowledgeIndexId)
+        .then((response) => {
+          toast.success("Template installed", {autoClose: 1800});
+        }).catch, installKnowledgeTemplate(knowledgeTemplateName, knowledgeIndexId).then
+
+  ● WARNING  DashboardService.js:176:9
+    api.put
+    Detected reachable call from tool "handleInstallClick" (registration) to ./apiConfig.put through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: http.
+    tool: /home/user/agent-repos/superagi/gui/pages/Content/Marketplace/ToolkitTemplate.js:39
+    path: cross-file
+    unresolved: window.location.href.toLowerCase().includes, window.location.href.toLowerCase, localStorage.setItem
+
+  ● WARNING  resource_helper.py:142:13
+    os.makedirs(directory, exist_ok=True)
+    Detected reachable call from tool "_execute" (langchain) to os.makedirs through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: directory.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/append_file.py:38
+    path: cross-file
+
+  ● WARNING  resource_helper.py:142:13
+    os.makedirs(directory, exist_ok=True)
+    Detected reachable call from tool "_execute" (langchain) to os.makedirs through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Resource hint: directory.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/delete_file.py:36
+    path: cross-file
+
+  ● WARNING  validate_csv.py:17:21
+    data.append(row)
+    Detected reachable call from tool "_execute" (langchain) to data.append through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Resource hint: row.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/read_file.py:43
+    path: cross-file
+
+  ● WARNING  apollo_search.py:78:17
+    people_list.append({'first_name': person['first_name'],
+    Detected reachable call from tool "_execute" (langchain) to people_list.append. No policy gate detected in the analyzed call path. Resource hint: first_name.
+    tool: /home/user/agent-repos/superagi/superagi/tools/apollo/apollo_search.py:57
+
+  ● WARNING  apollo_search.py:127:20
+    requests.post(url, headers=headers, data=json.dumps(data))
+    Detected reachable call from tool "_execute" (langchain) to requests.post through 1 intermediate call(s). No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: url.
+    tool: /home/user/agent-repos/superagi/superagi/tools/apollo/apollo_search.py:57
+
+  ● WARNING  write_code.py:106:13
+    file_names.append(file_name)
+    Detected reachable call from tool "_execute" (langchain) to file_names.append. No policy gate detected in the analyzed call path. Resource hint: file_name.
+    tool: /home/user/agent-repos/superagi/superagi/tools/code/write_code.py:57
+
+  ● WARNING  duck_duck_go_search.py:66:13
+    links.append(result["href"])
+    Detected reachable call from tool "_execute" (langchain) to links.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: href.
+    tool: /home/user/agent-repos/superagi/superagi/tools/duck_duck_go/duck_duck_go_search.py:50
+
+  ● WARNING  duck_duck_go_search.py:96:13
+    results.append({"title": search_results[i]["title"], "bod...
+    Detected reachable call from tool "_execute" (langchain) to results.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: title.
+    tool: /home/user/agent-repos/superagi/superagi/tools/duck_duck_go/duck_duck_go_search.py:50
+
+  ● WARNING  duck_duck_go_search.py:126:17
+    webpages.append(content)
+    Detected reachable call from tool "_execute" (langchain) to webpages.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: content.
+    tool: /home/user/agent-repos/superagi/superagi/tools/duck_duck_go/duck_duck_go_search.py:50
+
+  ● WARNING  read_email.py:61:13
+    messages.append(email_msg)
+    Detected reachable call from tool "_execute" (langchain) to messages.append. No policy gate detected in the analyzed call path. Resource hint: email_msg.
+    tool: /home/user/agent-repos/superagi/superagi/tools/email/read_email.py:33
+
+  ● WARNING  send_email_attachment.py:123:13
+    conn.append(
+    Detected reachable call from tool "_execute" (langchain) to conn.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: draft_folder.
+    tool: /home/user/agent-repos/superagi/superagi/tools/email/send_email_attachment.py:47
+
+  ● WARNING  send_email_attachment.py:137:18
+    with smtplib.SMTP(smtp_host, smtp_port) as smtp:
+    Detected reachable call from tool "_execute" (langchain) to smtplib.SMTP through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: smtp_host.
+    tool: /home/user/agent-repos/superagi/superagi/tools/email/send_email_attachment.py:47
+
+  ● WARNING  send_email_attachment.py:141:17
+    smtp.send_message(message)
+    Detected reachable call from tool "_execute" (langchain) to smtplib.SMTP.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: message.
+    tool: /home/user/agent-repos/superagi/superagi/tools/email/send_email_attachment.py:47
+
+  ● WARNING  send_email.py:67:13
+    conn.append(
+    Detected reachable call from tool "_execute" (langchain) to conn.append. No policy gate detected in the analyzed call path. Resource hint: draft_folder.
+    tool: /home/user/agent-repos/superagi/superagi/tools/email/send_email.py:31
+
+  ● WARNING  send_email.py:81:18
+    with smtplib.SMTP(smtp_host, smtp_port) as smtp:
+    Detected reachable call from tool "_execute" (langchain) to smtplib.SMTP. No policy gate detected in the analyzed call path. Resource hint: smtp_host.
+    tool: /home/user/agent-repos/superagi/superagi/tools/email/send_email.py:31
+
+  ● WARNING  send_email.py:85:17
+    smtp.send_message(message)
+    Detected reachable call from tool "_execute" (langchain) to smtplib.SMTP.send_message. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: message.
+    tool: /home/user/agent-repos/superagi/superagi/tools/email/send_email.py:31
+
+  ● WARNING  append_file.py:69:13
+    os.makedirs(directory, exist_ok=True)
+    Detected reachable call from tool "_execute" (langchain) to os.makedirs. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: directory.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/append_file.py:38
+
+  ● WARNING  append_file.py:70:18
+    with open(final_path, 'a+', encoding="utf-8") as file:
+    Detected reachable call from tool "_execute" (langchain) to builtins.open. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: final_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/append_file.py:38
+
+  ● WARNING  append_file.py:71:17
+    file.write(content)
+    Detected reachable call from tool "_execute" (langchain) to builtins.open.write. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: content.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/append_file.py:38
+
+  ● WARNING  list_files.py:68:17
+    found_files.append(file)
+    Detected reachable call from tool "_execute" (langchain) to found_files.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: file.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/list_files.py:33
+
+  ● WARNING  read_file.py:68:22
+    with open(temporary_file_path, "wb") as f:
+    Detected reachable call from tool "_execute" (langchain) to builtins.open. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: temporary_file_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/read_file.py:43
+
+  ● WARNING  read_file.py:70:21
+    f.write(contents)
+    Detected reachable call from tool "_execute" (langchain) to builtins.open.write. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: contents.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/read_file.py:43
+
+  ● WARNING  read_file.py:75:9
+    os.makedirs(directory, exist_ok=True)
+    Detected reachable call from tool "_execute" (langchain) to os.makedirs. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: directory.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/read_file.py:43
+
+  ● WARNING  read_file.py:89:17
+    content.append(soup.get_text())
+    Detected reachable call from tool "_execute" (langchain) to content.append. No policy gate detected in the analyzed call path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/read_file.py:43
+
+  ● WARNING  review_pull_request.py:118:17
+    pull_request_arr_parts.append(current_part)
+    Detected reachable call from tool "_execute" (langchain) to pull_request_arr_parts.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: current_part.
+    tool: /home/user/agent-repos/superagi/superagi/tools/github/review_pull_request.py:49
+
+  ● WARNING  review_pull_request.py:123:9
+    pull_request_arr_parts.append(current_part)
+    Detected reachable call from tool "_execute" (langchain) to pull_request_arr_parts.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: current_part.
+    tool: /home/user/agent-repos/superagi/superagi/tools/github/review_pull_request.py:49
+
+  ● WARNING  create_calendar_event.py:38:13
+    attendees_list.append(email_id)
+    Detected reachable call from tool "_execute" (langchain) to attendees_list.append. No policy gate detected in the analyzed call path. Resource hint: email_id.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/create_calendar_event.py:24
+
+  ● WARNING  create_calendar_event.py:63:17
+    service.events().insert(calendarId="primary", body=event,...
+    Detected reachable call from tool "_execute" (langchain) to service.events().insert(calendarId="primary", body=event, conferenceDataVersion=1).execute. No policy gate detected in the analyzed call path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/create_calendar_event.py:24
+
+  ● WARNING  create_calendar_event.py:63:17
+    service.events().insert(calendarId="primary", body=event,...
+    Detected reachable call from tool "_execute" (langchain) to service.events().insert. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: primary.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/create_calendar_event.py:24
+
+  ● WARNING  delete_calendar_event.py:33:22
+    service.events().delete(
+    Detected reachable call from tool "_execute" (langchain) to service.events().delete(
+                calendarId = "primary",
+                eventId = eid
+            ).execute. No policy gate detected in the analyzed call path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/delete_calendar_event.py:19
+
+  ● WARNING  delete_calendar_event.py:33:22
+    service.events().delete(
+    Detected reachable call from tool "_execute" (langchain) to service.events().delete. No policy gate detected in the analyzed call path. Resource hint: primary.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/delete_calendar_event.py:19
+
+  ● WARNING  event_details_calendar.py:31:22
+    service.events().get(
+    Detected reachable call from tool "_execute" (langchain) to service.events().get(
+                calendarId = "primary",
+                eventId = eid
+            ).execute. No policy gate detected in the analyzed call path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/event_details_calendar.py:17
+
+  ● WARNING  event_details_calendar.py:43:21
+    attendees.append(attendee['email'])
+    Detected reachable call from tool "_execute" (langchain) to attendees.append. No policy gate detected in the analyzed call path. Resource hint: email.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/event_details_calendar.py:17
+
+  ● WARNING  list_calendar_events.py:53:13
+    service.events().list(
+    Detected reachable call from tool "_execute" (langchain) to service.events().list(
+            calendarId="primary",
+            timeMin=date_utc['start_datetime_utc'],
+            timeMax=date_utc['end_datetime_utc'],
+            singleEvents=True,
+            orderBy="startTime",
+            ).execute through 1 intermediate call(s). No policy gate detected in the analyzed call path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/list_calendar_events.py:32
+
+  ● WARNING  list_calendar_events.py:66:13
+    csv_data.append([event_id, summary, start_date, end_date,...
+    Detected reachable call from tool "_execute" (langchain) to csv_data.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: event_id.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/list_calendar_events.py:32
+
+  ● WARNING  google_search.py:64:13
+    results.append({"title": snippets[i], "body": webpage, "l...
+    Detected reachable call from tool "_execute" (langchain) to results.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippets.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_search/google_search.py:42
+
+  ● WARNING  dalle_image_gen.py:69:20
+    requests.get(response[i]['url']).content
+    Detected reachable call from tool "_execute" (langchain) to requests.get. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: url.
+    tool: /home/user/agent-repos/superagi/superagi/tools/image_generation/dalle_image_gen.py:41
+
+  ● WARNING  stable_diffusion_image_gen.py:62:13
+    base64_strings.append(artifact['base64'])
+    Detected reachable call from tool "_execute" (langchain) to base64_strings.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: base64.
+    tool: /home/user/agent-repos/superagi/superagi/tools/image_generation/stable_diffusion_image_gen.py:46
+
+  ● WARNING  stable_diffusion_image_gen.py:83:20
+    requests.post(
+    Detected reachable call from tool "_execute" (langchain) to requests.post through 1 intermediate call(s). No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: f"https://api.stability.ai/v1/generation/{engine_id}/text-to-image".
+    tool: /home/user/agent-repos/superagi/superagi/tools/image_generation/stable_diffusion_image_gen.py:46
+
+  ● WARNING  instagram.py:177:18
+    requests.get(
+    Detected reachable call from tool "_execute" (langchain) to requests.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: url_to_get_acc_id.
+    tool: /home/user/agent-repos/superagi/superagi/tools/instagram_tool/instagram.py:53
+
+  ● WARNING  instagram.py:185:20
+    requests.post(
+    Detected reachable call from tool "_execute" (langchain) to requests.post through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: url_to_create_media_container.
+    tool: /home/user/agent-repos/superagi/superagi/tools/instagram_tool/instagram.py:53
+
+  ● WARNING  instagram.py:193:20
+    requests.post(
+    Detected reachable call from tool "_execute" (langchain) to requests.post through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: url_to_post_media_container.
+    tool: /home/user/agent-repos/superagi/superagi/tools/instagram_tool/instagram.py:53
+
+  ● WARNING  search_scraper.py:41:11
+    httpx.get(
+    Detected reachable call from tool "_execute" (langchain) to httpx.get through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: /search.
+    tool: /home/user/agent-repos/superagi/superagi/tools/searx/searx.py:39
+    path: cross-file
+
+  ● WARNING  search_scraper.py:97:13
+    sources.append(s.text.strip())
+    Detected reachable call from tool "_execute" (langchain) to sources.append through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/searx/searx.py:39
+    path: cross-file
+
+  ● WARNING  search_scraper.py:102:9
+    result_list.append(result)
+    Detected reachable call from tool "_execute" (langchain) to result_list.append through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: result.
+    tool: /home/user/agent-repos/superagi/superagi/tools/searx/searx.py:39
+    path: cross-file
+
+  ● INFO     prompt_reader.py:9:17
+    open(file_path, "r")
+    Detected reachable call from tool "_execute" (langchain) to builtins.open through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Resource hint: file_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/code/improve_code.py:48
+    path: cross-file
+
+  ● INFO     prompt_reader.py:9:17
+    open(file_path, "r")
+    Detected reachable call from tool "_execute" (langchain) to builtins.open through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Resource hint: file_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/code/write_code.py:57
+    path: cross-file
+
+  ● INFO     prompt_reader.py:9:17
+    open(file_path, "r")
+    Detected reachable call from tool "_execute" (langchain) to builtins.open through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: file_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/github/review_pull_request.py:49
+    path: cross-file
+
+  ● INFO     prompt_reader.py:9:17
+    open(file_path, "r")
+    Detected reachable call from tool "_execute" (langchain) to builtins.open through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: file_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/thinking/tools.py:48
+    path: cross-file
+
+  ● INFO     prompt_reader.py:10:28
+    f.read()
+    Detected reachable call from tool "_execute" (langchain) to builtins.open.read through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/code/improve_code.py:48
+    path: cross-file
+
+  ● INFO     prompt_reader.py:10:28
+    f.read()
+    Detected reachable call from tool "_execute" (langchain) to builtins.open.read through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/code/write_code.py:57
+    path: cross-file
+
+  ● INFO     prompt_reader.py:10:28
+    f.read()
+    Detected reachable call from tool "_execute" (langchain) to builtins.open.read through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/github/review_pull_request.py:49
+    path: cross-file
+
+  ● INFO     prompt_reader.py:10:28
+    f.read()
+    Detected reachable call from tool "_execute" (langchain) to builtins.open.read through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/thinking/tools.py:48
+    path: cross-file
+
+  ● INFO     token_counter.py:62:21
+    if model in model_token_per_message_dict.keys():
+    Detected reachable call from tool "_execute" (langchain) to model_token_per_message_dict.keys through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/code/write_code.py:57
+    path: cross-file
+
+  ● INFO     token_counter.py:62:21
+    if model in model_token_per_message_dict.keys():
+    Detected reachable call from tool "_execute" (langchain) to model_token_per_message_dict.keys through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/github/review_pull_request.py:49
+    path: cross-file
+
+  ● INFO     validate_csv.py:7:10
+    with open(file_path, 'rb') as f:
+    Detected reachable call from tool "_execute" (langchain) to builtins.open through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: file_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/read_file.py:43
+    path: cross-file
+
+  ● INFO     validate_csv.py:8:33
+    chardet.detect(f.read())
+    Detected reachable call from tool "_execute" (langchain) to builtins.open.read through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/read_file.py:43
+    path: cross-file
+
+  ● INFO     validate_csv.py:13:14
+    with open(file_path, 'r', encoding=encoding) as f:
+    Detected reachable call from tool "_execute" (langchain) to builtins.open through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: file_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/read_file.py:43
+    path: cross-file
+
+  ● INFO     improve_code.py:83:28
+    result.get('response')
+    Detected reachable call from tool "_execute" (langchain) to result.get. No policy gate detected in the analyzed call path. Resource hint: response.
+    tool: /home/user/agent-repos/superagi/superagi/tools/code/improve_code.py:48
+
+  ● INFO     improve_code.py:88:27
+    response.get('choices')
+    Detected reachable call from tool "_execute" (langchain) to response.get. No policy gate detected in the analyzed call path. Resource hint: choices.
+    tool: /home/user/agent-repos/superagi/superagi/tools/code/improve_code.py:48
+
+  ● INFO     read_email.py:79:47
+    str(part.get("Content-Disposition"))
+    Detected reachable call from tool "_execute" (langchain) to part.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Content-Disposition.
+    tool: /home/user/agent-repos/superagi/superagi/tools/email/read_email.py:33
+
+  ● INFO     send_email_attachment.py:75:42
+    if final_path is None or not os.path.exists(final_path):
+    Detected reachable call from tool "_execute" (langchain) to os.path.exists. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: final_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/email/send_email_attachment.py:47
+
+  ● INFO     send_email_attachment.py:77:18
+    with open(final_path, "rb") as file:
+    Detected reachable call from tool "_execute" (langchain) to builtins.open. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: final_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/email/send_email_attachment.py:47
+
+  ● INFO     send_email_attachment.py:78:35
+    file.read()
+    Detected reachable call from tool "_execute" (langchain) to builtins.open.read. No policy gate detected in the analyzed call path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/email/send_email_attachment.py:47
+
+  ● INFO     list_files.py:61:34
+    for root, dirs, files in os.walk(directory):
+    Detected reachable call from tool "_execute" (langchain) to os.walk through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: directory.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/list_files.py:33
+
+  ● INFO     read_file.py:72:38
+    if final_path is None or not os.path.exists(final_path) a...
+    Detected reachable call from tool "_execute" (langchain) to os.path.exists. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: final_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/file/read_file.py:43
+
+  ● INFO     create_calendar_event.py:64:121
+    f"Event {event_name} at {date_utc['start_datetime_utc']} ...
+    Detected reachable call from tool "_execute" (langchain) to event.get. No policy gate detected in the analyzed call path. Resource hint: htmlLink.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/create_calendar_event.py:24
+
+  ● INFO     event_details_calendar.py:31:22
+    service.events().get(
+    Detected reachable call from tool "_execute" (langchain) to service.events().get. No policy gate detected in the analyzed call path. Resource hint: primary.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/event_details_calendar.py:17
+
+  ● INFO     list_calendar_events.py:73:20
+    query_parameters.get('eid', [None])[0]
+    Detected reachable call from tool "_execute" (langchain) to query_parameters.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: eid.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/list_calendar_events.py:32
+
+  ● INFO     list_calendar_events.py:74:19
+    item.get('summary', '')
+    Detected reachable call from tool "_execute" (langchain) to item.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: summary.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/list_calendar_events.py:32
+
+  ● INFO     list_calendar_events.py:75:22
+    item['start'].get('dateTime', '')
+    Detected reachable call from tool "_execute" (langchain) to item['start'].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: dateTime.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/list_calendar_events.py:32
+
+  ● INFO     list_calendar_events.py:76:20
+    item['end'].get('dateTime', '')
+    Detected reachable call from tool "_execute" (langchain) to item['end'].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: dateTime.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/list_calendar_events.py:32
+
+  ● INFO     list_calendar_events.py:77:56
+    [attendee['email'] for attendee in item.get('attendees', ...
+    Detected reachable call from tool "_execute" (langchain) to item.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: attendees.
+    tool: /home/user/agent-repos/superagi/superagi/tools/google_calendar/list_calendar_events.py:32
+
+  ● INFO     instagram.py:203:18
+    with open(file_path, "rb") as file:
+    Detected reachable call from tool "_execute" (langchain) to builtins.open through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: file_path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/instagram_tool/instagram.py:53
+
+  ● INFO     instagram.py:204:35
+    file.read()
+    Detected reachable call from tool "_execute" (langchain) to builtins.open.read through 2 intermediate call(s). No policy gate detected in the analyzed call path.
+    tool: /home/user/agent-repos/superagi/superagi/tools/instagram_tool/instagram.py:53
+
+  ● INFO     search_scraper.py:82:18
+    result_div.find(["h4", "h3"])
+    Detected reachable call from tool "_execute" (langchain) to result_div.find through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: h4.
+    tool: /home/user/agent-repos/superagi/superagi/tools/searx/searx.py:39
+    path: cross-file
+
+  ● INFO     search_scraper.py:85:16
+    header.find("a")["href"]
+    Detected reachable call from tool "_execute" (langchain) to header.find through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: a.
+    tool: /home/user/agent-repos/superagi/superagi/tools/searx/searx.py:39
+    path: cross-file
+
+  ● INFO     search_scraper.py:88:40
+    clean_whitespace(result_div.find("p").text)
+    Detected reachable call from tool "_execute" (langchain) to result_div.find through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: p.
+    tool: /home/user/agent-repos/superagi/superagi/tools/searx/searx.py:39
+    path: cross-file
+
+  ● INFO     search_scraper.py:91:29
+    result_div.find(
+    Detected reachable call from tool "_execute" (langchain) to result_div.find through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: pull-right.
+    tool: /home/user/agent-repos/superagi/superagi/tools/searx/searx.py:39
+    path: cross-file
+
+  ● INFO     search_scraper.py:93:14
+    ) or result_div.find(attrs={"class": "engines"})
+    Detected reachable call from tool "_execute" (langchain) to result_div.find through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: engines.
+    tool: /home/user/agent-repos/superagi/superagi/tools/searx/searx.py:39
+    path: cross-file
+
+  Unclassified CEEs
+  ─────────────────────────────────────────────────────
+  ○ unclassified _app.js:253:0
+    clearLocalStorage
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified AgentCreate.js:205:0
+    handleClickOutside
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified AgentSchedule.js:44:0
+    handleClickOutside
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified KnowledgeForm.js:46:0
+    handleClickOutside
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified KnowledgeTemplate.js:46:0
+    handleClickOutside
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified ToolkitWorkspace.js:125:0
+    handleClickOutside
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified apollo_search.py:57:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified base_tool.py:171:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified improve_code.py:48:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified write_code.py:57:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified duck_duck_go_search.py:50:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified read_email.py:33:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified send_email_attachment.py:47:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified send_email.py:31:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified append_file.py:38:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified delete_file.py:36:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified list_files.py:33:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified read_file.py:43:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified write_file.py:39:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified add_file.py:52:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified delete_file.py:50:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified fetch_pull_request.py:43:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified review_pull_request.py:49:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified search_repo.py:42:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified create_calendar_event.py:24:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified delete_calendar_event.py:19:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified event_details_calendar.py:17:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified list_calendar_events.py:32:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified google_search.py:42:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified google_serp_search.py:45:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified dalle_image_gen.py:41:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified stable_diffusion_image_gen.py:46:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified instagram.py:53:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified knowledge_search.py:36:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified query_resource.py:42:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified searx.py:39:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified send_message.py:38:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tools.py:48:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified send_tweets.py:24:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tools.py:36:0
+    _execute
+    Tool registration detected. No external operations traced from this entry point.
+
+  ─────────────────────────────────────────────────────
+  362 files  ·  5.4s
+  Unique entrypoints reaching sensitive operations: 9.
+  Coverage gap: 966 unresolved call edge(s) in call graph.

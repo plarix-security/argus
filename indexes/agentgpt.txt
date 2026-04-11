@@ -1,0 +1,154 @@
+  Loading files: 100/234...  Loading files: 200/234...  Loaded 234 files. Building call graph...
+  Analyzing TypeScript/JS (150 files)...
+  wyscan v1.6.2  ·  Plarix
+  ─────────────────────────────────────────────────────
+
+  Scanning  ../agent-repos/agentgpt
+
+  ─────────────────────────────────────────────────────
+  10 warning  ·  10 info
+  29 cees detected
+  ─────────────────────────────────────────────────────
+
+  ● WARNING  search.py:34:20
+    async with session.post(
+    Detected reachable call from tool "call" (langchain) to session.post through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: f"https://google.serper.dev/{search_type}".
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● WARNING  search.py:80:17
+    answer_values.append(answer_box.get("answer"))
+    Detected reachable call from tool "call" (langchain) to answer_values.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: answer.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● WARNING  search.py:82:17
+    answer_values.append(answer_box.get("snippet").replace("\...
+    Detected reachable call from tool "call" (langchain) to answer_values.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: \n.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● WARNING  search.py:84:17
+    answer_values.append(", ".join(answer_box.get("snippetHig...
+    Detected reachable call from tool "call" (langchain) to answer_values.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippetHighlighted.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● WARNING  search.py:87:17
+    snippets.append(
+    Detected reachable call from tool "call" (langchain) to snippets.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: f"https://www.google.com/search?q={quote(input_str)}".
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● WARNING  search.py:99:17
+    texts.append(result["snippet"])
+    Detected reachable call from tool "call" (langchain) to texts.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippet.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● WARNING  search.py:103:17
+    texts.append(f"{attribute}: {value}.")
+    Detected reachable call from tool "call" (langchain) to texts.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: f"{attribute}: {value}.".
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● WARNING  search.py:104:13
+    snippets.append(CitedSnippet(len(snippets) + 1, "\n".join...
+    Detected reachable call from tool "call" (langchain) to snippets.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippets.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● WARNING  sidsearch.py:28:20
+    async with session.post(
+    Detected reachable call from tool "call" (langchain) to aiohttp.ClientSession.post through 2 intermediate call(s). No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: https://api.sid.ai/v1/users/me/query.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/sidsearch.py:130
+
+  ● WARNING  sidsearch.py:47:20
+    async with session.post(
+    Detected reachable call from tool "call" (langchain) to aiohttp.ClientSession.post through 3 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: https://auth.sid.ai/oauth/token.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/sidsearch.py:130
+
+  ● INFO     search.py:76:12
+    if results.get("answerBox"):
+    Detected reachable call from tool "call" (langchain) to results.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: answerBox.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● INFO     search.py:78:26
+    results.get("answerBox", {})
+    Detected reachable call from tool "call" (langchain) to results.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: answerBox.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● INFO     search.py:79:16
+    if answer_box.get("answer"):
+    Detected reachable call from tool "call" (langchain) to answer_box.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: answer.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● INFO     search.py:80:38
+    answer_values.append(answer_box.get("answer"))
+    Detected reachable call from tool "call" (langchain) to answer_box.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: answer.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● INFO     search.py:81:18
+    elif answer_box.get("snippet"):
+    Detected reachable call from tool "call" (langchain) to answer_box.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippet.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● INFO     search.py:82:38
+    answer_values.append(answer_box.get("snippet").replace("\...
+    Detected reachable call from tool "call" (langchain) to answer_box.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippet.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● INFO     search.py:83:18
+    elif answer_box.get("snippetHighlighted"):
+    Detected reachable call from tool "call" (langchain) to answer_box.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippetHighlighted.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● INFO     search.py:84:48
+    answer_values.append(", ".join(answer_box.get("snippetHig...
+    Detected reachable call from tool "call" (langchain) to answer_box.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippetHighlighted.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● INFO     search.py:102:37
+    for attribute, value in result.get("attributes", {}).item...
+    Detected reachable call from tool "call" (langchain) to result.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: attributes.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/search.py:55
+
+  ● INFO     sidsearch.py:118:61
+    Snippet(text=result["text"]) for result in (res.get("resu...
+    Detected reachable call from tool "call" (langchain) to res.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: results.
+    tool: /home/user/agent-repos/agentgpt/platform/reworkd_platform/web/api/agent/tools/sidsearch.py:130
+
+  Unclassified CEEs
+  ─────────────────────────────────────────────────────
+  ○ unclassified Hero.tsx:26:0
+    handleWindowResize
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified index.tsx:184:0
+    getStaticProps
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified code.py:14:0
+    call
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified conclude.py:12:0
+    call
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified image.py:57:0
+    call
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified reason.py:16:0
+    call
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified search.py:55:0
+    call
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified sidsearch.py:130:0
+    call
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified wikipedia_search.py:20:0
+    call
+    Tool registration detected. No external operations traced from this entry point.
+
+  ─────────────────────────────────────────────────────
+  234 files  ·  2.7s
+  Unique entrypoints reaching sensitive operations: 2.
+  Coverage gap: 563 unresolved call edge(s) in call graph.

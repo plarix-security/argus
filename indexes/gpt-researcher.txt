@@ -1,0 +1,181 @@
+  Loading files: 100/278...  Loading files: 200/278...  Loaded 278 files. Building call graph...
+  Analyzing TypeScript/JS (91 files)...
+  wyscan v1.6.2  ·  Plarix
+  ─────────────────────────────────────────────────────
+
+  Scanning  ../agent-repos/gpt-researcher
+
+  ─────────────────────────────────────────────────────
+  3 info
+  40 cees detected
+  ─────────────────────────────────────────────────────
+
+  ● INFO     tools.py:216:49
+    search_content += f"Title: {result.get('title', '')}\n"
+    Detected reachable call from tool "search_tool" (langchain) to result.get. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: title.
+    tool: /home/user/agent-repos/gpt-researcher/gpt_researcher/utils/tools.py:208
+
+  ● INFO     tools.py:217:51
+    search_content += f"Content: {result.get('content', '')[:...
+    Detected reachable call from tool "search_tool" (langchain) to result.get. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: content.
+    tool: /home/user/agent-repos/gpt-researcher/gpt_researcher/utils/tools.py:208
+
+  ● INFO     tools.py:218:47
+    search_content += f"URL: {result.get('url', '')}\n\n"
+    Detected reachable call from tool "search_tool" (langchain) to result.get. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: url.
+    tool: /home/user/agent-repos/gpt-researcher/gpt_researcher/utils/tools.py:208
+
+  Unclassified CEEs
+  ─────────────────────────────────────────────────────
+  ○ unclassified page.tsx:28:0
+    Home
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified page.tsx:84:0
+    checkIfMobile
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified page.tsx:312:0
+    checkIfMobile
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified Hero.tsx:62:0
+    handleScroll
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified ImageModal.tsx:17:0
+    handleKeyDown
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified Langgraph.js:4:0
+    startLanggraphResearch
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified CopilotResearchContent.tsx:67:0
+    checkIfMobile
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified CopilotResearchContent.tsx:142:0
+    handleResizeMove
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified CopilotResearchContent.tsx:177:0
+    handleResizeEnd
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified ResearchSidebar.tsx:28:0
+    handleClickOutside
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified workbox-f1770938.js:1:0
+    i
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified workbox-f1770938.js:1:0
+    i
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified workbox-f1770938.js:1:0
+    r
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified workbox-f1770938.js:1:0
+    r
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified getLayout.tsx:44:0
+    checkIfMobile
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:25:0
+    init
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:107:0
+    initHistoryPanel
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:215:0
+    initWebSocketPanel
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:492:0
+    clearConversationHistory
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:502:0
+    filterHistoryEntries
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:1142:0
+    copyToClipboard
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:1351:0
+    showImageDialog
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:1384:0
+    escapeKeyListener
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:1528:0
+    checkCookieStatus
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:1577:0
+    exportHistory
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:1620:0
+    triggerImportHistory
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:1630:0
+    handleFileImport
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:1712:0
+    initChat
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:1751:0
+    initSpeechRecognition
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:1893:0
+    sendChatMessage
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:2011:0
+    initExpandButtons
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:2114:0
+    initMCPSection
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:2177:0
+    validateMCPConfig
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:2228:0
+    formatMCPConfig
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:2279:0
+    showMCPInfo
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified scripts.js:2287:0
+    createMCPInfoModal
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tools.py:260:0
+    custom_tool
+    Tool registration detected. No external operations traced from this entry point.
+
+  ─────────────────────────────────────────────────────
+  278 files  ·  3.9s
+  Unique entrypoints reaching sensitive operations: 34.
+  Coverage gap: 2322 unresolved call edge(s) in call graph.
