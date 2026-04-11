@@ -765,19 +765,21 @@ function findEnclosingClass(
  * Recursively find all nodes of given types
  */
 function findAllNodes(
-  node: Parser.SyntaxNode,
+  root: Parser.SyntaxNode,
   types: Set<string>
 ): Parser.SyntaxNode[] {
   const results: Parser.SyntaxNode[] = [];
-
-  if (types.has(node.type)) {
-    results.push(node);
+  const stack: Parser.SyntaxNode[] = [root];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (types.has(node.type)) {
+      results.push(node);
+    }
+    // Push children in reverse order so left-to-right DFS is preserved
+    for (let i = node.children.length - 1; i >= 0; i--) {
+      stack.push(node.children[i]);
+    }
   }
-
-  for (const child of node.children) {
-    results.push(...findAllNodes(child, types));
-  }
-
   return results;
 }
 

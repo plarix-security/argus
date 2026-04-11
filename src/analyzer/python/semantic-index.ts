@@ -939,12 +939,14 @@ export class PythonSemanticIndex {
       callCallee?: string;
     },
     context: ResolutionContext,
-    visited: Set<string>
+    visited: Set<string>,
+    depth: number = 0
   ): Set<string> {
+    if (depth > 40) return new Set<string>();
     const result = new Set<string>();
 
     for (const reference of expression.references) {
-      for (const nodeId of this.resolveReferenceToFunctionNodes(reference, context, visited)) {
+      for (const nodeId of this.resolveReferenceToFunctionNodes(reference, context, visited, depth + 1)) {
         result.add(nodeId);
       }
     }
@@ -961,7 +963,7 @@ export class PythonSemanticIndex {
           filePath: returnInfo.filePath,
           className: returnInfo.enclosingClass,
           functionName: returnInfo.enclosingFunction,
-        }, visited)) {
+        }, visited, depth + 1)) {
           result.add(nodeId);
         }
       }
@@ -970,7 +972,8 @@ export class PythonSemanticIndex {
     return result;
   }
 
-  private resolveReferenceToFunctionNodes(reference: string, context: ResolutionContext, visited: Set<string>): Set<string> {
+  private resolveReferenceToFunctionNodes(reference: string, context: ResolutionContext, visited: Set<string>, depth: number = 0): Set<string> {
+    if (depth > 40) return new Set<string>(); // hard depth limit prevents stack overflow on large repos
     const visitKey = `${context.filePath}:${context.className || ''}:${context.functionName || ''}:${reference}`;
     if (visited.has(visitKey)) {
       return new Set<string>();
@@ -996,7 +999,7 @@ export class PythonSemanticIndex {
       const lastPart = parts[parts.length - 1];
       if (['invoke', 'ainvoke', 'run', 'arun', 'execute', '_run', '_execute', '__call__'].includes(lastPart)) {
         const receiverReference = parts.slice(0, -1).join('.');
-        for (const nodeId of this.resolveReferenceToFunctionNodes(receiverReference, context, visited)) {
+        for (const nodeId of this.resolveReferenceToFunctionNodes(receiverReference, context, visited, depth + 1)) {
           result.add(nodeId);
         }
         if (result.size > 0) {
@@ -1022,7 +1025,7 @@ export class PythonSemanticIndex {
     const assignments = this.findAssignments(reference, context);
     if (assignments.length > 0) {
       for (const assignment of assignments) {
-        for (const nodeId of this.expandExpressionToFunctionNodes(assignment.value, { filePath: context.filePath, className: assignment.enclosingClass, functionName: assignment.enclosingFunction }, visited)) {
+        for (const nodeId of this.expandExpressionToFunctionNodes(assignment.value, { filePath: context.filePath, className: assignment.enclosingClass, functionName: assignment.enclosingFunction }, visited, depth)) {
           result.add(nodeId);
         }
       }
@@ -1040,7 +1043,7 @@ export class PythonSemanticIndex {
       }
 
       for (const importedAssignment of this.findAssignments(imported.importedName, { filePath: imported.resolvedFile })) {
-        for (const nodeId of this.expandExpressionToFunctionNodes(importedAssignment.value, { filePath: imported.resolvedFile, className: importedAssignment.enclosingClass, functionName: importedAssignment.enclosingFunction }, visited)) {
+        for (const nodeId of this.expandExpressionToFunctionNodes(importedAssignment.value, { filePath: imported.resolvedFile, className: importedAssignment.enclosingClass, functionName: importedAssignment.enclosingFunction }, visited, depth)) {
           result.add(nodeId);
         }
       }
@@ -1056,7 +1059,7 @@ export class PythonSemanticIndex {
         }
 
         for (const importedAssignment of this.findAssignments(member, { filePath: importedBase.resolvedFile })) {
-          for (const nodeId of this.expandExpressionToFunctionNodes(importedAssignment.value, { filePath: importedBase.resolvedFile, className: importedAssignment.enclosingClass, functionName: importedAssignment.enclosingFunction }, visited)) {
+          for (const nodeId of this.expandExpressionToFunctionNodes(importedAssignment.value, { filePath: importedBase.resolvedFile, className: importedAssignment.enclosingClass, functionName: importedAssignment.enclosingFunction }, visited, depth)) {
             result.add(nodeId);
           }
         }

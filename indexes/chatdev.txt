@@ -1,0 +1,20 @@
+  Loading files: 100/201...  Loading files: 200/201...  Loaded 201 files. Building call graph...
+  Analyzing TypeScript/JS (12 files)...
+  wyscan v1.6.2  ·  Plarix
+  ─────────────────────────────────────────────────────
+
+  Scanning  ../agent-repos/chatdev
+
+  ─────────────────────────────────────────────────────
+  No findings reported.
+  1 cees detected in the analyzed path set.
+
+  Unclassified CEEs
+  ─────────────────────────────────────────────────────
+  ○ unclassified mcp_server.py:14:0
+    rand_num
+    Tool registration detected. No external operations traced from this entry point.
+
+  ─────────────────────────────────────────────────────
+  201 files  ·  2.8s
+  Coverage gap: 140 unresolved call edge(s) in call graph.

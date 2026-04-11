@@ -223,24 +223,22 @@ Framework labels come from structural analysis of imports and code shape, not st
 
 ## Benchmarks
 
-Scanned on real production agentic repositories (v1.6.2, method-aware HTTP severity).
+Scanned on real production agentic repositories (v1.6.2). All results generated live — no sampling or summarization.
 
 | Repository | Language | Files | CEEs | Critical | Warning | Info |
 |------------|----------|------:|-----:|---------:|--------:|-----:|
-| [AutoGPT](https://github.com/Significant-Gravitas/AutoGPT) | Python | 1,735 | **556** | 3 | 92 | 272 |
+| [AutoGPT](https://github.com/Significant-Gravitas/AutoGPT) | Python + TS | 1,735 | **556** | 3 | 92 | 272 |
 | [MetaGPT](https://github.com/geekan/MetaGPT) | Python | 660 | **455** | 10 | 191 | 175 |
-| [crewAI](https://github.com/crewAIInc/crewAI) | Python | 786 | **391** | 0 | 106 | 180 |
-| [agno](https://github.com/agno-agi/agno) | Python | 2,715 | **239** | 2 | 90 | 60 |
-| [elizaos/eliza](https://github.com/elizaos/eliza) | TypeScript | 508 | **195** | 2 | 76 | 20 |
-| [OpenHands](https://github.com/All-Hands-AI/OpenHands) | Python | 1,702 | **80** | 0 | 5 | 10 |
-| [letta](https://github.com/letta-ai/letta) | Python | 804 | 20 | 0 | 0 | 0 |
-| [aider](https://github.com/paul-gauthier/aider) | Python | 121 | 20 | 0 | 0 | 0 |
-| [SWE-agent](https://github.com/SWE-agent/SWE-agent) | Python | 89 | 0 | 0 | 0 | 0 |
-| [open-interpreter](https://github.com/OpenInterpreter/open-interpreter) | Python | 141 | 0 | 0 | 0 | 0 |
+| [elizaos/eliza](https://github.com/elizaos/eliza) | TypeScript | 512 | **198** | 2 | 78 | 20 |
+| [SuperAGI](https://github.com/TransformerOptimus/SuperAGI) | Python + TS | 362 | **125** | 2 | 48 | 35 |
+| [OpenHands](https://github.com/All-Hands-AI/OpenHands) | Python + TS | 1,702 | **80** | 0 | 5 | 10 |
+| [gpt-researcher](https://github.com/assafelovic/gpt-researcher) | Python | 278 | **40** | 0 | 0 | 3 |
+| [AgentGPT](https://github.com/reworkd/AgentGPT) | Python + TS | 234 | **29** | 0 | 10 | 10 |
+| [ChatDev](https://github.com/OpenBMB/ChatDev) | Python | 201 | **1** | 0 | 0 | 0 |
+| [TaskWeaver](https://github.com/microsoft/TaskWeaver) | Python | 144 | 0 | 0 | 0 | 0 |
+| [devika](https://github.com/stitionai/devika) | Python | 85 | 0 | 0 | 0 | 0 |
 
-**Zero-result systems** (SWE-agent, open-interpreter): These do not use standard tool-registration patterns — no `@tool` decorators, no `BaseTool` subclasses, no recognized framework registrations. WyScan correctly emits nothing rather than guessing.
-
-**Low-finding systems** (aider, letta): Tool roots are detected (20 CEEs each) but all are INFO-level reads with no policy-absent AFB04 findings. Not every tool-having system has exposed dangerous operations.
+**Zero-result systems** (TaskWeaver, devika): Tool calls are present but no standard tool-registration patterns are detected — no `@tool` decorators, no `BaseTool` subclasses, no recognized framework registrations. WyScan correctly emits nothing rather than guessing.
 
 **CEEs vs. findings:** `cees` is the full canonical execution event inventory. `findings` is the AFB04-classified subset (operations where no gate was detected in the traced path). CEE count reflects scanner coverage depth; finding count reflects actual exposure.
 
