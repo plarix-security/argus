@@ -10,6 +10,8 @@ wyscan scan ./agent-project
 
 ---
 
+<img src="assets/Screenshot 2026-04-11 172306.png" width="100%" />
+
 ## Output
 
 ```
