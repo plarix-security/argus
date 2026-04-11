@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/image.png" width="120" />
+</p>
+
 # [WyScan](https://plarix.dev)
 
 > Static scanner for Python, TypeScript, and JavaScript agent code that reports dangerous operations reachable from detected tool registrations.
