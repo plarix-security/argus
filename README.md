@@ -13,7 +13,7 @@ wyscan scan ./agent-project
 ## Output
 
 ```
-  wyscan v1.6.1  ·  Plarix
+  wyscan v1.6.2  ·  Plarix
   ─────────────────────────────────────────────────────
 
   Scanning  agent-project
@@ -46,7 +46,7 @@ wyscan scan ./agent-project
 **`wyscan check`**:
 
 ```
-  wyscan v1.6.1  ·  Plarix
+  wyscan v1.6.2  ·  Plarix
   ─────────────────────────────────────────────────────
 
   Checking dependencies...
@@ -75,7 +75,7 @@ wyscan scan ./agent-project
 **`wyscan install`**:
 
 ```
-  wyscan v1.6.1  ·  Plarix
+  wyscan v1.6.2  ·  Plarix
   ─────────────────────────────────────────────────────
 
   Preparing local CLI installation...
@@ -217,7 +217,7 @@ Framework labels come from structural analysis of imports and code shape, not st
 
 ## Benchmarks
 
-Scanned on real production agentic repositories (v1.6.1, method-aware HTTP severity).
+Scanned on real production agentic repositories (v1.6.2, method-aware HTTP severity).
 
 | Repository | Language | Files | CEEs | Critical | Warning | Info |
 |------------|----------|------:|-----:|---------:|--------:|-----:|
@@ -248,7 +248,7 @@ wyscan scan ./project --json
 
 ```json
 {
-  "version": "1.6.1",
+  "version": "1.6.2",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,

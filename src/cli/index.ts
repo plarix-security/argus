@@ -7,6 +7,7 @@
  *
  * Commands:
  *   wyscan scan <path> [flags]   Scan for AFB exposures
+ *   wyscan report <path> [flags] Evaluation dashboard (metrics, risk matrix, policy coverage)
  *   wyscan check                 Verify dependencies
  *   wyscan install               Install/build/link/check local CLI
  *   wyscan tui                   Show compact command panel
@@ -40,6 +41,7 @@ import {
   printZeroFindings,
   printTuiQuickPanel,
   printInstallDashboard,
+  printAnalysisDashboard,
   isTTY,
 } from './formatter';
 
@@ -55,20 +57,34 @@ const EXIT = {
 
 function resolveCliProjectRoot(): string {
   const candidates = [
-    path.resolve(__dirname, '../..'),
+    path.resolve(__dirname, '../..'),        // dist/cli/ → project root
+    path.resolve(__dirname, '../../..'),     // deeper nesting fallback
     process.cwd(),
+    path.dirname(process.execPath),          // e.g. /usr/local/bin/../lib/node_modules/wyscan
   ];
 
   for (const candidate of candidates) {
     const pkgPath = path.join(candidate, 'package.json');
-    if (!fs.existsSync(pkgPath)) {
-      continue;
-    }
+    if (!fs.existsSync(pkgPath)) continue;
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { name?: string };
-      if (pkg.name === NAME) {
-        return candidate;
-      }
+      if (pkg.name === NAME) return candidate;
+    } catch {
+      continue;
+    }
+  }
+
+  // Last resort: walk up from __dirname looking for package.json with matching name
+  let dir = __dirname;
+  for (let i = 0; i < 6; i++) {
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+    const pkgPath = path.join(dir, 'package.json');
+    if (!fs.existsSync(pkgPath)) continue;
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { name?: string };
+      if (pkg.name === NAME) return dir;
     } catch {
       continue;
     }
@@ -367,11 +383,12 @@ function printHelp(command?: string): void {
   Languages: Python, TypeScript/JavaScript (framework-core structural detection)
 
   Usage:
-    ${NAME} install         Install/build/link/check local CLI
-    ${NAME} scan <path>     Scan a file or directory
-    ${NAME} check           Verify scanner dependencies
-    ${NAME} tui             Show compact command panel
-    ${NAME} help [command]  Show help
+    ${NAME} install            Install/build/link/check local CLI
+    ${NAME} scan <path>        Scan a file or directory
+    ${NAME} report <path>      Evaluation dashboard (metrics, risk matrix, policy coverage)
+    ${NAME} check              Verify scanner dependencies
+    ${NAME} tui                Show compact command panel
+    ${NAME} help [command]     Show help
 
   Supported frameworks:
     Python: LangChain, LangGraph, CrewAI, AutoGen, Smolagents,
@@ -393,6 +410,8 @@ function printHelp(command?: string): void {
     ${NAME} scan .
     ${NAME} scan ./agents -l critical
     ${NAME} scan . -j > report.json
+    ${NAME} report .                       Full evaluation dashboard
+    ${NAME} report . -j > analysis.json   Export all CEEs for analysis
 `);
   console.log();
   printTuiQuickPanel();
@@ -474,7 +493,19 @@ async function runInstall(): Promise<number> {
       cwd: projectRoot,
       encoding: 'utf-8',
       stdio: 'pipe',
+      shell: process.platform === 'win32',
     });
+
+    if (result.error) {
+      // spawnSync sets result.error (e.g. ENOENT) when the command cannot be found
+      const detail = result.error.message.includes('ENOENT')
+        ? `Command not found: ${s.cmd}. Ensure Node.js and npm are installed and in PATH.`
+        : result.error.message.slice(0, 120);
+      rows.push({ step: s.step, status: 'fail', detail });
+      printInstallDashboard(rows);
+      return EXIT.ERROR;
+    }
+
     if (result.status === 0) {
       rows.push({ step: s.step, status: 'ok', detail: 'ok' });
       continue;
@@ -656,6 +687,92 @@ async function runScan(args: string[]): Promise<number> {
 }
 
 /**
+ * Run report command — scan and render evaluation dashboard
+ */
+async function runReport(args: string[]): Promise<number> {
+  const { targetPath, options, error } = parseFlags(args);
+
+  if (error) {
+    printError(error);
+    return EXIT.ERROR;
+  }
+
+  const resolvedPath = path.resolve(targetPath || '.');
+
+  if (!fs.existsSync(resolvedPath)) {
+    printError(`Path not found: ${resolvedPath}`);
+    return EXIT.ERROR;
+  }
+
+  let analyzer: AFBAnalyzer;
+  try {
+    analyzer = new AFBAnalyzer();
+    await analyzer.ensureInitialized();
+  } catch (err) {
+    if (options.debug) console.error(err);
+    printError('Scanner initialization failed. Run "wyscan check" to diagnose.', err instanceof Error ? err.message : undefined);
+    return EXIT.ERROR;
+  }
+
+  let report: AnalysisReport;
+  try {
+    const stat = fs.statSync(resolvedPath);
+    if (stat.isFile()) {
+      const result = analyzer.analyzeFile(resolvedPath);
+      report = {
+        repository: path.basename(path.dirname(resolvedPath)),
+        filesAnalyzed: result.success ? [result.file] : [],
+        totalFindings: result.findings.length,
+        totalCEEs: (result.cees || []).length,
+        findingsBySeverity: {
+          critical: result.findings.filter(f => f.severity === Severity.CRITICAL).length,
+          warning: result.findings.filter(f => f.severity === Severity.WARNING).length,
+          info: result.findings.filter(f => f.severity === Severity.INFO).length,
+          suppressed: result.findings.filter(f => f.severity === Severity.SUPPRESSED).length,
+        },
+        findings: result.findings,
+        cees: result.cees || [],
+        metadata: {
+          scannerVersion: VERSION,
+          timestamp: new Date().toISOString(),
+          totalTimeMs: result.analysisTimeMs,
+          failedFiles: result.success ? [] : [result.file],
+          skippedFiles: [],
+          fileLimitHit: false,
+          fileLimit: undefined,
+          totalFilesDiscovered: 1,
+        },
+      };
+    } else {
+      report = analyzer.analyzeDirectory(resolvedPath);
+    }
+  } catch (err) {
+    if (options.debug) console.error(err);
+    printError('Scan failed', err instanceof Error ? err.message : undefined);
+    return EXIT.ERROR;
+  }
+
+  if (options.json) {
+    const json = generateJSON(report, resolvedPath);
+    if (options.output) {
+      fs.writeFileSync(options.output, json + '\n');
+    } else {
+      console.log(json);
+    }
+    return EXIT.CLEAN;
+  }
+
+  if (options.output) {
+    const captured = captureConsoleOutput(() => printAnalysisDashboard(report, resolvedPath));
+    fs.writeFileSync(options.output, captured);
+  } else {
+    printAnalysisDashboard(report, resolvedPath);
+  }
+
+  return EXIT.CLEAN;
+}
+
+/**
  * Main entry point
  */
 async function main(): Promise<void> {
@@ -698,6 +815,11 @@ async function main(): Promise<void> {
 
   if (command === 'scan') {
     const code = await runScan(args.slice(1));
+    process.exit(code);
+  }
+
+  if (command === 'report' || command === 'analyze') {
+    const code = await runReport(args.slice(1));
     process.exit(code);
   }
 

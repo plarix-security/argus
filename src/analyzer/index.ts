@@ -98,6 +98,10 @@ export class AFBAnalyzer {
     const pythonInputs: Array<{ filePath: string; sourceCode: string }> = [];
     const typescriptInputs: Array<{ filePath: string; sourceCode: string }> = [];
 
+    const total = files.length;
+    const showProgress = total > 200 && process.stderr.isTTY;
+    let loaded = 0;
+
     for (const file of files) {
       const language = this.walker.getLanguage(file);
       if (!language) {
@@ -112,16 +116,40 @@ export class AFBAnalyzer {
         continue;
       }
 
-      const sourceCode = fs.readFileSync(file, 'utf-8');
-      if (language === 'python') {
-        pythonInputs.push({ filePath: file, sourceCode });
-      } else {
-        // typescript or javascript - batch together for cross-file analysis
-        typescriptInputs.push({ filePath: file, sourceCode });
+      try {
+        const sourceCode = fs.readFileSync(file, 'utf-8');
+        if (language === 'python') {
+          pythonInputs.push({ filePath: file, sourceCode });
+        } else {
+          typescriptInputs.push({ filePath: file, sourceCode });
+        }
+      } catch {
+        unsupportedResults.push({
+          file,
+          language,
+          findings: [],
+          success: false,
+          error: 'Could not read file',
+          analysisTimeMs: 0,
+        });
+      }
+
+      loaded++;
+      if (showProgress && loaded % 100 === 0) {
+        process.stderr.write(`\r  Loading files: ${loaded}/${total}...`);
       }
     }
 
+    if (showProgress) {
+      process.stderr.write(`\r  Loaded ${total} files. Building call graph...\n`);
+    }
+
     const pythonResults = pythonInputs.length > 0 ? analyzePythonFiles(pythonInputs) : [];
+
+    if (showProgress && typescriptInputs.length > 0) {
+      process.stderr.write(`  Analyzing TypeScript/JS (${typescriptInputs.length} files)...\n`);
+    }
+
     const typescriptResults = typescriptInputs.length > 0 ? analyzeTypeScriptFiles(typescriptInputs) : [];
     return [...pythonResults, ...typescriptResults, ...unsupportedResults];
   }
