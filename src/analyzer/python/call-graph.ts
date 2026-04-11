@@ -1508,7 +1508,10 @@ function findDangerousPathsFromNode(
   currentPath: string[],
   foundPaths: { operation: DangerousOperation; path: string[]; hasGate: boolean; involvesCrossFile: boolean; unresolvedCalls: string[]; depthLimitHit?: boolean }[],
   config: ImportResolutionConfig = DEFAULT_IMPORT_CONFIG,
-  currentCrossFileDepth: number = 0
+  currentCrossFileDepth: number = 0,
+  // Incremental tracking — avoids O(depth²) by recomputing from scratch each step
+  hasGateInPath: boolean = false,
+  involvesCrossFile: boolean = false
 ): { operation: DangerousOperation; path: string[]; hasGate: boolean; involvesCrossFile: boolean; unresolvedCalls: string[]; depthLimitHit?: boolean }[] {
   // Prevent infinite loops
   if (visited.has(node.id)) {
@@ -1516,21 +1519,9 @@ function findDangerousPathsFromNode(
   }
   visited.add(node.id);
 
-  // Track if we've seen a structural policy gate in this path
-  const hasGateInPath = currentPath.some((nodeId) => {
-    const n = allNodes.get(nodeId);
-    return n?.hasPolicyGate || false;
-  });
-
-  // Track cross-file involvement: check if path spans multiple files
-  const filesInPath = new Set<string>();
-  for (const nodeId of currentPath) {
-    const file = extractFileFromNodeId(nodeId);
-    if (file) {
-      filesInPath.add(file);
-    }
-  }
-  const involvesCrossFile = filesInPath.size > 1;
+  // Update gate status incrementally (node itself may have a gate)
+  const nodeHasGate = node.hasPolicyGate || false;
+  const effectiveHasGate = hasGateInPath || nodeHasGate;
 
   // Track unresolved calls
   const unresolvedCalls: string[] = [];
@@ -1540,7 +1531,7 @@ function findDangerousPathsFromNode(
     foundPaths.push({
       operation: op,
       path: [...currentPath],
-      hasGate: hasGateInPath || node.hasPolicyGate,
+      hasGate: effectiveHasGate,
       involvesCrossFile,
       unresolvedCalls: [...unresolvedCalls],
     });
@@ -1556,13 +1547,13 @@ function findDangerousPathsFromNode(
       const calleeFile = extractFileFromNodeId(calleeId) || '';
       const crossesFileBoundary = currentFile !== calleeFile && calleeFile !== '';
       const newCrossFileDepth = crossesFileBoundary ? currentCrossFileDepth + 1 : currentCrossFileDepth;
+      const newInvolvesCrossFile = involvesCrossFile || crossesFileBoundary;
 
       if (calleeNode) {
         // Check if we've hit the cross-file depth limit
         if (newCrossFileDepth > config.maxDepth) {
           // Emit a SUPPRESSED finding indicating depth limit was hit
           if (config.emitSuppressedOnLimit) {
-            // Check if callee has any dangerous ops that we won't trace
             const calleeHasDangerousOps = calleeNode.dangerousOps.length > 0 ||
               Array.from(calleeNode.callees).some(c => {
                 const n = allNodes.get(c);
@@ -1580,7 +1571,7 @@ function findDangerousPathsFromNode(
                   codeSnippet: `Cross-file resolution limit (depth ${config.maxDepth}) reached. Manual review recommended for: ${calleeId}`,
                 },
                 path: [...currentPath, calleeId],
-                hasGate: hasGateInPath,
+                hasGate: effectiveHasGate,
                 involvesCrossFile: true,
                 unresolvedCalls: [calleeId],
                 depthLimitHit: true,
@@ -1595,13 +1586,12 @@ function findDangerousPathsFromNode(
             [...currentPath, calleeId],
             foundPaths,
             config,
-            newCrossFileDepth
+            newCrossFileDepth,
+            effectiveHasGate,
+            newInvolvesCrossFile
           );
         }
       } else {
-        // Track unresolved cross-file calls (not in our node map)
-        // These are calls we couldn't resolve - mark as potentially gated
-        // Don't add to unresolved if it's a known dangerous operation pattern
         const isKnownDangerousPattern = DANGEROUS_OPERATION_PATTERNS.some(
           (p) => p.pattern.test(calleeId)
         );

@@ -103,6 +103,7 @@ interface ScanOptions {
   summary: boolean;
   quiet: boolean;
   debug: boolean;
+  maxFiles: number | null;
 }
 
 /**
@@ -127,6 +128,7 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
     summary: false,
     quiet: false,
     debug: false,
+    maxFiles: null,
   };
 
   let targetPath: string | null = null;
@@ -175,6 +177,18 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
         return { targetPath: null, options, error: `Missing value for ${arg}. Provide an output filename.` };
       }
       options.output = args[i + 1];
+      i += 2;
+      continue;
+    }
+    if (arg === '-n' || arg === '--max-files') {
+      if (!args[i + 1] || args[i + 1].startsWith('-')) {
+        return { targetPath: null, options, error: `Missing value for ${arg}. Provide a number, e.g. --max-files 500` };
+      }
+      const n = parseInt(args[i + 1], 10);
+      if (isNaN(n) || n < 1) {
+        return { targetPath: null, options, error: `"${args[i + 1]}" is not a valid file limit. Use a positive integer.` };
+      }
+      options.maxFiles = n;
       i += 2;
       continue;
     }
@@ -566,7 +580,7 @@ async function runScan(args: string[]): Promise<number> {
   // Initialize analyzer
   let analyzer: AFBAnalyzer;
   try {
-    analyzer = new AFBAnalyzer();
+    analyzer = new AFBAnalyzer(options.maxFiles != null ? { maxFiles: options.maxFiles } : undefined);
     await analyzer.ensureInitialized();
   } catch (err) {
     if (options.debug) {
@@ -706,7 +720,7 @@ async function runReport(args: string[]): Promise<number> {
 
   let analyzer: AFBAnalyzer;
   try {
-    analyzer = new AFBAnalyzer();
+    analyzer = new AFBAnalyzer(options.maxFiles != null ? { maxFiles: options.maxFiles } : undefined);
     await analyzer.ensureInitialized();
   } catch (err) {
     if (options.debug) console.error(err);
