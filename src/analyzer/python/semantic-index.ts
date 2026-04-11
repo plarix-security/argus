@@ -106,7 +106,7 @@ function matchesFrameworkModule(modulePath: string, targetModule: string): boole
   return false;
 }
 
-function resolveModulePath(modulePath: string, currentFilePath: string, allFilePaths: string[]): string | undefined {
+function resolveModulePath(modulePath: string, currentFilePath: string, filePathSet: Set<string>, possibleRoots: Set<string>): string | undefined {
   const currentDir = path.dirname(currentFilePath);
 
   if (modulePath.startsWith('.')) {
@@ -124,23 +124,13 @@ function resolveModulePath(modulePath: string, currentFilePath: string, allFileP
 
     for (const candidate of candidates) {
       const normalized = path.normalize(candidate);
-      if (allFilePaths.includes(normalized)) {
+      if (filePathSet.has(normalized)) {
         return normalized;
       }
     }
   }
 
   const moduleAsPath = modulePath.replace(/\./g, path.sep);
-  const possibleRoots = new Set<string>();
-  for (const filePath of allFilePaths) {
-    const parts = filePath.split(path.sep);
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (parts[i] === 'src' || parts[i] === 'lib' || parts[i] === 'packages' || parts[i] === 'backend') {
-        possibleRoots.add(parts.slice(0, i + 1).join(path.sep));
-      }
-    }
-    possibleRoots.add(path.dirname(filePath));
-  }
 
   for (const root of possibleRoots) {
     const candidates = [
@@ -150,7 +140,7 @@ function resolveModulePath(modulePath: string, currentFilePath: string, allFileP
 
     for (const candidate of candidates) {
       const normalized = path.normalize(candidate);
-      if (allFilePaths.includes(normalized)) {
+      if (filePathSet.has(normalized)) {
         return normalized;
       }
     }
@@ -174,6 +164,8 @@ function getCallArgument(call: CallSite, keywordName: string, positionalIndex?: 
 
 export class PythonSemanticIndex {
   private readonly allFilePaths: string[];
+  private readonly filePathSet: Set<string>;
+  private readonly possibleRoots: Set<string>;
   private readonly importBindings = new Map<string, Map<string, ImportBinding>>();
   private readonly functionsByFile = new Map<string, Map<string, string>>();
   private readonly assignmentsByFile = new Map<string, AssignmentInfo[]>();
@@ -187,6 +179,18 @@ export class PythonSemanticIndex {
 
   constructor(private readonly files: Map<string, ParsedPythonFile>) {
     this.allFilePaths = Array.from(files.keys());
+    // Pre-compute for O(1) lookups — avoids O(n²) in resolveModulePath on large repos
+    this.filePathSet = new Set(this.allFilePaths);
+    this.possibleRoots = new Set<string>();
+    for (const filePath of this.allFilePaths) {
+      const parts = filePath.split(path.sep);
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (parts[i] === 'src' || parts[i] === 'lib' || parts[i] === 'packages' || parts[i] === 'backend') {
+          this.possibleRoots.add(parts.slice(0, i + 1).join(path.sep));
+        }
+      }
+      this.possibleRoots.add(path.dirname(filePath));
+    }
     this.buildIndex();
   }
 
@@ -452,7 +456,7 @@ export class PythonSemanticIndex {
 
       const bindings = new Map<string, ImportBinding>();
       for (const imp of parsed.imports) {
-        const resolvedFile = resolveModulePath(imp.module, filePath, this.allFilePaths);
+        const resolvedFile = resolveModulePath(imp.module, filePath, this.filePathSet, this.possibleRoots);
         if (imp.isFrom) {
           for (const name of imp.names) {
             bindings.set(name.alias || name.name, {

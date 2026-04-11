@@ -99,7 +99,7 @@ export class AFBAnalyzer {
     const typescriptInputs: Array<{ filePath: string; sourceCode: string }> = [];
 
     const total = files.length;
-    const showProgress = total > 200 && process.stderr.isTTY;
+    const showProgress = total > 200;
     let loaded = 0;
 
     for (const file of files) {
