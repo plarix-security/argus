@@ -61,15 +61,15 @@ wyscan scan ./agent-project
 **`wyscan tui`**:
 
 ```
-  ┌─────────────────────────────────────────────────┐
-  │ WYSCAN CLI QUICK PANEL                                   │
-  ├─────────────────────────────────────────────────┤
-  │ install : wyscan install                                 │
-  │ scan  : wyscan scan <path> [-l critical|warning]         │
-  │ check : wyscan check                                     │
-  │ json  : wyscan scan <path> --json                        │
-  │ quiet : wyscan scan <path> --summary                     │
-  └─────────────────────────────────────────────────┘
+  ┌──────────────────────────────────────────────────────┐
+  │ WYSCAN CLI QUICK PANEL                               │
+  ├──────────────────────────────────────────────────────┤
+  │ install : wyscan install                             │
+  │ scan  : wyscan scan <path> [-l critical|warning]     │
+  │ check : wyscan check                                 │
+  │ json  : wyscan scan <path> --json                    │
+  │ quiet : wyscan scan <path> --summary                 │
+  └──────────────────────────────────────────────────────┘
 ```
 
 **`wyscan install`**:
@@ -81,14 +81,14 @@ wyscan scan ./agent-project
   Preparing local CLI installation...
 
   ┌──────────────────────────────────────────────────────┐
-  │ WYSCAN INSTALL DASHBOARD                                       │
+  │ WYSCAN INSTALL DASHBOARD                             │
   ├──────────────────────────────────────────────────────┤
-  │ ✔ npm install    ·  ok                                        │
-  │ ✔ npm run build  ·  ok                                        │
-  │ ✔ npm link       ·  ok                                        │
-  │ ✔ check          ·  all checks passed                         │
+  │ ✔ npm install    ·  ok                               │
+  │ ✔ npm run build  ·  ok                               │
+  │ ✔ npm link       ·  ok                               │
+  │ ✔ check          ·  all checks passed                │
   ├──────────────────────────────────────────────────────┤
-  │ Next: wyscan scan <path>  |  wyscan help                       │
+  │ Next: wyscan scan <path>  |  wyscan help             │
   └──────────────────────────────────────────────────────┘
 ```
 
