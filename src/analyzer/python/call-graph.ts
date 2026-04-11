@@ -636,7 +636,8 @@ function isStructuralPolicyGate(controlFlow: ControlFlowInfo | undefined): boole
 function resolveModulePath(
   modulePath: string,
   currentFilePath: string,
-  allFilePaths: string[]
+  filePathSet: Set<string>,
+  possibleRoots: Set<string>
 ): string | undefined {
   // Convert module path to potential file paths
   const moduleAsPath = modulePath.replace(/\./g, '/');
@@ -656,26 +657,13 @@ function resolveModulePath(
     ];
     for (const candidate of candidates) {
       const normalized = path.normalize(candidate);
-      if (allFilePaths.includes(normalized)) {
+      if (filePathSet.has(normalized)) {
         return normalized;
       }
     }
   }
 
-  // Try absolute import from common roots
-  const possibleRoots = new Set<string>();
-  for (const filePath of allFilePaths) {
-    // Find common package roots
-    const parts = filePath.split(path.sep);
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (parts[i] === 'src' || parts[i] === 'lib' || parts[i] === 'packages' || parts[i] === 'backend') {
-        possibleRoots.add(parts.slice(0, i + 1).join(path.sep));
-      }
-    }
-    // Also try from dirname
-    possibleRoots.add(path.dirname(filePath));
-  }
-
+  // Try absolute import from common roots (pre-computed by caller for performance)
   for (const root of possibleRoots) {
     const candidates = [
       path.join(root, moduleAsPath + '.py'),
@@ -683,7 +671,7 @@ function resolveModulePath(
     ];
     for (const candidate of candidates) {
       const normalized = path.normalize(candidate);
-      if (allFilePaths.includes(normalized)) {
+      if (filePathSet.has(normalized)) {
         return normalized;
       }
     }
@@ -706,11 +694,24 @@ function buildCrossFileImportMap(
   const nameToFile = new Map<string, string>();
   const nameToNodeId = new Map<string, string>();
 
+  // Pre-compute for O(1) lookups — avoids O(n²) when called per-import on large repos
+  const filePathSet = new Set(allFilePaths);
+  const possibleRoots = new Set<string>();
+  for (const filePath of allFilePaths) {
+    const parts = filePath.split(path.sep);
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (parts[i] === 'src' || parts[i] === 'lib' || parts[i] === 'packages' || parts[i] === 'backend') {
+        possibleRoots.add(parts.slice(0, i + 1).join(path.sep));
+      }
+    }
+    possibleRoots.add(path.dirname(filePath));
+  }
+
   for (const [filePath, parsed] of files) {
     const resolvedImports: ResolvedImport[] = [];
 
     for (const imp of parsed.imports) {
-      const resolvedFile = resolveModulePath(imp.module, filePath, allFilePaths);
+      const resolvedFile = resolveModulePath(imp.module, filePath, filePathSet, possibleRoots);
 
       if (imp.isFrom) {
         // from module import name1, name2

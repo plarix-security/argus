@@ -426,3 +426,176 @@ export function printZeroFindings(report: AnalysisReport, targetPath: string, me
   printUnclassifiedCEEs(report);
   printFooter(report);
 }
+
+// ─── Analysis Dashboard ────────────────────────────────────────────────────
+
+function bar(fraction: number, width = 20): string {
+  const filled = Math.round(fraction * width);
+  return '█'.repeat(filled) + '░'.repeat(width - filled);
+}
+
+function pct(n: number, total: number): string {
+  if (total === 0) return '  0%';
+  return `${Math.round((n / total) * 100).toString().padStart(3)}%`;
+}
+
+function dashPanel(title: string, lines: string[], width = 55): string[] {
+  const top    = `  ┌─ ${title} ${'─'.repeat(Math.max(0, width - title.length - 4))}┐`;
+  const body   = lines.map(l => `  │ ${l.padEnd(width - 2)} │`);
+  const bottom = `  └${'─'.repeat(width)}┘`;
+  return [top, ...body, bottom];
+}
+
+/**
+ * Print a rich evaluation dashboard for analysis, policy writing, and reporting.
+ * Shows: overview metrics, severity breakdown, framework & operation distribution,
+ * tool risk matrix, policy coverage, and unique operation signatures.
+ */
+export function printAnalysisDashboard(report: AnalysisReport, targetPath: string): void {
+  const W = 55;
+
+  // ── header ────────────────────────────────────────────
+  console.log();
+  console.log(`  ${styled('wyscan', chalk.white)} v${VERSION}  ·  Plarix Security`);
+  console.log(`  ${styled('EVALUATION DASHBOARD', chalk.white.bold)}`);
+  console.log(`  ${styled('─'.repeat(W), chalk.dim)}`);
+  console.log(`  ${styled('Target:', chalk.dim)} ${path.resolve(targetPath)}`);
+  const ts = report.metadata?.timestamp ? new Date(report.metadata.timestamp).toLocaleString() : '';
+  if (ts) console.log(`  ${styled('Scanned:', chalk.dim)} ${ts}`);
+  console.log();
+
+  const allCEEs    = report.cees ?? [];
+  const findings   = report.findings ?? [];
+  const totalCEEs  = allCEEs.length;
+  const totalFiles = report.filesAnalyzed?.length ?? 0;
+  const runtimeMs  = report.metadata?.totalTimeMs ?? 0;
+  const gatePresent  = allCEEs.filter(c => c.gateStatus === 'present').length;
+  const gateAbsent   = allCEEs.filter(c => c.gateStatus === 'absent').length;
+  const policyRate   = totalCEEs > 0 ? Math.round((gatePresent / totalCEEs) * 100) : 0;
+
+  // ── overview ──────────────────────────────────────────
+  const overviewLines = [
+    `Total CEEs      : ${styled(String(totalCEEs).padStart(5), chalk.white.bold)}   Files analyzed : ${String(totalFiles).padStart(5)}`,
+    `Total findings  : ${styled(String(findings.length).padStart(5), chalk.white.bold)}   Runtime        : ${(runtimeMs / 1000).toFixed(2).padStart(5)}s`,
+    `Gate-covered    : ${styled(String(gatePresent).padStart(5), chalk.green)}   Policy coverage: ${String(policyRate).padStart(4)}%`,
+    `Ungated (AFB04) : ${styled(String(gateAbsent).padStart(5), chalk.red)}   Policies needed: ~${String(new Set(allCEEs.filter(c => c.gateStatus === 'absent').map(c => c.operation)).size).padStart(3)}`,
+  ];
+  for (const line of dashPanel('OVERVIEW', overviewLines, W)) console.log(styled(line, chalk.dim) || line);
+  console.log();
+
+  // ── severity breakdown ────────────────────────────────
+  const sevCounts = {
+    critical:   findings.filter(f => f.severity === Severity.CRITICAL).length,
+    warning:    findings.filter(f => f.severity === Severity.WARNING).length,
+    info:       findings.filter(f => f.severity === Severity.INFO).length,
+    suppressed: findings.filter(f => f.severity === Severity.SUPPRESSED).length,
+  };
+  const sevTotal = findings.length || 1;
+  const sevLines = [
+    `${styled('● CRITICAL ', chalk.red.bold)}  ${String(sevCounts.critical).padStart(4)}  ${pct(sevCounts.critical, sevTotal)}  ${bar(sevCounts.critical / sevTotal)}`,
+    `${styled('● WARNING  ', chalk.yellow.bold)}  ${String(sevCounts.warning).padStart(4)}  ${pct(sevCounts.warning, sevTotal)}  ${bar(sevCounts.warning / sevTotal)}`,
+    `${styled('● INFO     ', chalk.cyan)}  ${String(sevCounts.info).padStart(4)}  ${pct(sevCounts.info, sevTotal)}  ${bar(sevCounts.info / sevTotal)}`,
+    `${styled('○ SUPPRESSED', chalk.dim)}  ${String(sevCounts.suppressed).padStart(4)}  ${pct(sevCounts.suppressed, sevTotal)}`,
+  ];
+  for (const line of dashPanel('SEVERITY BREAKDOWN', sevLines, W)) console.log(line);
+  console.log();
+
+  // ── framework breakdown ───────────────────────────────
+  const fwCounts = new Map<string, number>();
+  for (const cee of allCEEs) {
+    const fw = cee.framework || 'generic';
+    fwCounts.set(fw, (fwCounts.get(fw) ?? 0) + 1);
+  }
+  const fwSorted = [...fwCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const fwLines = fwSorted.length > 0
+    ? fwSorted.map(([fw, cnt]) => `${fw.padEnd(18)} ${String(cnt).padStart(4)} CEEs  ${pct(cnt, totalCEEs || 1)}  ${bar(cnt / (totalCEEs || 1), 12)}`)
+    : ['  (no CEEs detected)'];
+  for (const line of dashPanel('BY FRAMEWORK', fwLines, W)) console.log(line);
+  console.log();
+
+  // ── operation category breakdown ─────────────────────
+  const catCounts = new Map<string, number>();
+  for (const cee of allCEEs) {
+    const cat = cee.category ?? 'unknown';
+    catCounts.set(cat, (catCounts.get(cat) ?? 0) + 1);
+  }
+  const catSorted = [...catCounts.entries()].sort((a, b) => b[1] - a[1]);
+  const catLines = catSorted.length > 0
+    ? catSorted.map(([cat, cnt]) => `${cat.padEnd(22)} ${String(cnt).padStart(4)}  ${pct(cnt, totalCEEs || 1)}  ${bar(cnt / (totalCEEs || 1), 10)}`)
+    : ['  (no CEEs detected)'];
+  for (const line of dashPanel('BY OPERATION CATEGORY', catLines, W)) console.log(line);
+  console.log();
+
+  // ── tool risk matrix ──────────────────────────────────
+  interface ToolRisk { count: number; maxSev: string; ops: Set<string>; }
+  const toolRisk = new Map<string, ToolRisk>();
+  const sevOrder: Record<string, number> = { critical: 0, warning: 1, info: 2, suppressed: 3 };
+  for (const cee of allCEEs.filter(c => c.gateStatus === 'absent')) {
+    const entry = toolRisk.get(cee.tool) ?? { count: 0, maxSev: 'suppressed', ops: new Set<string>() };
+    entry.count++;
+    entry.ops.add(cee.operation);
+    if ((sevOrder[cee.severity] ?? 3) < (sevOrder[entry.maxSev] ?? 3)) entry.maxSev = cee.severity;
+    toolRisk.set(cee.tool, entry);
+  }
+  const riskSorted = [...toolRisk.entries()].sort((a, b) => {
+    const sd = (sevOrder[a[1].maxSev] ?? 3) - (sevOrder[b[1].maxSev] ?? 3);
+    return sd !== 0 ? sd : b[1].count - a[1].count;
+  }).slice(0, 10);
+  const riskHeader = `${'Tool'.padEnd(22)} ${'Sev'.padEnd(9)} CEEs  Top operation`;
+  const riskDivider = '─'.repeat(W - 2);
+  const riskRows = riskSorted.map(([tool, info]) => {
+    const sevLabel = info.maxSev.toUpperCase().slice(0, 4);
+    const topOp = [...info.ops][0]?.slice(0, 18) ?? '';
+    return `${tool.slice(0, 21).padEnd(22)} ${sevLabel.padEnd(9)} ${String(info.count).padStart(4)}  ${topOp}`;
+  });
+  const riskLines = riskSorted.length > 0
+    ? [riskHeader, riskDivider, ...riskRows]
+    : ['  (no ungated tool paths detected)'];
+  for (const line of dashPanel('TOOL RISK MATRIX (ungated paths)', riskLines, W)) console.log(line);
+  console.log();
+
+  // ── policy coverage ───────────────────────────────────
+  const uniqueUngatedOps = new Set(allCEEs.filter(c => c.gateStatus === 'absent').map(c => c.operation));
+  const coverageLines = [
+    `Gate present : ${String(gatePresent).padStart(4)} CEEs  ${bar(gatePresent / (totalCEEs || 1), 18)}  ${pct(gatePresent, totalCEEs || 1)}`,
+    `Gate absent  : ${styled(String(gateAbsent).padStart(4), chalk.red)} CEEs  ${bar(gateAbsent / (totalCEEs || 1), 18)}  ${pct(gateAbsent, totalCEEs || 1)}`,
+    ``,
+    `Unique ungated operation signatures : ${styled(String(uniqueUngatedOps.size), chalk.yellow.bold)}`,
+    `Recommended policies to write       : ~${String(uniqueUngatedOps.size)}`,
+    ``,
+    ...([...uniqueUngatedOps].slice(0, 8).map(op => `  · ${op.slice(0, W - 6)}`)),
+    ...(uniqueUngatedOps.size > 8 ? [`  · ... and ${uniqueUngatedOps.size - 8} more`] : []),
+  ];
+  for (const line of dashPanel('POLICY COVERAGE', coverageLines, W)) console.log(line);
+  console.log();
+
+  // ── unique cee signatures (for analysis) ─────────────
+  type SigKey = string;
+  const uniqueSigs = new Map<SigKey, { count: number; severity: string; framework: string; files: Set<string> }>();
+  for (const cee of allCEEs) {
+    const key = `${cee.tool}::${cee.operation}::${cee.category}::${cee.gateStatus}`;
+    const entry = uniqueSigs.get(key) ?? { count: 0, severity: cee.severity, framework: cee.framework ?? 'generic', files: new Set() };
+    entry.count++;
+    entry.files.add(cee.file);
+    if ((sevOrder[cee.severity] ?? 3) < (sevOrder[entry.severity] ?? 3)) entry.severity = cee.severity;
+    uniqueSigs.set(key, entry);
+  }
+  const sigCount = uniqueSigs.size;
+  const sigLines = [
+    `Total CEE instances         : ${styled(String(totalCEEs), chalk.white.bold)}`,
+    `Unique CEE signatures       : ${styled(String(sigCount), chalk.white.bold)}  (tool × op × category × gate)`,
+    `Deduplication ratio         : ${totalCEEs > 0 ? (totalCEEs / sigCount).toFixed(1) : '1.0'}x`,
+    ``,
+    `Use --json to export all CEEs for deeper analysis.`,
+    `Each CEE carries: call path · gate status · evidence · resource`,
+  ];
+  for (const line of dashPanel('CEE SIGNATURE ANALYSIS', sigLines, W)) console.log(line);
+  console.log();
+
+  // ── footer ────────────────────────────────────────────
+  console.log(`  ${styled('─'.repeat(W), chalk.dim)}`);
+  console.log(`  ${styled('Export full data:', chalk.dim)} wyscan scan <path> --json`);
+  console.log(`  ${styled('Filter by severity:', chalk.dim)} wyscan scan <path> --level critical`);
+  console.log(`  ${styled('plarix.dev', chalk.dim)}`);
+  console.log();
+}
