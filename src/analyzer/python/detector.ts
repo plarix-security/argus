@@ -217,13 +217,17 @@ export function analyzePythonFile(
  * builds one call graph, then attributes findings back to the file where the
  * matched operation occurs.
  */
-export function analyzePythonFiles(inputs: PythonSourceInput[]): FileAnalysisResult[] {
+export function analyzePythonFiles(inputs: PythonSourceInput[], onProgress?: (msg: string) => void): FileAnalysisResult[] {
+  const pyTotal = inputs.length;
+  let pyParsed = 0;
   const parsedByFile = new Map<string, ParsedPythonFile>();
   const parseResults = new Map<string, FileAnalysisResult>();
 
   for (const input of inputs) {
     const startTime = Date.now();
     const parsed = parsePythonSource(input.sourceCode);
+    pyParsed++;
+    if (onProgress && pyTotal > 100 && pyParsed % 100 === 0) onProgress(`  Parsing Python (${pyParsed}/${pyTotal})...`);
 
     if (!parsed.success) {
       parseResults.set(input.filePath, {
@@ -264,9 +268,16 @@ export function analyzePythonFiles(inputs: PythonSourceInput[]): FileAnalysisRes
   const findingsByFile = new Map<string, AFBFinding[]>();
   const ceesByFile = new Map<string, CEERecord[]>();
   const seenEvents = new Set<string>();
+  if (onProgress) onProgress('  Building Python call graph...');
   const callGraph = buildCallGraph(parsedByFile);
 
+  const totalExposed = callGraph.exposedPaths.length;
+  if (onProgress && totalExposed > 0) onProgress(`  Detecting CEEs (0/${totalExposed} paths)...`);
+  let exposedIdx = 0;
+
   for (const exposed of callGraph.exposedPaths) {
+    exposedIdx++;
+    if (onProgress && totalExposed > 50 && exposedIdx % 50 === 0) onProgress(`  Detecting CEEs (${exposedIdx}/${totalExposed} paths)...`);
     const operationFile = exposed.file;
     const parsed = parsedByFile.get(operationFile);
     if (!parsed) {

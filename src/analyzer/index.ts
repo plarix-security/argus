@@ -144,13 +144,21 @@ export class AFBAnalyzer {
       process.stderr.write(`\r  Loaded ${total} files. Building call graph...\n`);
     }
 
-    const pythonResults = pythonInputs.length > 0 ? analyzePythonFiles(pythonInputs) : [];
+    const progressHandler = showProgress
+      ? (msg: string) => process.stderr.write('\r' + msg)
+      : undefined;
+
+    if (showProgress) process.stderr.write('  Analyzing Python...\n');
+    const pythonResults = pythonInputs.length > 0 ? analyzePythonFiles(pythonInputs, progressHandler) : [];
+    if (showProgress && pythonInputs.length > 0) process.stderr.write('\r  Python analysis complete.\n');
 
     if (showProgress && typescriptInputs.length > 0) {
       process.stderr.write(`  Analyzing TypeScript/JS (${typescriptInputs.length} files)...\n`);
     }
 
-    const typescriptResults = typescriptInputs.length > 0 ? analyzeTypeScriptFiles(typescriptInputs) : [];
+    const typescriptResults = typescriptInputs.length > 0 ? analyzeTypeScriptFiles(typescriptInputs, progressHandler) : [];
+    if (showProgress && typescriptInputs.length > 0) process.stderr.write('\r  TypeScript/JS analysis complete.\n');
+
     return [...pythonResults, ...typescriptResults, ...unsupportedResults];
   }
 

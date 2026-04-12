@@ -175,7 +175,9 @@ export function analyzeTypeScriptFile(
 /**
  * Analyze multiple TypeScript/JavaScript files together
  */
-export function analyzeTypeScriptFiles(inputs: TypeScriptSourceInput[]): FileAnalysisResult[] {
+export function analyzeTypeScriptFiles(inputs: TypeScriptSourceInput[], onProgress?: (msg: string) => void): FileAnalysisResult[] {
+  const tsTotal = inputs.length;
+  let tsParsed = 0;
   const files = new Map<string, ParsedTypeScriptFile>();
   const parseFailedFiles: Array<{ filePath: string; language: 'typescript' | 'javascript'; error: string }> = [];
 
@@ -186,6 +188,8 @@ export function analyzeTypeScriptFiles(inputs: TypeScriptSourceInput[]): FileAna
     const language = ext === '.js' || ext === '.jsx' ? 'javascript' : 'typescript';
     const parsed = parseTypeScriptSource(input.sourceCode, isTSX);
 
+    tsParsed++;
+    if (onProgress && tsTotal > 100 && tsParsed % 100 === 0) onProgress(`  Parsing TypeScript/JS (${tsParsed}/${tsTotal})...`);
     if (parsed.success) {
       files.set(input.filePath, parsed);
     } else {
@@ -198,6 +202,7 @@ export function analyzeTypeScriptFiles(inputs: TypeScriptSourceInput[]): FileAna
   }
 
   // Build call graph across all files
+  if (onProgress) onProgress('  Building TypeScript/JS call graph...');
   const semanticRoots = extractSemanticInvocationRoots(files);
   const callGraph = buildCallGraph(files, semanticRoots);
   const rootsByFramework: Record<string, number> = {};
@@ -221,8 +226,13 @@ export function analyzeTypeScriptFiles(inputs: TypeScriptSourceInput[]): FileAna
 
   // Generate findings per file
   const results: FileAnalysisResult[] = [];
+  const tsFileTotal = files.size;
+  let tsFileIdx = 0;
+  if (onProgress && tsFileTotal > 0) onProgress(`  Classifying TypeScript/JS CEEs (0/${tsFileTotal} files)...`);
 
   for (const [filePath, parsed] of files) {
+    tsFileIdx++;
+    if (onProgress && tsFileTotal > 50 && tsFileIdx % 50 === 0) onProgress(`  Classifying TypeScript/JS CEEs (${tsFileIdx}/${tsFileTotal} files)...`);
     const startTime = Date.now();
     const ext = path.extname(filePath).toLowerCase();
     const language = ext === '.js' || ext === '.jsx' ? 'javascript' : 'typescript';
