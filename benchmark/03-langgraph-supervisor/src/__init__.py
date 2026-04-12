@@ -1,1 +1,0 @@
-"""Supervisor system package."""
