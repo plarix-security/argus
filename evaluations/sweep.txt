@@ -1,0 +1,104 @@
+  Loading files: 100/227...  Loading files: 200/227...  Loaded 227 files. Building call graph...
+  Analyzing TypeScript/JS (73 files)...
+  wyscan v1.6.2  ·  Plarix
+  ─────────────────────────────────────────────────────
+
+  Scanning  C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep
+
+  ─────────────────────────────────────────────────────
+  1 critical  ·  14 warning
+  18 cees detected
+  ─────────────────────────────────────────────────────
+
+  ● CRITICAL question_answerer.py:270:16
+    subprocess.run(
+    Detected reachable call from tool "ripgrep" (sweepai) to subprocess.run. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: rg.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:261
+
+  ● WARNING  question_answerer.py:160:13
+    snippets.append(SNIPPET_FORMAT.format(
+    Detected reachable call from tool "semantic_search" (sweepai) to snippets.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippet.expand(expand_size).denotation.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:139
+
+  ● WARNING  question_answerer.py:166:13
+    snippets.append(f"Snippet already retrieved previously: {...
+    Detected reachable call from tool "semantic_search" (sweepai) to snippets.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: f"Snippet already retrieved previously: {snippet.denotation}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:139
+
+  ● WARNING  question_answerer.py:201:13
+    snippets.append(SNIPPET_FORMAT.format(
+    Detected reachable call from tool "vector_search" (sweepai) to snippets.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippet.expand(expand_size).denotation.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:180
+
+  ● WARNING  question_answerer.py:207:13
+    snippets.append(f"Snippet already retrieved previously: {...
+    Detected reachable call from tool "vector_search" (sweepai) to snippets.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: f"Snippet already retrieved previously: {snippet.denotation}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:180
+
+  ● WARNING  question_answerer.py:360:13
+    missing_files.append(file_path)
+    Detected reachable call from tool "submit_task" (sweepai) to missing_files.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: file_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:373
+
+  ● WARNING  question_answerer.py:361:9
+    snippets.append(Snippet(
+    Detected reachable call from tool "submit_task" (sweepai) to snippets.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: content.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:373
+
+  ● WARNING  question_answerer.py:433:13
+    bad_files.append(file_name)
+    Detected reachable call from tool "add_files_to_context" (sweepai) to bad_files.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: file_name.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:393
+
+  ● WARNING  question_answerer.py:449:25
+    all_ranges.append((snippet.start, snippet.end))
+    Detected reachable call from tool "add_files_to_context" (sweepai) to all_ranges.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippet.start.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:393
+
+  ● WARNING  question_answerer.py:450:25
+    snippet_indexes.append(i)
+    Detected reachable call from tool "add_files_to_context" (sweepai) to snippet_indexes.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: i.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:393
+
+  ● WARNING  question_answerer.py:451:17
+    all_ranges.append(file_range)
+    Detected reachable call from tool "add_files_to_context" (sweepai) to all_ranges.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: file_range.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:393
+
+  ● WARNING  question_answerer.py:458:21
+    relevant_files.append(Snippet(
+    Detected reachable call from tool "add_files_to_context" (sweepai) to relevant_files.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: file_contents.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:393
+
+  ● WARNING  question_answerer.py:475:29
+    snippet_indexes.append(i)
+    Detected reachable call from tool "add_files_to_context" (sweepai) to snippet_indexes.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: i.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:393
+
+  ● WARNING  question_answerer.py:485:13
+    relevant_files.append(Snippet(
+    Detected reachable call from tool "add_files_to_context" (sweepai) to relevant_files.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: file_contents.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\question_answerer.py:393
+
+  ● WARNING  search_agent.py:204:5
+    llm_state["questions_and_answers"].append((question, answ...
+    Detected reachable call from tool "ask_question_about_codebase" (sweepai) to llm_state["questions_and_answers"].append. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: question.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\sweep\sweepai\agents\search_agent.py:189
+
+  Unclassified CEEs
+  ─────────────────────────────────────────────────────
+  ○ unclassified question_answerer.py:297:0
+    view_file
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified question_answerer.py:501:0
+    done_file_search
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified search_agent.py:218:0
+    submit_task
+    Tool registration detected. No external operations traced from this entry point.
+
+  ─────────────────────────────────────────────────────
+  227 files  ·  12.1s
+  Coverage gap: 331 unresolved call edge(s) in call graph.

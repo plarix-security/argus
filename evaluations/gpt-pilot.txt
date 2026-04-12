@@ -1,0 +1,1166 @@
+  Loading files: 100/302...  Loading files: 200/302...  Loading files: 300/302...  Loaded 302 files. Building call graph...
+  Analyzing TypeScript/JS (185 files)...
+  wyscan v1.6.2  ·  Plarix
+  ─────────────────────────────────────────────────────
+
+  Scanning  C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot
+
+  ─────────────────────────────────────────────────────
+  88 warning  ·  121 info
+  232 cees detected
+  ─────────────────────────────────────────────────────
+
+  ● WARNING  architect.py:110:9
+    telemetry.set("templates", spec.templates)
+    Detected reachable call from tool "run" (class-based-tool) to telemetry.set. No policy gate detected in the analyzed call path. Resource hint: templates.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\architect.py:99
+
+  ● WARNING  architect.py:135:15
+    await self.send_message("Selecting starter templates ...")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Selecting starter templates ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\architect.py:99
+
+  ● WARNING  architect.py:174:15
+    await self.send_message("Planning project architecture ...")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Planning project architecture ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\architect.py:99
+
+  ● WARNING  architect.py:177:15
+    await self.send_message("Picking technologies to use ...")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Picking technologies to use ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\architect.py:99
+
+  ● WARNING  architect.py:197:9
+    telemetry.set("architecture", json.loads(arch.model_dump_...
+    Detected reachable call from tool "run" (class-based-tool) to telemetry.set through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: architecture.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\architect.py:99
+
+  ● WARNING  architect.py:235:9
+    telemetry.set("templates", spec.templates)
+    Detected reachable call from tool "run" (class-based-tool) to telemetry.set through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: templates.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\architect.py:99
+
+  ● WARNING  architect.py:249:19
+    await self.send_message(f"Checking if {dep['name']} is av...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"Checking if {dep['name']} is available ...".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\architect.py:99
+
+  ● WARNING  architect.py:257:23
+    await self.send_message(f"❌ {dep['name']} is not availabl...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"❌ {dep['name']} is not available. {remedy}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\architect.py:99
+
+  ● WARNING  architect.py:266:23
+    await self.send_message(f"✅ {dep['name']} is available.")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"✅ {dep['name']} is available.".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\architect.py:99
+
+  ● WARNING  bug_hunter.py:67:17
+    self.state_manager.async_tasks.append(asyncio.create_task...
+    Detected reachable call from tool "run" (class-based-tool) to self.state_manager.async_tasks.append. No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● WARNING  bug_hunter.py:83:15
+    await self.send_message("Finding a way to reproduce the b...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Finding a way to reproduce the bug ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● WARNING  bug_hunter.py:132:19
+    await self.send_message("Found the bug. I'm attempting to...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Found the bug. I'm attempting to fix it ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● WARNING  bug_hunter.py:137:19
+    await self.send_message("Adding more logs to identify the...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Adding more logs to identify the bug ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● WARNING  bug_hunter.py:157:15
+    await self.ui.send_message(
+    Detected reachable call from tool "run" (class-based-tool) to self.ui.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: Start the app and test it by following these instructions:\n\n.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● WARNING  bug_hunter.py:320:23
+    await self.send_message(llm_answer)
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: llm_answer.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● WARNING  bug_hunter.py:325:23
+    await self.send_message(response)
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: response.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● WARNING  bug_hunter.py:332:23
+    await self.send_message(llm_answer)
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: llm_answer.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● WARNING  bug_hunter.py:358:23
+    await self.send_message(response)
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: response.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● WARNING  bug_hunter.py:396:23
+    await self.send_message("Waiting for the bug reproduction...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: Waiting for the bug reproduction instructions....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● WARNING  code_monkey.py:181:13
+    tasks.append(self.describe_file(file, content))
+    Detected reachable call from tool "run" (class-based-tool) to tasks.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: file.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\code_monkey.py:72
+
+  ● WARNING  developer.py:228:15
+    await self.send_message("### Thinking about how to implem...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: ### Thinking about how to implement this task ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● WARNING  developer.py:339:13
+    unique_steps.append(step)
+    Detected reachable call from tool "run" (class-based-tool) to unique_steps.append through 3 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: step.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● WARNING  developer.py:415:15
+    await self.send_message(f"Starting task #{task_index} wit...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"Starting task #{task_index} with the description:\n\n## {description}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● WARNING  developer.py:420:19
+    await self.send_message(f"Additional feedback: {self.next...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: f"Additional feedback: {self.next_state.current_task['redo_human_instructions']}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● WARNING  developer.py:433:19
+    await self.ui.send_message(
+    Detected reachable call from tool "run" (class-based-tool) to self.ui.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Ok, great, you're now starting to build the backend and the first task is to test how the authentication works. You can now register and login. Your data will be saved into the database..
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● WARNING  developer.py:453:19
+    await self.send_message("Skipping task...")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Skipping task....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● WARNING  executor.py:96:19
+    await self.send_message(f"Skipping command {cmd}")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message. No policy gate detected in the analyzed call path. Resource hint: f"Skipping command {cmd}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\executor.py:72
+
+  ● WARNING  external_docs.py:76:20
+    client.get(url)
+    Detected reachable call from tool "run" (class-based-tool) to httpx.Client.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: url.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\external_docs.py:46
+
+  ● WARNING  external_docs.py:101:15
+    await self.send_message("Determining if external document...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Determining if external documentation is needed for the next task....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\external_docs.py:46
+
+  ● WARNING  external_docs.py:113:15
+    await self.send_message("Getting relevant documentation f...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Getting relevant documentation for the following topics:.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\external_docs.py:46
+
+  ● WARNING  external_docs.py:143:17
+    reqs.append(client.get(url, params={"q": qs, "doc_key": d...
+    Detected reachable call from tool "run" (class-based-tool) to reqs.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: url.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\external_docs.py:46
+
+  ● WARNING  external_docs.py:144:17
+    ordered_keys.append(docset_key)
+    Detected reachable call from tool "run" (class-based-tool) to ordered_keys.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: docset_key.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\external_docs.py:46
+
+  ● WARNING  external_docs.py:155:17
+    snippets.append((k, res.json()))
+    Detected reachable call from tool "run" (class-based-tool) to snippets.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: k.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\external_docs.py:46
+
+  ● WARNING  external_docs.py:171:13
+    docs.append({"key": docset_key, "desc": docsets_dict[docs...
+    Detected reachable call from tool "run" (class-based-tool) to docs.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: docset_key.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\external_docs.py:46
+
+  ● WARNING  frontend.py:78:15
+    await self.send_message("## Building the frontend\n\nThis...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: ## Building the frontend\n\nThis may take a couple of minutes..
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:119:15
+    await self.send_message("### Continuing to build UI... Th...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: ### Continuing to build UI... This may take a couple of minutes.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:169:19
+    await self.send_message("Errors detected, fixing...")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Errors detected, fixing....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:229:23
+    await self.send_message("Implementing the changes you sug...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Implementing the changes you suggested....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:248:42
+    await client.post(
+    Detected reachable call from tool "run" (class-based-tool) to client.post through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: url.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:266:39
+    await self.send_message(
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"Couldn't find any relevant API documentation. Retrying... \nError: {error}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:275:27
+    await self.send_message(f"Please try reloading the projec...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"Please try reloading the project. \nError: {error}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:404:25
+    self.next_state.epics[-1]["file_paths_to_remove_mock"].ap...
+    Detected reachable call from tool "run" (class-based-tool) to self.next_state.epics[-1]["file_paths_to_remove_mock"].append through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: file_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:444:31
+    await self.send_message(f"Running command: `{command}`...")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"Running command: `{command}`...".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:470:42
+    await client.post(
+    Detected reachable call from tool "run" (class-based-tool) to client.post through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: url.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:507:39
+    await self.send_message(
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"I couldn't find any relevant API documentation. Retrying... \nError: {error}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:514:27
+    await self.send_message(f"Please try reloading the projec...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"Please try reloading the project. \nError: {error}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:564:19
+    await self.send_message(
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"### Auto-debugging the frontend #{self.next_state.epics[-1]['auto_debug_attempts']+1}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:594:23
+    await self.send_message(f"### Auto-debugging found an err...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"### Auto-debugging found an error: \n{diff_stdout}\n{diff_stderr}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  frontend.py:601:15
+    await self.send_message("### All good, no errors found.")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: ### All good, no errors found..
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● WARNING  human_input.py:19:15
+    await self.send_message(f"## {HUMAN_INTERVENTION_QUESTION...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"## {HUMAN_INTERVENTION_QUESTION}\n\n{description}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\human_input.py:10
+
+  ● WARNING  importer.py:34:15
+    await self.send_message(
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"This is experimental feature and is currently limited to projects with size up to {MAX_PROJECT_LINES} lines of code.".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\importer.py:21
+
+  ● WARNING  importer.py:51:19
+    await self.send_message(
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: WARNING: Your project ({imported_lines} LOC) is larger than supported and may cause issues in Pythagora..
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\importer.py:21
+
+  ● WARNING  importer.py:59:9
+    self.send_message("Inspecting most important project file...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Inspecting most important project files ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\importer.py:21
+
+  ● WARNING  importer.py:65:9
+    self.send_message("Analyzing project ...")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Analyzing project ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\importer.py:21
+
+  ● WARNING  orchestrator.py:179:19
+    await self.send_message("Installing project dependencies....
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Installing project dependencies....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● WARNING  orchestrator.py:388:23
+    await self.send_message(f"We found {len(modified_files)} ...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"We found {len(modified_files)} new and/or modified files.".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● WARNING  orchestrator.py:560:17
+    parallel.append(CodeMonkey(self.state_manager, self.ui, s...
+    Detected reachable call from tool "run" (class-based-tool) to parallel.append through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: self.state_manager.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● WARNING  orchestrator.py:588:17
+    input_required_files.append({"file": file.path, "line": l...
+    Detected reachable call from tool "run" (class-based-tool) to input_required_files.append through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: file.path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● WARNING  orchestrator.py:637:9
+    telemetry.set("num_files", total_files)
+    Detected reachable call from tool "run" (class-based-tool) to telemetry.set through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: num_files.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● WARNING  orchestrator.py:638:9
+    telemetry.set("num_lines", total_lines)
+    Detected reachable call from tool "run" (class-based-tool) to telemetry.set through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: num_lines.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● WARNING  tech_lead.py:148:19
+    await self.ui.send_message("Your new feature is complete!...
+    Detected reachable call from tool "run" (class-based-tool) to self.ui.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Your new feature is complete!.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● WARNING  tech_lead.py:156:19
+    await self.ui.send_message("Your app is DONE! You can sta...
+    Detected reachable call from tool "run" (class-based-tool) to self.ui.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Your app is DONE! You can start using it right now!.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● WARNING  tech_lead.py:182:23
+    await self.ui.send_message("Thank you for using Pythagora...
+    Detected reachable call from tool "run" (class-based-tool) to self.ui.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Thank you for using Pythagora!.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● WARNING  tech_lead.py:299:15
+    await self.send_message("Creating the development plan ...")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: Creating the development plan ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● WARNING  tech_lead.py:322:15
+    await self.send_message("Creating tasks ...")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: Creating tasks ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● WARNING  tech_lead.py:342:13
+    epic_tasks.append(self.process_epic(sub_epic_number, sub_...
+    Detected reachable call from tool "run" (class-based-tool) to epic_tasks.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: sub_epic_number.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● WARNING  tech_lead.py:347:13
+    self.next_state.tasks.append(tasks_result)
+    Detected reachable call from tool "run" (class-based-tool) to self.next_state.tasks.append through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: tasks_result.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● WARNING  tech_lead.py:388:13
+    self.next_state.tasks.insert(
+    Detected reachable call from tool "run" (class-based-tool) to self.next_state.tasks.insert through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: Implement and test Login and Register pages.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● WARNING  tech_writer.py:42:15
+    await self.ui.send_message(
+    Detected reachable call from tool "run" (class-based-tool) to self.ui.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"CONGRATULATIONS! You reached {pct_finished}% of your project generation!".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_writer.py:16
+
+  ● WARNING  tech_writer.py:54:15
+    await self.send_message("Creating README ...")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Creating README ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_writer.py:16
+
+  ● WARNING  troubleshooter.py:79:19
+    await self.ui.send_message("Test the app by following the...
+    Detected reachable call from tool "run" (class-based-tool) to self.ui.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Test the app by following these steps:.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● WARNING  troubleshooter.py:191:15
+    await self.send_message("Figuring out how to run the app ...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Figuring out how to run the app ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● WARNING  troubleshooter.py:204:15
+    await self.send_message("### Determining how to test the ...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: ### Determining how to test the app ....
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● WARNING  troubleshooter.py:223:19
+    await self.ui.send_message(
+    Detected reachable call from tool "run" (class-based-tool) to self.ui.send_message through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: No testing required for this task, moving on to the next one..
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● WARNING  wizard.py:51:31
+    await self.send_message("Please try creating a new projec...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Please try creating a new project..
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\wizard.py:24
+
+  ● WARNING  wizard.py:57:27
+    await self.send_message("Please provide a valid input.")
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Please provide a valid input..
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\wizard.py:24
+
+  ● WARNING  wizard.py:109:31
+    await self.send_message("Thank you for submitting your re...
+    Detected reachable call from tool "run" (class-based-tool) to self.send_message through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: Thank you for submitting your request. We will be in touch..
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\wizard.py:24
+
+  ● WARNING  wizard.py:142:34
+    await client.post(
+    Detected reachable call from tool "run" (class-based-tool) to client.post through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: url.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\wizard.py:24
+
+  ● WARNING  wizard.py:171:15
+    await self.ui.send_message(
+    Detected reachable call from tool "run" (class-based-tool) to self.ui.send_message through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: f"An error occurred while uploading the docs. Error: {error if error else 'unknown'}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\wizard.py:24
+
+  ● WARNING  __init__.py:387:23
+    await client.post(self.endpoint, json=payload)
+    Detected reachable call from tool "run" (class-based-tool) to httpx.AsyncClient.post through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: self.endpoint.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+    path: cross-file
+
+  ● WARNING  __init__.py:387:23
+    await client.post(self.endpoint, json=payload)
+    Detected reachable call from tool "run" (class-based-tool) to httpx.AsyncClient.post through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: self.endpoint.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+    path: cross-file
+
+  ● WARNING  __init__.py:387:23
+    await client.post(self.endpoint, json=payload)
+    Detected reachable call from tool "run" (class-based-tool) to httpx.AsyncClient.post through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: self.endpoint.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\external_docs.py:46
+    path: cross-file
+
+  ● WARNING  __init__.py:387:23
+    await client.post(self.endpoint, json=payload)
+    Detected reachable call from tool "run" (class-based-tool) to httpx.AsyncClient.post through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: self.endpoint.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+    path: cross-file
+
+  ● WARNING  __init__.py:387:23
+    await client.post(self.endpoint, json=payload)
+    Detected reachable call from tool "run" (class-based-tool) to httpx.AsyncClient.post through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: self.endpoint.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\importer.py:21
+    path: cross-file
+
+  ● WARNING  __init__.py:387:23
+    await client.post(self.endpoint, json=payload)
+    Detected reachable call from tool "run" (class-based-tool) to httpx.AsyncClient.post through 1 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: self.endpoint.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\task_completer.py:15
+    path: cross-file
+
+  ● WARNING  __init__.py:387:23
+    await client.post(self.endpoint, json=payload)
+    Detected reachable call from tool "run" (class-based-tool) to httpx.AsyncClient.post through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: self.endpoint.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+    path: cross-file
+
+  ● WARNING  __init__.py:387:23
+    await client.post(self.endpoint, json=payload)
+    Detected reachable call from tool "run" (class-based-tool) to httpx.AsyncClient.post through 5 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: self.endpoint.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+    path: cross-file
+
+  ● WARNING  __init__.py:387:23
+    await client.post(self.endpoint, json=payload)
+    Detected reachable call from tool "run" (class-based-tool) to httpx.AsyncClient.post through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: self.endpoint.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\wizard.py:24
+    path: cross-file
+
+  ● INFO     bug_hunter.py:127:30
+    self.current_state.current_iteration.get("bug_hunting_cyc...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_iteration.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: bug_hunting_cycles.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● INFO     bug_hunter.py:372:42
+    json.loads(self.current_state.current_task.get("test_inst...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_task.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: test_instructions.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● INFO     bug_hunter.py:375:26
+    self.current_state.current_iteration.get("bug_hunting_cyc...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_iteration.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: bug_hunting_cycles.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● INFO     bug_hunter.py:382:30
+    hunting_cycle.get("backend_logs"),
+    Detected reachable call from tool "run" (class-based-tool) to hunting_cycle.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: backend_logs.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● INFO     bug_hunter.py:383:31
+    hunting_cycle.get("frontend_logs"),
+    Detected reachable call from tool "run" (class-based-tool) to hunting_cycle.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: frontend_logs.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● INFO     bug_hunter.py:384:31
+    hunting_cycle.get("fix_attempted"),
+    Detected reachable call from tool "run" (class-based-tool) to hunting_cycle.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: fix_attempted.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● INFO     bug_hunter.py:385:31
+    hunting_cycle.get("user_feedback"),
+    Detected reachable call from tool "run" (class-based-tool) to hunting_cycle.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: user_feedback.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\bug_hunter.py:61
+
+  ● INFO     code_monkey.py:109:28
+    last_iteration.get("description")
+    Detected reachable call from tool "run" (class-based-tool) to last_iteration.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\code_monkey.py:72
+
+  ● INFO     code_monkey.py:110:29
+    last_iteration.get("user_feedback")
+    Detected reachable call from tool "run" (class-based-tool) to last_iteration.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: user_feedback.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\code_monkey.py:72
+
+  ● INFO     code_monkey.py:111:32
+    last_iteration.get("user_feedback_qa")
+    Detected reachable call from tool "run" (class-based-tool) to last_iteration.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: user_feedback_qa.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\code_monkey.py:72
+
+  ● INFO     code_monkey.py:165:20
+    if not file.content.meta.get("description")
+    Detected reachable call from tool "run" (class-based-tool) to file.content.meta.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\code_monkey.py:72
+
+  ● INFO     code_monkey.py:169:23
+    to_describe.get(file.path)
+    Detected reachable call from tool "run" (class-based-tool) to to_describe.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: file.path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\code_monkey.py:72
+
+  ● INFO     developer.py:96:48
+    if self.current_state.current_step and self.current_state...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_step.get. No policy gate detected in the analyzed call path. Resource hint: type.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     developer.py:110:16
+    if not self.current_state.current_task.get("run_always", ...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_task.get. No policy gate detected in the analyzed call path. Resource hint: run_always.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     developer.py:209:18
+    self.current_state.current_epic.get("source", "app")
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_epic.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: source.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     developer.py:232:33
+    current_task.get("related_api_endpoints", [])
+    Detected reachable call from tool "run" (class-based-tool) to current_task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: related_api_endpoints.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     developer.py:247:17
+    and self.next_state.current_task.get("redo_human_instruct...
+    Detected reachable call from tool "run" (class-based-tool) to self.next_state.current_task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: redo_human_instructions.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     developer.py:395:17
+    self.current_state.current_task.get("id"),
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     developer.py:402:13
+    self.current_state.current_task.get("id"),
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     developer.py:419:12
+    if self.next_state.current_task.get("redo_human_instructi...
+    Detected reachable call from tool "run" (class-based-tool) to self.next_state.current_task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: redo_human_instructions.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     developer.py:423:12
+    if self.current_state.current_task.get("quick_implementat...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: quick_implementation.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     developer.py:426:12
+    if self.current_state.current_task.get("user_added_subseq...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: user_added_subsequently.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     developer.py:429:12
+    if self.current_state.current_task.get("hardcoded", False):
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: hardcoded.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     developer.py:432:48
+    if self.current_state.current_task and self.current_state...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: hardcoded.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+
+  ● INFO     error_handler.py:45:17
+    error.data.get("message", "Unknown error"), error.data.ge...
+    Detected reachable call from tool "run" (class-based-tool) to error.data.get. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: message.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\error_handler.py:24
+
+  ● INFO     error_handler.py:67:15
+    details.get("cmd")
+    Detected reachable call from tool "run" (class-based-tool) to details.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: cmd.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\error_handler.py:24
+
+  ● INFO     error_handler.py:68:19
+    details.get("timeout")
+    Detected reachable call from tool "run" (class-based-tool) to details.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: timeout.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\error_handler.py:24
+
+  ● INFO     error_handler.py:69:23
+    details.get("status_code")
+    Detected reachable call from tool "run" (class-based-tool) to details.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: status_code.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\error_handler.py:24
+
+  ● INFO     error_handler.py:70:18
+    details.get("stdout", "")
+    Detected reachable call from tool "run" (class-based-tool) to details.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: stdout.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\error_handler.py:24
+
+  ● INFO     error_handler.py:71:18
+    details.get("stderr", "")
+    Detected reachable call from tool "run" (class-based-tool) to details.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: stderr.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\error_handler.py:24
+
+  ● INFO     error_handler.py:119:73
+    self.next_state.steps = [s for s in self.current_state.st...
+    Detected reachable call from tool "run" (class-based-tool) to s.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: completed.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\error_handler.py:24
+
+  ● INFO     executor.py:79:19
+    options.get("timeout")
+    Detected reachable call from tool "run" (class-based-tool) to options.get. No policy gate detected in the analyzed call path. Resource hint: timeout.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\executor.py:72
+
+  ● INFO     external_docs.py:143:29
+    reqs.append(client.get(url, params={"q": qs, "doc_key": d...
+    Detected reachable call from tool "run" (class-based-tool) to client.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: url.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\external_docs.py:46
+
+  ● INFO     frontend.py:47:14
+    elif self.next_state.epics[-1].get("file_paths_to_remove_...
+    Detected reachable call from tool "run" (class-based-tool) to self.next_state.epics[-1].get. No policy gate detected in the analyzed call path. Resource hint: file_paths_to_remove_mock.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● INFO     frontend.py:51:18
+    elif not self.next_state.epics[-1].get("fe_iteration_done"):
+    Detected reachable call from tool "run" (class-based-tool) to self.next_state.epics[-1].get. No policy gate detected in the analyzed call path. Resource hint: fe_iteration_done.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● INFO     frontend.py:132:22
+    self.current_state.epics[-1].get("use_relace", False)
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.epics[-1].get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: use_relace.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● INFO     frontend.py:135:12
+    if self.next_state.epics[-1].get("manual_iteration", False):
+    Detected reachable call from tool "run" (class-based-tool) to self.next_state.epics[-1].get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: manual_iteration.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● INFO     frontend.py:138:20
+    or self.current_state.epics[-1].get("retry_count", 0) >= 2
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.epics[-1].get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: retry_count.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● INFO     frontend.py:140:56
+    self.next_state.epics[-1]["retry_count"] = self.current_s...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.epics[-1].get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: retry_count.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● INFO     frontend.py:402:32
+    if not self.next_state.epics[-1].get("file_paths_to_remov...
+    Detected reachable call from tool "run" (class-based-tool) to self.next_state.epics[-1].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: file_paths_to_remove_mock.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● INFO     frontend.py:436:34
+    with open(absolute_path, "r") as file:
+    Detected reachable call from tool "run" (class-based-tool) to builtins.open through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: absolute_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● INFO     frontend.py:438:54
+    if npm_script not in package_json.get("scripts", {}):
+    Detected reachable call from tool "run" (class-based-tool) to package_json.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: scripts.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● INFO     frontend.py:558:12
+    if self.next_state.epics[-1].get("auto_debug_attempts", 0...
+    Detected reachable call from tool "run" (class-based-tool) to self.next_state.epics[-1].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: auto_debug_attempts.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● INFO     frontend.py:568:17
+    self.current_state.epics[-1].get("auto_debug_attempts", 0...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.epics[-1].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: auto_debug_attempts.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\frontend.py:44
+
+  ● INFO     human_input.py:12:46
+    return await self.input_required(self.prev_response.data....
+    Detected reachable call from tool "run" (class-based-tool) to self.prev_response.data.get. No policy gate detected in the analyzed call path. Resource hint: files.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\human_input.py:10
+
+  ● INFO     orchestrator.py:91:21
+    and self.current_state.current_task.get("redo_human_instr...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_task.get. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: redo_human_instructions.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:118:37
+    "src/pages/" in single_agent.step.get("save_file", {}).ge...
+    Detected reachable call from tool "run" (class-based-tool) to single_agent.step.get("save_file", {}).get. No policy gate detected in the analyzed call path. Resource hint: path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:118:37
+    "src/pages/" in single_agent.step.get("save_file", {}).ge...
+    Detected reachable call from tool "run" (class-based-tool) to single_agent.step.get. No policy gate detected in the analyzed call path. Resource hint: save_file.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:119:38
+    or "src/api/" in single_agent.step.get("save_file", {}).g...
+    Detected reachable call from tool "run" (class-based-tool) to single_agent.step.get("save_file", {}).get. No policy gate detected in the analyzed call path. Resource hint: path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:119:38
+    or "src/api/" in single_agent.step.get("save_file", {}).g...
+    Detected reachable call from tool "run" (class-based-tool) to single_agent.step.get. No policy gate detected in the analyzed call path. Resource hint: save_file.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:120:24
+    or single_agent.current_state.current_task.get("related_a...
+    Detected reachable call from tool "run" (class-based-tool) to single_agent.current_state.current_task.get. No policy gate detected in the analyzed call path. Resource hint: related_api_endpoints.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:127:37
+    "path": single_agent.step.get("save_file", {}).get("path"...
+    Detected reachable call from tool "run" (class-based-tool) to single_agent.step.get("save_file", {}).get. No policy gate detected in the analyzed call path. Resource hint: path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:127:37
+    "path": single_agent.step.get("save_file", {}).get("path"...
+    Detected reachable call from tool "run" (class-based-tool) to single_agent.step.get. No policy gate detected in the analyzed call path. Resource hint: save_file.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:128:40
+    "content": single_agent.step.get("save_file", {}).get("co...
+    Detected reachable call from tool "run" (class-based-tool) to single_agent.step.get("save_file", {}).get. No policy gate detected in the analyzed call path. Resource hint: content.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:128:40
+    "content": single_agent.step.get("save_file", {}).get("co...
+    Detected reachable call from tool "run" (class-based-tool) to single_agent.step.get. No policy gate detected in the analyzed call path. Resource hint: save_file.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:129:54
+    "related_api_endpoints": single_agent.current_state.curre...
+    Detected reachable call from tool "run" (class-based-tool) to single_agent.current_state.current_task.get. No policy gate detected in the analyzed call path. Resource hint: related_api_endpoints.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:135:28
+    if single_agent.current_state.current_task.get("related_a...
+    Detected reachable call from tool "run" (class-based-tool) to single_agent.current_state.current_task.get. No policy gate detected in the analyzed call path. Resource hint: related_api_endpoints.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:172:16
+    if not os.path.exists(package_json_path):
+    Detected reachable call from tool "run" (class-based-tool) to os.path.exists through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: package_json_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:178:16
+    if not os.path.exists(node_modules_path):
+    Detected reachable call from tool "run" (class-based-tool) to os.path.exists through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: node_modules_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:188:16
+    if not os.path.exists(absolute_path):
+    Detected reachable call from tool "run" (class-based-tool) to os.path.exists through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: absolute_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:193:18
+    with open(absolute_path, "r", encoding="utf-8") as file:
+    Detected reachable call from tool "run" (class-based-tool) to builtins.open through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: absolute_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:194:27
+    file.read()
+    Detected reachable call from tool "run" (class-based-tool) to builtins.open.read through 1 intermediate call(s). No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:225:16
+    if not os.path.exists(absolute_path):
+    Detected reachable call from tool "run" (class-based-tool) to os.path.exists through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: absolute_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:229:18
+    with open(absolute_path, "r") as file:
+    Detected reachable call from tool "run" (class-based-tool) to builtins.open through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: absolute_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:260:20
+    if not os.path.exists(index_path):
+    Detected reachable call from tool "run" (class-based-tool) to os.path.exists through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: index_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:264:18
+    with open(index_path, "r", encoding="utf-8") as file:
+    Detected reachable call from tool "run" (class-based-tool) to builtins.open through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: index_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:265:27
+    file.read()
+    Detected reachable call from tool "run" (class-based-tool) to builtins.open.read through 1 intermediate call(s). No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:287:16
+    if not os.path.exists(absolute_path):
+    Detected reachable call from tool "run" (class-based-tool) to os.path.exists through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: absolute_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:292:18
+    with open(absolute_path, "r") as file:
+    Detected reachable call from tool "run" (class-based-tool) to builtins.open through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: absolute_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:295:16
+    if package_json["scripts"].get("build") == script:
+    Detected reachable call from tool "run" (class-based-tool) to package_json["scripts"].get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: build.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:310:16
+    if not os.path.exists(absolute_path):
+    Detected reachable call from tool "run" (class-based-tool) to os.path.exists through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: absolute_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:315:18
+    with open(absolute_path, "r", encoding="utf-8") as file:
+    Detected reachable call from tool "run" (class-based-tool) to builtins.open through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: absolute_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:316:35
+    file.read()
+    Detected reachable call from tool "run" (class-based-tool) to builtins.open.read through 1 intermediate call(s). No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:335:18
+    with open(template_path, "r", encoding="utf-8") as file:
+    Detected reachable call from tool "run" (class-based-tool) to builtins.open through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: template_path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:336:36
+    file.read()
+    Detected reachable call from tool "run" (class-based-tool) to builtins.open.read through 1 intermediate call(s). No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:362:30
+    files += single_response.data.get("files", [])
+    Detected reachable call from tool "run" (class-based-tool) to single_response.data.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: files.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:455:67
+    file.path for file in self.current_state.files if not fil...
+    Detected reachable call from tool "run" (class-based-tool) to file.content.meta.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:483:34
+    elif state.epics and not state.epics[0].get("description"):
+    Detected reachable call from tool "run" (class-based-tool) to state.epics[0].get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:486:37
+    elif state.current_epic and state.current_epic.get("sourc...
+    Detected reachable call from tool "run" (class-based-tool) to state.current_epic.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: source.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:498:31
+    state.current_task.get("status") if state.current_task el...
+    Detected reachable call from tool "run" (class-based-tool) to state.current_task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: status.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:555:21
+    step.get("type")
+    Detected reachable call from tool "run" (class-based-tool) to step.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: type.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     orchestrator.py:622:22
+    self.current_state.current_step.get("source")
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_step.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: source.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\orchestrator.py:48
+
+  ● INFO     task_completer.py:24:18
+    self.current_state.current_epic.get("source", "app")
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_epic.get. No policy gate detected in the analyzed call path. Resource hint: source.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\task_completer.py:15
+
+  ● INFO     tech_lead.py:235:24
+    if task.get("description"):
+    Detected reachable call from tool "run" (class-based-tool) to task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● INFO     tech_lead.py:256:17
+    self.next_state.epics[-1].get("sub_epics", []),
+    Detected reachable call from tool "run" (class-based-tool) to self.next_state.epics[-1].get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: sub_epics.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● INFO     tech_lead.py:301:12
+    if epic.get("source") == "feature":
+    Detected reachable call from tool "run" (class-based-tool) to epic.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: source.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● INFO     tech_lead.py:302:66
+    await self.get_relevant_files_parallel(user_feedback=epic...
+    Detected reachable call from tool "run" (class-based-tool) to epic.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● INFO     tech_lead.py:310:27
+    self.current_state.current_epic.get("source", "app"),
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_epic.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: source.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● INFO     tech_lead.py:323:12
+    if epic.get("source") == "feature" or epic.get("complexit...
+    Detected reachable call from tool "run" (class-based-tool) to epic.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: source.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● INFO     tech_lead.py:384:17
+    and self.current_state.current_epic.get("source", "") == ...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_epic.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: source.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● INFO     tech_lead.py:385:17
+    and self.current_state.knowledge_base.user_options.get("a...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.knowledge_base.user_options.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: auth.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+
+  ● INFO     troubleshooter.py:41:16
+    if self.current_state.current_iteration.get("status") == ...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_iteration.get. No policy gate detected in the analyzed call path. Resource hint: status.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● INFO     troubleshooter.py:49:25
+    self.current_state.current_iteration.get("user_feedback")
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_iteration.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: user_feedback.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● INFO     troubleshooter.py:50:28
+    self.current_state.current_iteration.get("user_feedback_qa")
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_iteration.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: user_feedback_qa.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● INFO     troubleshooter.py:51:30
+    self.current_state.current_iteration.get("bug_hunting_cyc...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_iteration.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: bug_hunting_cycles.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● INFO     troubleshooter.py:66:29
+    self.current_state.current_task.get("test_instructions")
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_task.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: test_instructions.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● INFO     troubleshooter.py:113:47
+    if last_iteration is not None and last_iteration.get("alt...
+    Detected reachable call from tool "run" (class-based-tool) to last_iteration.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: alternative_solutions.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● INFO     troubleshooter.py:166:33
+    task.get("related_api_endpoints", [])
+    Detected reachable call from tool "run" (class-based-tool) to task.get through 3 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: related_api_endpoints.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● INFO     troubleshooter.py:291:20
+    if not self.current_state.current_task.get("hardcoded", F...
+    Detected reachable call from tool "run" (class-based-tool) to self.current_state.current_task.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: hardcoded.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\troubleshooter.py:39
+
+  ● INFO     wizard.py:76:24
+    if auth_data.get("types") is None or "apiKey" not in auth...
+    Detected reachable call from tool "run" (class-based-tool) to auth_data.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: types.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\wizard.py:24
+
+  ● INFO     helpers.py:424:18
+    task.get("sub_epic_id", 1) + 2
+    Detected reachable call from tool "run" (class-based-tool) to task.get through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: sub_epic_id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\developer.py:95
+    path: cross-file
+
+  ● INFO     api_server.py:281:36
+    if state.epics and state.epics[0].get("description", None...
+    Detected reachable call from tool "run" (class-based-tool) to state.epics[0].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:284:43
+    if state.current_task and state.current_task.get("descrip...
+    Detected reachable call from tool "run" (class-based-tool) to state.current_task.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:288:52
+    state.iterations[-1].get("user_feedback", None)
+    Detected reachable call from tool "run" (class-based-tool) to state.iterations[-1].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: user_feedback.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:290:43
+    if state.current_task and state.current_task.get("test_in...
+    Detected reachable call from tool "run" (class-based-tool) to state.current_task.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: test_instructions.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:291:44
+    state.current_task.get("test_instructions")
+    Detected reachable call from tool "run" (class-based-tool) to state.current_task.get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: test_instructions.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:295:25
+    and state.steps[-1].get("command", {}) != {}
+    Detected reachable call from tool "run" (class-based-tool) to state.steps[-1].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: command.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:296:25
+    and state.steps[-1].get("completed", False) is False
+    Detected reachable call from tool "run" (class-based-tool) to state.steps[-1].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: completed.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:298:35
+    state.steps[-1].get("command", {}).get("command", "")
+    Detected reachable call from tool "run" (class-based-tool) to state.steps[-1].get("command", {}).get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: command.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:298:35
+    state.steps[-1].get("command", {}).get("command", "")
+    Detected reachable call from tool "run" (class-based-tool) to state.steps[-1].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: command.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:302:25
+    and state.steps[-1].get("human_intervention_description",...
+    Detected reachable call from tool "run" (class-based-tool) to state.steps[-1].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: human_intervention_description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:303:25
+    and state.steps[-1].get("completed", False) is False
+    Detected reachable call from tool "run" (class-based-tool) to state.steps[-1].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: completed.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:305:42
+    state.steps[-1].get("human_intervention_description", None)
+    Detected reachable call from tool "run" (class-based-tool) to state.steps[-1].get through 2 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: human_intervention_description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:321:49
+    convo_id, user_msg=message.content.get("message", "")
+    Detected reachable call from tool "run" (class-based-tool) to message.content.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: message.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:325:24
+    if chat_msg.get("role", "") == "user":
+    Detected reachable call from tool "run" (class-based-tool) to chat_msg.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: role.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:326:58
+    conversation.user(chat_msg.get("content", ""))
+    Detected reachable call from tool "run" (class-based-tool) to chat_msg.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: content.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:327:24
+    if chat_msg.get("role", "") == "assistant":
+    Detected reachable call from tool "run" (class-based-tool) to chat_msg.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: role.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:328:63
+    conversation.assistant(chat_msg.get("content", ""))
+    Detected reachable call from tool "run" (class-based-tool) to chat_msg.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: content.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:339:38
+    uuid.UUID(message.content.get("convoId", ""))
+    Detected reachable call from tool "run" (class-based-tool) to message.content.get. No policy gate detected in the analyzed call path. Resource hint: convoId.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     api_server.py:340:32
+    message.content.get("chatHistory", [])
+    Detected reachable call from tool "run" (class-based-tool) to message.content.get. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: chatHistory.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\ui\api_server.py:335
+
+  ● INFO     text.py:30:19
+    logs.find(marker)
+    Detected reachable call from tool "run" (class-based-tool) to logs.find through 2 intermediate call(s). The analyzed path crosses file boundaries. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: marker.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\gpt-pilot\core\agents\tech_lead.py:59
+    path: cross-file
+
+  Unclassified CEEs
+  ─────────────────────────────────────────────────────
+  ○ unclassified architect.py:99:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified bug_hunter.py:61:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified code_monkey.py:72:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified developer.py:95:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified error_handler.py:24:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified executor.py:72:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified external_docs.py:46:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified frontend.py:44:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified human_input.py:10:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified importer.py:21:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified legacy_handler.py:9:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified orchestrator.py:48:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified problem_solver.py:38:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified task_completer.py:15:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tech_lead.py:59:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tech_writer.py:16:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified troubleshooter.py:39:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified wizard.py:24:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified sidebar.tsx:100:0
+    handleKeyDown
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified useMobile.tsx:10:0
+    onChange
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified sidebar.tsx:100:0
+    handleKeyDown
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified useMobile.tsx:10:0
+    onChange
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified api_server.py:335:0
+    run
+    Tool registration detected. No external operations traced from this entry point.
+
+  ─────────────────────────────────────────────────────
+  302 files  ·  12.9s
+  Unique entrypoints reaching sensitive operations: 4.
+  Coverage gap: 379 unresolved call edge(s) in call graph.

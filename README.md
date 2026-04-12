@@ -223,7 +223,7 @@ Framework labels come from structural analysis of imports and code shape, not st
 
 ## Benchmarks
 
-Scanned on real production agentic repositories (v1.6.2). All results generated live — no sampling or summarization.
+Scanned on real production agentic repositories (v1.6.2). All results generated live — no sampling or summarization. Full scan outputs in [`evaluations/`](./evaluations/).
 
 | Repository | Language | Files | CEEs | Critical | Warning | Info |
 |------------|----------|------:|-----:|---------:|--------:|-----:|
@@ -234,11 +234,9 @@ Scanned on real production agentic repositories (v1.6.2). All results generated 
 | [OpenHands](https://github.com/All-Hands-AI/OpenHands) | Python + TS | 1,702 | **80** | 0 | 5 | 10 |
 | [gpt-researcher](https://github.com/assafelovic/gpt-researcher) | Python | 278 | **40** | 0 | 0 | 3 |
 | [AgentGPT](https://github.com/reworkd/AgentGPT) | Python + TS | 234 | **29** | 0 | 10 | 10 |
-| [ChatDev](https://github.com/OpenBMB/ChatDev) | Python | 201 | **1** | 0 | 0 | 0 |
-| [TaskWeaver](https://github.com/microsoft/TaskWeaver) | Python | 144 | 0 | 0 | 0 | 0 |
-| [devika](https://github.com/stitionai/devika) | Python | 85 | 0 | 0 | 0 | 0 |
-
-**Zero-result systems** (TaskWeaver, devika): Tool calls are present but no standard tool-registration patterns are detected — no `@tool` decorators, no `BaseTool` subclasses, no recognized framework registrations. WyScan correctly emits nothing rather than guessing.
+| [agno](https://github.com/agno-agi/agno) | Python | 2,719 | **239** | 2 | 90 | 60 |
+| [gpt-pilot](https://github.com/Pythagora-io/gpt-pilot) | Python + TS | 302 | **232** | 0 | 88 | 121 |
+| [Sweep](https://github.com/sweepai/sweep) | Python + TS | 227 | **18** | 1 | 14 | 0 |
 
 **CEEs vs. findings:** `cees` is the full canonical execution event inventory. `findings` is the AFB04-classified subset (operations where no gate was detected in the traced path). CEE count reflects scanner coverage depth; finding count reflects actual exposure.
 

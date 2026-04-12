@@ -1,0 +1,1123 @@
+  Loading files: 100/2719...  Loading files: 200/2719...  Loading files: 300/2719...  Loading files: 400/2719...  Loading files: 500/2719...  Loading files: 600/2719...  Loading files: 700/2719...  Loading files: 800/2719...  Loading files: 900/2719...  Loading files: 1000/2719...  Loading files: 1100/2719...  Loading files: 1200/2719...  Loading files: 1300/2719...  Loading files: 1400/2719...  Loading files: 1500/2719...  Loading files: 1600/2719...  Loading files: 1700/2719...  Loading files: 1800/2719...  Loading files: 1900/2719...  Loading files: 2000/2719...  Loading files: 2100/2719...  Loading files: 2200/2719...  Loading files: 2300/2719...  Loading files: 2400/2719...  Loading files: 2500/2719...  Loading files: 2600/2719...  Loading files: 2700/2719...  Loaded 2719 files. Building call graph...
+  wyscan v1.6.2  ·  Plarix
+  ─────────────────────────────────────────────────────
+
+  Scanning  C:\Users\Asus\AppData\Local\Temp\agent-repos\agno
+
+  ─────────────────────────────────────────────────────
+  2 critical  ·  90 warning  ·  60 info
+  239 cees detected
+  ─────────────────────────────────────────────────────
+
+  ● CRITICAL external_tool_execution.py:29:16
+    return subprocess.check_output(command, shell=True).decod...
+    Detected reachable call from tool "execute_shell_command" (agno) to subprocess.check_output. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: command.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\10_human_in_the_loop\external_tool_execution.py:18
+
+  ● CRITICAL external_tool_execution_stream.py:38:12
+    return subprocess.check_output(shlex.split(command)).deco...
+    Detected reachable call from tool "run_shell_command" (agno) to subprocess.check_output. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: command.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\03_teams\20_human_in_the_loop\external_tool_execution_stream.py:31
+
+  ● WARNING  human_in_the_loop.py:94:5
+    learnings_kb.insert(
+    Detected reachable call from tool "save_learning" (agno) to learnings_kb.insert. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: title.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\00_quickstart\human_in_the_loop.py:70
+
+  ● WARNING  save_query.py:73:13
+    knowledge.insert(
+    Detected reachable call from tool "save_validated_query" (agno) to knowledge.insert. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: payload.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\dash\tools\save_query.py:14
+
+  ● WARNING  awareness.py:46:13
+    lines.append(f"### {source['source_name']} (`{source['sou...
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"### {source['source_name']} (`{source['source_type']}`)".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:48:17
+    lines.append(source["description"])
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:49:13
+    lines.append("")
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: "".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:53:21
+    lines.append("**Capabilities:**")
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: **Capabilities:**.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:55:25
+    lines.append(f"  - {cap}")
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"  - {cap}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:56:21
+    lines.append("")
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: "".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:59:21
+    lines.append("**Where to find things:**")
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: **Where to find things:**.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:61:25
+    lines.append(f"  - {key}: `{value}`")
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"  - {key}: `{value}`".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:62:21
+    lines.append("")
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: "".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:66:21
+    lines.append("**Buckets:**")
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: **Buckets:**.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:68:25
+    lines.append(
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"  - **{bucket['name']}**: {bucket.get('description', '')}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:71:21
+    lines.append("")
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: "".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:73:13
+    lines.append("")
+    Detected reachable call from tool "list_sources" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: "".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● WARNING  awareness.py:129:21
+    lines.append(f"{icon} **{name}/**")
+    Detected reachable call from tool "get_metadata" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"{icon} **{name}/**".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● WARNING  awareness.py:134:21
+    lines.append(f"{icon} {name}{size_info}")
+    Detected reachable call from tool "get_metadata" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"{icon} {name}{size_info}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● WARNING  awareness.py:137:21
+    lines.append(f"   `{item['id']}`")
+    Detected reachable call from tool "get_metadata" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"   `{item['id']}`".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● WARNING  awareness.py:152:25
+    lines.append(f"**{key}:** {value}")
+    Detected reachable call from tool "get_metadata" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"**{key}:** {value}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● WARNING  awareness.py:169:17
+    lines.append(f"{icon} **{name}/**")
+    Detected reachable call from tool "get_metadata" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"{icon} **{name}/**".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● WARNING  awareness.py:177:17
+    lines.append(f"{icon} {name}{size_info}")
+    Detected reachable call from tool "get_metadata" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"{icon} {name}{size_info}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● WARNING  s3.py:41:13
+    lines.append(f"**{bucket['name']}**")
+    Detected reachable call from tool "list_buckets" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"**{bucket['name']}**".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:28
+
+  ● WARNING  s3.py:43:17
+    lines.append(f"  {bucket['description']}")
+    Detected reachable call from tool "list_buckets" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"  {bucket['description']}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:28
+
+  ● WARNING  s3.py:45:17
+    lines.append(f"  Region: {bucket['region']}")
+    Detected reachable call from tool "list_buckets" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"  Region: {bucket['region']}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:28
+
+  ● WARNING  s3.py:46:13
+    lines.append("")
+    Detected reachable call from tool "list_buckets" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: "".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:28
+
+  ● WARNING  s3.py:72:17
+    lines.append(f"[bucket] **{item['name']}/**")
+    Detected reachable call from tool "list_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"[bucket] **{item['name']}/**".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:51
+
+  ● WARNING  s3.py:74:17
+    lines.append(f"[dir] **{item['name']}/**")
+    Detected reachable call from tool "list_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"[dir] **{item['name']}/**".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:51
+
+  ● WARNING  s3.py:79:17
+    lines.append(f"[file] {item['name']} ({size_str}, {modifi...
+    Detected reachable call from tool "list_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"[file] {item['name']} ({size_str}, {modified})".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:51
+
+  ● WARNING  s3.py:80:17
+    lines.append(f"   `{item['id']}`")
+    Detected reachable call from tool "list_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"   `{item['id']}`".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:51
+
+  ● WARNING  s3.py:110:13
+    lines.append(f"**{result['key']}**")
+    Detected reachable call from tool "search_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: f"**{result['key']}**".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:85
+
+  ● WARNING  s3.py:111:13
+    lines.append(f"  Bucket: {result['bucket']}")
+    Detected reachable call from tool "search_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: f"  Bucket: {result['bucket']}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:85
+
+  ● WARNING  s3.py:112:13
+    lines.append(f"  Match: {result['match_type']}")
+    Detected reachable call from tool "search_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: f"  Match: {result['match_type']}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:85
+
+  ● WARNING  s3.py:115:17
+    lines.append("  ```")
+    Detected reachable call from tool "search_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint:   ```.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:85
+
+  ● WARNING  s3.py:117:21
+    lines.append(f"  {snippet_line}")
+    Detected reachable call from tool "search_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: f"  {snippet_line}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:85
+
+  ● WARNING  s3.py:118:17
+    lines.append("  ```")
+    Detected reachable call from tool "search_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint:   ```.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:85
+
+  ● WARNING  s3.py:120:13
+    lines.append(f"  Path: `{result['id']}`")
+    Detected reachable call from tool "search_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: f"  Path: `{result['id']}`".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:85
+
+  ● WARNING  s3.py:121:13
+    lines.append("")
+    Detected reachable call from tool "search_files" (agno) to lines.append. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: "".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:85
+
+  ● WARNING  s3.py:158:13
+    lines.append("---")
+    Detected reachable call from tool "read_file" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: ---.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:126
+
+  ● WARNING  s3.py:160:17
+    lines.append(f"Modified: {meta['modified']}")
+    Detected reachable call from tool "read_file" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"Modified: {meta['modified']}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:126
+
+  ● WARNING  s3.py:162:17
+    lines.append(f"Size: {_format_size(meta['size'])}")
+    Detected reachable call from tool "read_file" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: f"Size: {_format_size(meta['size'])}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:126
+
+  ● WARNING  s3.py:163:13
+    lines.append("---")
+    Detected reachable call from tool "read_file" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: ---.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:126
+
+  ● WARNING  s3.py:164:13
+    lines.append("")
+    Detected reachable call from tool "read_file" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: "".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:126
+
+  ● WARNING  s3.py:166:9
+    lines.append(result.get("content", ""))
+    Detected reachable call from tool "read_file" (agno) to lines.append. No policy gate detected in the analyzed call path. Resource hint: content.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:126
+
+  ● WARNING  s3.py:192:18
+    self.connector.write(parent_id=parent, title=filename, co...
+    Detected reachable call from tool "write_file" (agno) to self.connector.write. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: parent.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:171
+
+  ● WARNING  save_discovery.py:61:13
+    knowledge.insert(
+    Detected reachable call from tool "save_intent_discovery" (agno) to knowledge.insert. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: payload.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\save_discovery.py:14
+
+  ● WARNING  confirmation_advanced.py:34:16
+    httpx.get("https://hacker-news.firebaseio.com/v0/topstori...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\10_human_in_the_loop\confirmation_advanced.py:23
+
+  ● WARNING  confirmation_advanced.py:40:26
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\10_human_in_the_loop\confirmation_advanced.py:23
+
+  ● WARNING  confirmation_advanced.py:46:9
+    all_stories.append(story)
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to all_stories.append. No policy gate detected in the analyzed call path. Resource hint: story.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\10_human_in_the_loop\confirmation_advanced.py:23
+
+  ● WARNING  confirmation_required.py:34:16
+    httpx.get("https://hacker-news.firebaseio.com/v0/topstori...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\10_human_in_the_loop\confirmation_required.py:23
+
+  ● WARNING  confirmation_required.py:40:26
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\10_human_in_the_loop\confirmation_required.py:23
+
+  ● WARNING  confirmation_required.py:46:9
+    all_stories.append(story)
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to all_stories.append. No policy gate detected in the analyzed call path. Resource hint: story.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\10_human_in_the_loop\confirmation_required.py:23
+
+  ● WARNING  confirmation_with_session_state.py:37:9
+    watchlist.append(symbol)
+    Detected reachable call from tool "add_to_watchlist" (agno) to watchlist.append. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: symbol.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\10_human_in_the_loop\confirmation_with_session_state.py:21
+
+  ● WARNING  approval_async.py:34:16
+    httpx.get("https://hacker-news.firebaseio.com/v0/topstori...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\11_approvals\approval_async.py:23
+
+  ● WARNING  approval_async.py:38:17
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\11_approvals\approval_async.py:23
+
+  ● WARNING  approval_async.py:42:9
+    stories.append(story)
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to stories.append. No policy gate detected in the analyzed call path. Resource hint: story.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\11_approvals\approval_async.py:23
+
+  ● WARNING  approval_basic.py:33:16
+    httpx.get("https://hacker-news.firebaseio.com/v0/topstori...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\11_approvals\approval_basic.py:22
+
+  ● WARNING  approval_basic.py:37:17
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\11_approvals\approval_basic.py:22
+
+  ● WARNING  approval_basic.py:41:9
+    stories.append(story)
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to stories.append. No policy gate detected in the analyzed call path. Resource hint: story.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\11_approvals\approval_basic.py:22
+
+  ● WARNING  approval_basic.py:32:16
+    httpx.get("https://hacker-news.firebaseio.com/v0/topstori...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\05_agent_os\approvals\approval_basic.py:21
+
+  ● WARNING  approval_basic.py:36:17
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\05_agent_os\approvals\approval_basic.py:21
+
+  ● WARNING  approval_basic.py:40:9
+    stories.append(story)
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to stories.append. No policy gate detected in the analyzed call path. Resource hint: story.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\05_agent_os\approvals\approval_basic.py:21
+
+  ● WARNING  retry_tool_call_from_post_hook.py:49:5
+    run_context.session_state["shopping_list"].append(item)
+    Detected reachable call from tool "add_item" (agno) to run_context.session_state["shopping_list"].append. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Instruction or context-like input is present in the analyzed path. Resource hint: item.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\exceptions\retry_tool_call_from_post_hook.py:40
+
+  ● WARNING  human_in_the_loop.py:63:16
+    httpx.get("https://hacker-news.firebaseio.com/v0/topstori...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\other\human_in_the_loop.py:52
+
+  ● WARNING  human_in_the_loop.py:68:26
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\other\human_in_the_loop.py:52
+
+  ● WARNING  async_tool_decorator.py:27:26
+    await client.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.AsyncClient.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\async_tool_decorator.py:21
+
+  ● WARNING  async_tool_decorator.py:34:36
+    await client.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.AsyncClient.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\async_tool_decorator.py:21
+
+  ● WARNING  cache_tool_calls.py:22:16
+    httpx.get("https://hacker-news.firebaseio.com/v0/topstori...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\cache_tool_calls.py:19
+
+  ● WARNING  cache_tool_calls.py:28:26
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\cache_tool_calls.py:19
+
+  ● WARNING  cache_tool_calls.py:34:9
+    stories.append(json.dumps(story))
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to stories.append. No policy gate detected in the analyzed call path. Resource hint: story.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\cache_tool_calls.py:19
+
+  ● WARNING  tool_decorator_with_hook.py:36:16
+    httpx.get("https://hacker-news.firebaseio.com/v0/topstori...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator_with_hook.py:31
+
+  ● WARNING  tool_decorator_with_hook.py:41:26
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator_with_hook.py:31
+
+  ● WARNING  tool_decorator_with_instructions.py:34:16
+    httpx.get("https://hacker-news.firebaseio.com/v0/topstori...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator_with_instructions.py:17
+
+  ● WARNING  tool_decorator_with_instructions.py:40:26
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator_with_instructions.py:17
+
+  ● WARNING  tool_decorator_with_instructions.py:44:9
+    stories.append(f"{story.get('title')} - {story.get('url',...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to stories.append. No policy gate detected in the analyzed call path. Resource hint: f"{story.get('title')} - {story.get('url', 'No URL')}".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator_with_instructions.py:17
+
+  ● WARNING  tool_decorator.py:25:16
+    httpx.get("https://hacker-news.firebaseio.com/v0/topstori...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator.py:20
+
+  ● WARNING  tool_decorator.py:30:26
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator.py:20
+
+  ● WARNING  tool_decorator.py:73:24
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator.py:67
+
+  ● WARNING  tool_decorator.py:81:44
+    await client.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.AsyncClient.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator.py:67
+
+  ● WARNING  tool_decorator.py:102:34
+    await client.get(
+    Detected reachable call from tool "get_current_weather" (agno) to httpx.AsyncClient.get. No policy gate detected in the analyzed call path. Resource hint: https://geocoding-api.open-meteo.com/v1/search.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator.py:93
+
+  ● WARNING  tool_decorator.py:118:38
+    await client.get(
+    Detected reachable call from tool "get_current_weather" (agno) to httpx.AsyncClient.get. No policy gate detected in the analyzed call path. Resource hint: https://api.open-meteo.com/v1/forecast.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator.py:93
+
+  ● WARNING  pre_and_post_hooks.py:38:16
+    httpx.get("https://hacker-news.firebaseio.com/v0/topstori...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_hooks\pre_and_post_hooks.py:33
+
+  ● WARNING  pre_and_post_hooks.py:43:26
+    httpx.get(
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to httpx.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_hooks\pre_and_post_hooks.py:33
+
+  ● WARNING  pre_and_post_hooks.py:80:26
+    await client.get(
+    Detected reachable call from tool "get_top_hackernews_stories_async" (agno) to httpx.AsyncClient.get. No policy gate detected in the analyzed call path. Resource hint: https://hacker-news.firebaseio.com/v0/topstories.json.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_hooks\pre_and_post_hooks.py:74
+
+  ● WARNING  pre_and_post_hooks.py:87:36
+    await client.get(
+    Detected reachable call from tool "get_top_hackernews_stories_async" (agno) to httpx.AsyncClient.get. No policy gate detected in the analyzed call path. Resource hint: f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json".
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_hooks\pre_and_post_hooks.py:74
+
+  ● WARNING  mcp.py:359:17
+    run_responses.append(RunSchema.from_dict(run).model_dump())
+    Detected reachable call from tool "get_session_runs" (pydantic-ai) to run_responses.append. No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:316
+
+  ● WARNING  mcp.py:362:21
+    run_responses.append(RunSchema.from_dict(run).model_dump())
+    Detected reachable call from tool "get_session_runs" (pydantic-ai) to run_responses.append. No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:316
+
+  ● WARNING  mcp.py:364:21
+    run_responses.append(TeamRunSchema.from_dict(run).model_d...
+    Detected reachable call from tool "get_session_runs" (pydantic-ai) to run_responses.append. No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:316
+
+  ● WARNING  mcp.py:367:21
+    run_responses.append(WorkflowRunSchema.from_dict(run).mod...
+    Detected reachable call from tool "get_session_runs" (pydantic-ai) to run_responses.append. No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:316
+
+  ● WARNING  mcp.py:369:21
+    run_responses.append(TeamRunSchema.from_dict(run).model_d...
+    Detected reachable call from tool "get_session_runs" (pydantic-ai) to run_responses.append. No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:316
+
+  ● WARNING  mcp.py:371:21
+    run_responses.append(RunSchema.from_dict(run).model_dump())
+    Detected reachable call from tool "get_session_runs" (pydantic-ai) to run_responses.append. No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:316
+
+  ● INFO     awareness.py:33:19
+    SOURCE_REGISTRY.get("sources", [])
+    Detected reachable call from tool "list_sources" (agno) to SOURCE_REGISTRY.get. No policy gate detected in the analyzed call path. Resource hint: sources.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● INFO     awareness.py:47:16
+    if source.get("description"):
+    Detected reachable call from tool "list_sources" (agno) to source.get. No policy gate detected in the analyzed call path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● INFO     awareness.py:52:20
+    if source.get("capabilities"):
+    Detected reachable call from tool "list_sources" (agno) to source.get. No policy gate detected in the analyzed call path. Resource hint: capabilities.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● INFO     awareness.py:58:20
+    if source.get("common_locations"):
+    Detected reachable call from tool "list_sources" (agno) to source.get. No policy gate detected in the analyzed call path. Resource hint: common_locations.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● INFO     awareness.py:65:54
+    if source["source_type"] == "s3" and source.get("buckets"):
+    Detected reachable call from tool "list_sources" (agno) to source.get. No policy gate detected in the analyzed call path. Resource hint: buckets.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● INFO     awareness.py:69:58
+    f"  - **{bucket['name']}**: {bucket.get('description', '')}"
+    Detected reachable call from tool "list_sources" (agno) to bucket.get. No policy gate detected in the analyzed call path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:16
+
+  ● INFO     awareness.py:103:67
+    f"Unknown source: {source}. Available: {', '.join(connect...
+    Detected reachable call from tool "get_metadata" (agno) to connectors.keys. No policy gate detected in the analyzed call path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:119:34
+    _get_icon(item.get("type", ""), source)
+    Detected reachable call from tool "get_metadata" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: type.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:120:24
+    item.get("name", item.get("id", "Unknown"))
+    Detected reachable call from tool "get_metadata" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: name.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:122:20
+    if item.get("type") in (
+    Detected reachable call from tool "get_metadata" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: type.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:132:24
+    if item.get("size"):
+    Detected reachable call from tool "get_metadata" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: size.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:136:20
+    if item.get("id") and item["id"] != name:
+    Detected reachable call from tool "get_metadata" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:146:22
+    connector.read(path)
+    Detected reachable call from tool "get_metadata" (agno) to connector.read. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:149:20
+    if result.get("metadata"):
+    Detected reachable call from tool "get_metadata" (agno) to result.get. No policy gate detected in the analyzed call path. Resource hint: metadata.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:159:30
+    _get_icon(item.get("type", ""), source)
+    Detected reachable call from tool "get_metadata" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: type.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:160:20
+    item.get("name", item.get("id", "Unknown"))
+    Detected reachable call from tool "get_metadata" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: name.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:162:16
+    if item.get("type") in (
+    Detected reachable call from tool "get_metadata" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: type.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:172:20
+    if item.get("size"):
+    Detected reachable call from tool "get_metadata" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: size.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:174:28
+    item.get("modified", "")
+    Detected reachable call from tool "get_metadata" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: modified.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     awareness.py:196:12
+    return icons.get(item_type, "[item]")
+    Detected reachable call from tool "get_metadata" (agno) to icons.get through 1 intermediate call(s). No policy gate detected in the analyzed call path. Resource hint: item_type.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\awareness.py:86
+
+  ● INFO     s3.py:42:16
+    if bucket.get("description"):
+    Detected reachable call from tool "list_buckets" (agno) to bucket.get. No policy gate detected in the analyzed call path. Resource hint: description.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:28
+
+  ● INFO     s3.py:44:16
+    if bucket.get("region"):
+    Detected reachable call from tool "list_buckets" (agno) to bucket.get. No policy gate detected in the analyzed call path. Resource hint: region.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:28
+
+  ● INFO     s3.py:76:24
+    item.get("size", 0)
+    Detected reachable call from tool "list_files" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: size.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:51
+
+  ● INFO     s3.py:78:28
+    item.get("modified", "")
+    Detected reachable call from tool "list_files" (agno) to item.get. No policy gate detected in the analyzed call path. Resource hint: modified.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:51
+
+  ● INFO     s3.py:114:16
+    if result.get("snippet"):
+    Detected reachable call from tool "search_files" (agno) to result.get. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: snippet.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:85
+
+  ● INFO     s3.py:149:18
+    self.connector.read(path, options=options if options else...
+    Detected reachable call from tool "read_file" (agno) to self.connector.read. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: path.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:126
+
+  ● INFO     s3.py:156:12
+    if result.get("metadata"):
+    Detected reachable call from tool "read_file" (agno) to result.get. No policy gate detected in the analyzed call path. Resource hint: metadata.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:126
+
+  ● INFO     s3.py:159:16
+    if meta.get("modified"):
+    Detected reachable call from tool "read_file" (agno) to meta.get. No policy gate detected in the analyzed call path. Resource hint: modified.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:126
+
+  ● INFO     s3.py:161:16
+    if meta.get("size"):
+    Detected reachable call from tool "read_file" (agno) to meta.get. No policy gate detected in the analyzed call path. Resource hint: size.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:126
+
+  ● INFO     s3.py:166:22
+    lines.append(result.get("content", ""))
+    Detected reachable call from tool "read_file" (agno) to result.get. No policy gate detected in the analyzed call path. Resource hint: content.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\01_demo\agents\scout\tools\s3.py:126
+
+  ● INFO     confirmation_with_session_state.py:34:17
+    run_context.session_state.get("watchlist", [])
+    Detected reachable call from tool "add_to_watchlist" (agno) to run_context.session_state.get. No policy gate detected in the analyzed call path. Instruction or context-like input is present in the analyzed path. Resource hint: watchlist.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\02_agents\10_human_in_the_loop\confirmation_with_session_state.py:21
+
+  ● INFO     tool_call_limit.py:22:12
+    return catalog.get(product_name.lower(), "This product is...
+    Detected reachable call from tool "lookup_product_price" (agno) to catalog.get. No policy gate detected in the analyzed call path. Resource hint: This product is not in the catalog.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\03_teams\03_tools\tool_call_limit.py:14
+
+  ● INFO     tool_call_limit.py:33:12
+    return shipping_times.get(country.lower(), "Unknown shipp...
+    Detected reachable call from tool "lookup_shipping_time" (agno) to shipping_times.get. No policy gate detected in the analyzed call path. Resource hint: Unknown shipping zone.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\03_teams\03_tools\tool_call_limit.py:25
+
+  ● INFO     tool_choice.py:23:12
+    return city_to_timezone.get(city.lower(), "Unsupported ci...
+    Detected reachable call from tool "get_city_timezone" (agno) to city_to_timezone.get. No policy gate detected in the analyzed call path. Resource hint: Unsupported city for this example.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\03_teams\03_tools\tool_choice.py:14
+
+  ● INFO     server.py:24:15
+    request.headers.get("x-user-id", "unknown")
+    Detected reachable call from tool "greet" (pydantic-ai) to request.headers.get. No policy gate detected in the analyzed call path. Resource hint: x-user-id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\05_agent_os\mcp_demo\dynamic_headers\server.py:18
+
+  ● INFO     server.py:25:18
+    request.headers.get("x-session-id", "unknown")
+    Detected reachable call from tool "greet" (pydantic-ai) to request.headers.get. No policy gate detected in the analyzed call path. Resource hint: x-session-id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\05_agent_os\mcp_demo\dynamic_headers\server.py:18
+
+  ● INFO     server.py:26:18
+    request.headers.get("x-agent-name", "unknown")
+    Detected reachable call from tool "greet" (pydantic-ai) to request.headers.get. No policy gate detected in the analyzed call path. Resource hint: x-agent-name.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\05_agent_os\mcp_demo\dynamic_headers\server.py:18
+
+  ● INFO     server.py:27:17
+    request.headers.get("x-team-name", "none")
+    Detected reachable call from tool "greet" (pydantic-ai) to request.headers.get. No policy gate detected in the analyzed call path. Resource hint: x-team-name.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\05_agent_os\mcp_demo\dynamic_headers\server.py:18
+
+  ● INFO     tool_use.py:28:12
+    weather_data.get(city, {"temp": 20, "condition": "unknown...
+    Detected reachable call from tool "get_weather" (agno) to weather_data.get. No policy gate detected in the analyzed call path. Traced tool-controlled input into the matched operation arguments. Resource hint: city.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\90_models\mistral\tool_use.py:15
+
+  ● INFO     server.py:27:15
+    request.headers.get("x-user-id", "unknown")
+    Detected reachable call from tool "greet" (pydantic-ai) to request.headers.get. No policy gate detected in the analyzed call path. Resource hint: x-user-id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\mcp\dynamic_headers\server.py:20
+
+  ● INFO     server.py:28:17
+    request.headers.get("x-tenant-id", "unknown")
+    Detected reachable call from tool "greet" (pydantic-ai) to request.headers.get. No policy gate detected in the analyzed call path. Resource hint: x-tenant-id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\mcp\dynamic_headers\server.py:20
+
+  ● INFO     server.py:29:18
+    request.headers.get("x-agent-name", "unknown")
+    Detected reachable call from tool "greet" (pydantic-ai) to request.headers.get. No policy gate detected in the analyzed call path. Resource hint: x-agent-name.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\mcp\dynamic_headers\server.py:20
+
+  ● INFO     async_tool_decorator.py:23:19
+    agent.dependencies.get("num_stories", 5) if agent.depende...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to agent.dependencies.get. No policy gate detected in the analyzed call path. Resource hint: num_stories.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\async_tool_decorator.py:21
+
+  ● INFO     tool_decorator_with_hook.py:33:19
+    agent.dependencies.get("num_stories", 5) if agent.depende...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to agent.dependencies.get. No policy gate detected in the analyzed call path. Resource hint: num_stories.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator_with_hook.py:31
+
+  ● INFO     tool_decorator_with_instructions.py:44:27
+    stories.append(f"{story.get('title')} - {story.get('url',...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to story.get. No policy gate detected in the analyzed call path. Resource hint: title.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator_with_instructions.py:17
+
+  ● INFO     tool_decorator.py:22:19
+    agent.dependencies.get("num_stories", 5) if agent.depende...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to agent.dependencies.get. No policy gate detected in the analyzed call path. Resource hint: num_stories.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator.py:20
+
+  ● INFO     tool_decorator.py:69:17
+    agent.dependencies.get("num_stories", 5) if agent.depende...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to agent.dependencies.get. No policy gate detected in the analyzed call path. Resource hint: num_stories.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator.py:67
+
+  ● INFO     tool_decorator.py:95:17
+    agent.dependencies.get("city", "San Francisco")
+    Detected reachable call from tool "get_current_weather" (agno) to agent.dependencies.get. No policy gate detected in the analyzed call path. Resource hint: city.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator.py:93
+
+  ● INFO     tool_decorator.py:112:24
+    if not geo_data.get("results"):
+    Detected reachable call from tool "get_current_weather" (agno) to geo_data.get. No policy gate detected in the analyzed call path. Resource hint: results.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator.py:93
+
+  ● INFO     tool_decorator.py:128:35
+    weather_data.get("current_weather")
+    Detected reachable call from tool "get_current_weather" (agno) to weather_data.get. No policy gate detected in the analyzed call path. Resource hint: current_weather.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_decorator\tool_decorator.py:93
+
+  ● INFO     pre_and_post_hooks.py:35:19
+    agent.dependencies.get("num_stories", 5) if agent.depende...
+    Detected reachable call from tool "get_top_hackernews_stories" (agno) to agent.dependencies.get. No policy gate detected in the analyzed call path. Resource hint: num_stories.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_hooks\pre_and_post_hooks.py:33
+
+  ● INFO     pre_and_post_hooks.py:76:19
+    agent.dependencies.get("num_stories", 5) if agent.depende...
+    Detected reachable call from tool "get_top_hackernews_stories_async" (agno) to agent.dependencies.get. No policy gate detected in the analyzed call path. Resource hint: num_stories.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\cookbook\91_tools\tool_hooks\pre_and_post_hooks.py:74
+
+  ● INFO     mcp.py:352:16
+    session.get("runs")  # type: ignore
+    Detected reachable call from tool "get_session_runs" (pydantic-ai) to session.get. No policy gate detected in the analyzed call path. Resource hint: runs.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:316
+
+  ● INFO     mcp.py:361:20
+    if run.get("agent_id") is not None:
+    Detected reachable call from tool "get_session_runs" (pydantic-ai) to run.get. No policy gate detected in the analyzed call path. Resource hint: agent_id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:316
+
+  ● INFO     mcp.py:366:20
+    if run.get("workflow_id") is not None:
+    Detected reachable call from tool "get_session_runs" (pydantic-ai) to run.get. No policy gate detected in the analyzed call path. Resource hint: workflow_id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:316
+
+  ● INFO     mcp.py:368:22
+    elif run.get("team_id") is not None:
+    Detected reachable call from tool "get_session_runs" (pydantic-ai) to run.get. No policy gate detected in the analyzed call path. Resource hint: team_id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:316
+
+  ● INFO     mcp.py:413:16
+    session.get("runs")  # type: ignore
+    Detected reachable call from tool "get_session_run" (pydantic-ai) to session.get. No policy gate detected in the analyzed call path. Resource hint: runs.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:375
+
+  ● INFO     mcp.py:419:16
+    if run.get("run_id") == run_id:
+    Detected reachable call from tool "get_session_run" (pydantic-ai) to run.get. No policy gate detected in the analyzed call path. Resource hint: run_id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:375
+
+  ● INFO     mcp.py:426:12
+    if target_run.get("workflow_id") is not None:
+    Detected reachable call from tool "get_session_run" (pydantic-ai) to target_run.get. No policy gate detected in the analyzed call path. Resource hint: workflow_id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:375
+
+  ● INFO     mcp.py:428:14
+    elif target_run.get("team_id") is not None:
+    Detected reachable call from tool "get_session_run" (pydantic-ai) to target_run.get. No policy gate detected in the analyzed call path. Resource hint: team_id.
+    tool: C:\Users\Asus\AppData\Local\Temp\agent-repos\agno\libs\agno\agno\os\mcp.py:375
+
+  Unclassified CEEs
+  ─────────────────────────────────────────────────────
+  ○ unclassified s3.py:27:0
+    list_buckets
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified s3.py:50:0
+    list_files
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified s3.py:84:0
+    search_files
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified s3.py:125:0
+    read_file
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified s3.py:170:0
+    write_file
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified workflow.py:32:0
+    get_todays_calendar
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified workflow.py:65:0
+    get_email_digest
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified message_history_hooks.py:33:0
+    get_weather
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mixed_external_and_regular_tools.py:35:0
+    get_user_location
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified user_input_required.py:19:0
+    send_email
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified approval_external_execution.py:20:0
+    deploy_to_production
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified approval_list_and_resolve.py:20:0
+    delete_user_data
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified approval_list_and_resolve.py:31:0
+    send_bulk_email
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified approval_team.py:21:0
+    deploy_to_production
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified approval_user_input.py:20:0
+    send_money
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified audit_approval_async.py:20:0
+    delete_user_data
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified audit_approval_confirmation.py:20:0
+    delete_user_data
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified audit_approval_external.py:19:0
+    run_security_scan
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified audit_approval_overview.py:20:0
+    critical_action
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified audit_approval_overview.py:34:0
+    sensitive_action
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified audit_approval_user_input.py:19:0
+    transfer_funds
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified 09_custom_tools.py:21:0
+    calculate_compound_interest
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified 09_custom_tools.py:45:0
+    calculate_monthly_payment
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified 09_custom_tools.py:74:0
+    assess_risk_score
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified custom_tools.py:14:0
+    answer_from_known_questions
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified message_history_in_tool_hooks.py:41:0
+    get_weather
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified confirmation_rejected_stream.py:28:0
+    delete_user_account
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified confirmation_rejected.py:17:0
+    delete_user_account
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified confirmation_required_async_stream.py:28:0
+    deploy_to_production
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified confirmation_required_async.py:17:0
+    deploy_to_production
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified confirmation_required_stream.py:30:0
+    deploy_to_production
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified confirmation_required.py:25:0
+    get_the_weather
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified external_tool_execution.py:25:0
+    send_email
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified team_tool_confirmation_stream.py:30:0
+    approve_deployment
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified team_tool_confirmation.py:18:0
+    approve_deployment
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified user_input_required_stream.py:28:0
+    book_flight
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified user_input_required.py:25:0
+    plan_trip
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified approval_user_input.py:20:0
+    send_money
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified agent_with_silent_tools.py:23:0
+    generate_haiku
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified agent_with_tools.py:23:0
+    generate_haiku
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified autogen_instantiation.py:18:0
+    get_weather
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified crewai_instantiation.py:18:0
+    get_weather
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified langgraph_instantiation.py:19:0
+    get_weather
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified openai_agents_instantiation.py:23:0
+    get_weather
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified pydantic_tool_input.py:36:0
+    search_products
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified pydantic_tool_input.py:76:0
+    create_user
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified pydantic_tool_input.py:113:0
+    process_payment
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified pydantic_tool_input.py:144:0
+    submit_order
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified pydantic_tool_input.py:185:0
+    plan_delivery
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified custom_tool_events.py:28:0
+    get_customer_profile
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified server.py:21:0
+    get_weather
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified server.py:26:0
+    get_temperature
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified server.py:13:0
+    get_events
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified server.py:18:0
+    get_birthdays_this_week
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified server.py:13:0
+    get_events
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified server.py:18:0
+    get_birthdays_this_week
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified add_tool_after_initialization.py:19:0
+    get_weather
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified complex_input_types.py:61:0
+    create_user
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified complex_input_types.py:68:0
+    create_task
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified session_state_tool.py:15:0
+    answer_from_known_questions
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified stop_after_tool_call.py:16:0
+    get_answer_to_life_universe_and_everything
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tool_decorator_on_class_method.py:33:0
+    multiply_number
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tool_decorator_on_class_method.py:34:0
+    multiply_number
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tool_decorator_on_class_method.py:44:0
+    get_greeting
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tool_decorator_on_class_method.py:45:0
+    get_greeting
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tool_decorator_on_class_method.py:65:0
+    stream_numbers
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tool_decorator_on_class_method.py:66:0
+    stream_numbers
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tool_decorator.py:65:0
+    get_top_hackernews_stories
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified tool_decorator.py:89:0
+    get_current_weather
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified message_history_in_hooks.py:33:0
+    get_weather
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:57:0
+    config
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:87:0
+    run_agent
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:94:0
+    run_team
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:101:0
+    run_workflow
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:110:0
+    get_sessions
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:178:0
+    get_session
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:218:0
+    create_session
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:433:0
+    rename_session
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:478:0
+    update_session
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:558:0
+    delete_session
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:583:0
+    delete_sessions
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:613:0
+    create_memory
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:658:0
+    get_memory
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:685:0
+    get_memories
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:759:0
+    update_memory
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:806:0
+    delete_memory
+    Tool registration detected. No external operations traced from this entry point.
+
+  ○ unclassified mcp.py:827:0
+    delete_memories
+    Tool registration detected. No external operations traced from this entry point.
+
+  ─────────────────────────────────────────────────────
+  2719 files  ·  136.8s
