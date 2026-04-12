@@ -1,4 +1,4 @@
-.PHONY: build test lint check install clean benchmark help
+.PHONY: build test lint check install clean help
 
 # Default target
 all: build
@@ -32,14 +32,6 @@ clean:
 clean-all: clean
 	rm -rf node_modules
 
-## Run benchmark evaluation
-benchmark:
-	python3 benchmark/scripts/evaluate.py
-
-## Run a specific benchmark by number
-benchmark-%:
-	node dist/cli/index.js scan benchmark/$*-*/
-
 ## Type check without emitting
 typecheck:
 	npx tsc --noEmit
@@ -58,8 +50,6 @@ help:
 	@echo "  install     - Install globally via npm link"
 	@echo "  clean       - Remove build artifacts"
 	@echo "  clean-all   - Remove build artifacts and node_modules"
-	@echo "  benchmark   - Run all benchmark evaluations"
-	@echo "  benchmark-N - Run specific benchmark (e.g., make benchmark-15)"
 	@echo "  typecheck   - Type check without emitting"
 	@echo "  watch       - Watch mode for development"
 	@echo "  help        - Show this help message"

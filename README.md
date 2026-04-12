@@ -461,7 +461,6 @@ npm run wyscan -- scan ./project
 | `make clean` | Remove build artifacts |
 | `make typecheck` | Type check without emit |
 | `make watch` | Watch mode |
-| `make benchmark-N` | Scan benchmark fixture N |
 
 ---
 
