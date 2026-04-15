@@ -223,7 +223,7 @@ Framework labels come from structural analysis of imports and code shape, not st
 
 ## Benchmarks
 
-Scanned on real production agentic repositories (v1.6.3). All results generated live — no sampling or summarization. Full scan outputs in [`evaluations/`](./evaluations/).
+Scanned on real production agentic repositories (v1.6.3). All results generated live - no sampling or summarization. Full scan outputs in [`evaluations/`](./evaluations/).
 
 | Repository | Language | Files | CEEs | Critical | Warning | Info |
 |------------|----------|------:|-----:|---------:|--------:|-----:|
@@ -361,12 +361,12 @@ wyscan scan ./project --json
 
 **Field notes:**
 
-- `findings` — AFB04-classified subset; operations with `gate_status: absent`. Drives the exit code.
-- `cees` — full canonical execution event inventory across all analyzed paths.
-- `call_path` — traced function chain from tool registration to matched operation.
-- `evidence_kind` — `semantic` (framework import resolved), `structural` (code shape), or `heuristic`.
-- `depth_limit_hit` — call tracing reached the configured depth ceiling; result is lower confidence.
-- `coverage_note` — plain-language scope note for this scan.
+- `findings` - AFB04-classified subset; operations with `gate_status: absent`. Drives the exit code.
+- `cees` - full canonical execution event inventory across all analyzed paths.
+- `call_path` - traced function chain from tool registration to matched operation.
+- `evidence_kind` - `semantic` (framework import resolved), `structural` (code shape), or `heuristic`.
+- `depth_limit_hit` - call tracing reached the configured depth ceiling; result is lower confidence.
+- `coverage_note` - plain-language scope note for this scan.
 
 ---
 
