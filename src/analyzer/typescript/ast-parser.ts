@@ -326,7 +326,7 @@ function extractParameters(node: Parser.SyntaxNode): string[] {
  * Extract callee information from call expression
  */
 function extractCalleeInfo(callNode: Parser.SyntaxNode): { callee: string; baseExpression?: string; memberChain: string[] } {
-  const functionNode = callNode.childForFieldName('function');
+  const functionNode = callNode.childForFieldName('function') || callNode.childForFieldName('constructor');
 
   if (!functionNode) {
     return { callee: '<unknown>', memberChain: [] };

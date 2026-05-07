@@ -929,6 +929,98 @@ export function buildCallGraph(
     }
   }
 
+  // Create synthetic nodes for semantic roots that don't match any function
+  // This handles MCP server.tool() and similar patterns where the tool handler
+  // is an inline anonymous callback at module level.
+  if (semanticRoots) {
+    // Group unmatched roots by file and sort by line number
+    const unmatchedRootsByFile = new Map<string, SemanticInvocationRoot[]>();
+    for (const [rootId, root] of semanticRoots) {
+      if (nodes.has(rootId)) continue;
+      const fileRoots = unmatchedRootsByFile.get(root.sourceFile) || [];
+      fileRoots.push(root);
+      unmatchedRootsByFile.set(root.sourceFile, fileRoots);
+    }
+
+    for (const [filePath, fileRoots] of unmatchedRootsByFile) {
+      const parsed = files.get(filePath);
+      if (!parsed) continue;
+
+      fileRoots.sort((a, b) => a.line - b.line);
+      const variableTypeMap = buildVariableTypeMap(parsed, parsed.imports);
+
+      for (let i = 0; i < fileRoots.length; i++) {
+        const root = fileRoots[i];
+        const nextRoot = i + 1 < fileRoots.length ? fileRoots[i + 1] : undefined;
+        const maxLine = nextRoot ? nextRoot.line - 1 : root.line + 100; // Limit scope to next root
+
+        const dangerousOps: DangerousOperation[] = [];
+        const outgoingCalls: Array<{ targetCandidates: string[]; call: CallSite }> = [];
+
+        for (const call of parsed.calls) {
+          const isInlineHandler = call.enclosingFunction === '<anonymous>' || call.enclosingFunction === null;
+          if (!isInlineHandler) continue;
+
+          // Call must be after the tool registration and before the next tool registration
+          if (call.line < root.line || call.line > maxLine) continue;
+
+          const resolvedIdentity = resolveCallIdentity(call, parsed.imports, files, filePath, config, variableTypeMap);
+
+          const dangerousOp = matchDangerousOperation(call, resolvedIdentity, filePath);
+          if (dangerousOp) {
+            dangerousOp.enclosingNodeId = root.nodeId;
+            dangerousOps.push(dangerousOp);
+          }
+
+          const syntheticFunc: FunctionDef = {
+            name: root.toolName,
+            startLine: root.line,
+            endLine: maxLine,
+            parameters: [],
+            decorators: [],
+            isAsync: true,
+            isArrow: true,
+            isMethod: false,
+            isExported: false,
+          };
+
+          outgoingCalls.push({
+            targetCandidates: resolveCallTargetCandidates(
+              call,
+              syntheticFunc,
+              parsed.imports,
+              filePath,
+              config,
+              availableFiles
+            ),
+            call,
+          });
+        }
+
+        const syntheticNode: CallGraphNode = {
+          id: root.nodeId,
+          name: root.toolName,
+          startLine: root.line,
+          endLine: maxLine,
+          callees: new Set(),
+          callers: new Set(),
+          isToolRegistration: true,
+          framework: root.framework,
+          toolDetectionKind: 'semantic',
+          toolDetectionEvidence: root.evidence,
+          dangerousOps,
+          hasPolicyGate: false,
+          sourceFile: filePath,
+          parameters: [],
+          outgoingCalls,
+        };
+
+        nodes.set(root.nodeId, syntheticNode);
+        toolRegistrations.push(syntheticNode);
+      }
+    }
+  }
+
   // Build edges
   let unresolvedCallEdges = 0;
   let crossFileResolvedEdges = 0;

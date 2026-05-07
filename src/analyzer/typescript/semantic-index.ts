@@ -47,6 +47,8 @@ export interface SemanticInvocationRoot {
   sourceFile: string;
   /** Line number */
   line: number;
+  /** End line number for the registration block */
+  endLine?: number;
 }
 
 export class TypeScriptSemanticIndex {
@@ -256,12 +258,23 @@ function extractLangChainTools(
       // Find func parameter
       const funcArg = call.arguments.find(arg => arg.includes('func:'));
 
-      if (funcArg && call.enclosingFunction) {
-        // Extract function name from func: reference
-        const funcMatch = funcArg.match(/func:\s*([a-zA-Z_][a-zA-Z0-9_]*)/);
-        const toolName = funcMatch ? funcMatch[1] : call.enclosingFunction;
+      if (funcArg) {
+        // Try to get name
+        const nameArg = call.arguments.find(arg => arg.includes('name:'));
+        const nameMatch = nameArg?.match(/name:\s*['"]([^'"]+)['"]/);
+        
+        let toolName = 'langchainTool';
+        if (nameMatch) {
+          toolName = nameMatch[1];
+        } else {
+          const funcMatch = funcArg.match(/func:\s*([a-zA-Z_][a-zA-Z0-9_]*)/);
+          toolName = funcMatch ? funcMatch[1] : (call.enclosingFunction || 'langchainTool');
+        }
 
-        const nodeId = `${filePath}:${toolName}`;
+        const nodeId = call.enclosingFunction
+          ? `${filePath}:${call.enclosingFunction}`
+          : `${filePath}:${toolName}`;
+
         roots.push({
           nodeId,
           toolName,

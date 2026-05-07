@@ -1,0 +1,28 @@
+name: 'Wyscan Security Scanner'
+description: 'Detects Unauthorized Action (AFB04) vulnerabilities in agentic AI codebases'
+author: 'Plarix'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  target:
+    description: 'Path to scan (file or directory)'
+    required: false
+    default: '.'
+  mode:
+    description: 'Scan mode (scan or mcp)'
+    required: false
+    default: 'scan'
+  level:
+    description: 'Filter findings by severity (critical, warning, info)'
+    required: false
+    default: 'warning'
+  fail-on-findings:
+    description: 'Fail the action if findings are detected at or above the specified level'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'node20'
+  main: 'action/dist/index.js'
