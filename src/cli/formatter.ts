@@ -619,3 +619,93 @@ export function printAnalysisDashboard(report: AnalysisReport, targetPath: strin
   console.log(`  ${styled('plarix.dev', chalk.dim)}`);
   console.log();
 }
+
+/**
+ * Print OWASP Agentic AI Top 10 Report
+ */
+export function printOwaspReport(report: AnalysisReport, targetPath: string): void {
+  // Turn off colors for markdown report
+  const prevIsTTY = process.stdout.isTTY;
+  Object.defineProperty(process.stdout, 'isTTY', { value: false, writable: true });
+
+  const date = new Date().toISOString().split('T')[0];
+  const repoName = report.repository || path.basename(path.resolve(targetPath));
+  const findings = report.findings;
+  
+  const critCount = findings.filter(f => f.severity === Severity.CRITICAL).length;
+  const highCount = findings.filter(f => f.severity === Severity.WARNING).length;
+  const lowCount = findings.filter(f => f.severity === Severity.INFO).length;
+  
+  const score = Math.max(0, 100 - (critCount * 15 + highCount * 8 + lowCount * 3));
+  
+  console.log(`# OWASP Agentic AI Security Report\n`);
+  console.log(`**Project:** ${repoName} | **Scan Date:** ${date} | **Total Findings:** ${findings.length}\n`);
+  console.log(`## Safety Score: ${score}/100\n`);
+  
+  // Group by OWASP
+  const owaspGroups = new Map<string, AFBFinding[]>();
+  for (const f of findings) {
+    if (f.owasp) {
+      if (!owaspGroups.has(f.owasp)) {
+        owaspGroups.set(f.owasp, []);
+      }
+      owaspGroups.get(f.owasp)!.push(f);
+    }
+  }
+
+  // Known OWASP Categories in Wyscan
+  const allOwaspCategories = [
+    { id: 'OWASP-A4', name: 'Excessive Agency / Unauthorized Actions', covered: 'Yes' },
+    { id: 'OWASP-L1', name: 'Prompt Injection', covered: 'Yes' },
+    { id: 'OWASP-L2', name: 'Sensitive Data Exposure in Prompts', covered: 'Yes' },
+    { id: 'OWASP-L8', name: 'Vector/RAG Weakness', covered: 'Yes' },
+    { id: 'OWASP-L3', name: 'Training Data Poisoning', covered: 'No' },
+    { id: 'OWASP-L4', name: 'Model Denial of Service', covered: 'No' },
+    { id: 'OWASP-L5', name: 'Supply Chain Vulnerabilities', covered: 'No' },
+    { id: 'OWASP-L6', name: 'Sensitive Information Disclosure', covered: 'No' },
+    { id: 'OWASP-L7', name: 'Insecure Plugin Design', covered: 'No' },
+    { id: 'OWASP-L9', name: 'Overreliance', covered: 'No' },
+    { id: 'OWASP-L10', name: 'Model Theft', covered: 'No' }
+  ];
+
+  console.log(`## Findings Details\n`);
+  
+  if (owaspGroups.size === 0) {
+    console.log(`*No OWASP-mapped vulnerabilities detected.*\n`);
+  } else {
+    for (const [owaspId, groupFindings] of owaspGroups) {
+      const categoryName = allOwaspCategories.find(c => c.id === owaspId)?.name || 'Unknown Category';
+      console.log(`### ${owaspId} — ${categoryName}\n`);
+      for (const f of groupFindings) {
+        console.log(`- **Severity:** ${f.severity.toUpperCase()}`);
+        console.log(`- **File:** \`${f.file}:${f.line}\``);
+        const snippet = f.codeSnippet.replace(/\\n/g, ' ').substring(0, 100);
+        
+        let callChain = '';
+        if (f.context?.toolName) {
+          const toolPart = f.context.framework ? `${f.context.framework}:${f.context.toolName}` : f.context.toolName;
+          callChain = `${toolPart} -> ${snippet}`;
+        } else {
+          callChain = snippet;
+        }
+        console.log(`- **Call Chain:** \`${callChain}\``);
+        if (f.remediation) {
+          console.log(`- **Remediation:** ${f.remediation}`);
+        }
+        console.log();
+      }
+    }
+  }
+
+  console.log(`## Coverage Summary\n`);
+  console.log(`| Category | Covered by Wyscan | Findings Count |`);
+  console.log(`|----------|-------------------|----------------|`);
+  
+  for (const cat of allOwaspCategories) {
+    const count = owaspGroups.get(cat.id)?.length || 0;
+    console.log(`| ${cat.id} - ${cat.name} | ${cat.covered} | ${count} |`);
+  }
+
+  // Restore TTY
+  Object.defineProperty(process.stdout, 'isTTY', { value: prevIsTTY, writable: true });
+}
