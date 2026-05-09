@@ -4,12 +4,13 @@
 
 # [WyScan](https://plarix.dev)
 
-> Static scanner for Python, TypeScript, and JavaScript agent code that reports dangerous operations reachable from detected tool registrations.
+> Static security scanner for OWASP Agentic AI risks in AI agents and Model Context Protocol (MCP) servers.
 
-**WyScan is an AFB04 scanner.** It parses source files with tree-sitter, resolves tool registrations through semantic analysis of framework code structure, traces reachable calls across the analyzed file set, and reports matched operations when no structural policy gate is detected in that path.
+**WyScan is an OWASP Agentic AI Security Scanner.** It parses source files with tree-sitter, resolves tool registrations through semantic analysis of framework code structure, traces reachable calls across the analyzed file set, and maps findings to the OWASP Agentic AI Top 10 framework (including LLM01, LLM02, LLM08, and LLM09/AFB04).
 
 ```bash
 wyscan scan ./agent-project
+wyscan mcp ./my-mcp-server
 ```
 
 ---
@@ -19,7 +20,7 @@ wyscan scan ./agent-project
 ## Output
 
 ```
-  wyscan v1.6.3  ·  Plarix
+  wyscan v2.1.0  ·  Plarix
   ─────────────────────────────────────────────────────
 
   Scanning  agent-project
@@ -52,7 +53,7 @@ wyscan scan ./agent-project
 **`wyscan check`**:
 
 ```
-  wyscan v1.6.3  ·  Plarix
+  wyscan v2.1.0  ·  Plarix
   ─────────────────────────────────────────────────────
 
   Checking dependencies...
@@ -81,7 +82,7 @@ wyscan scan ./agent-project
 **`wyscan install`**:
 
 ```
-  wyscan v1.6.3  ·  Plarix
+  wyscan v2.1.0  ·  Plarix
   ─────────────────────────────────────────────────────
 
   Preparing local CLI installation...
@@ -127,7 +128,9 @@ npm install && node dist/cli/index.js install
 | Command | Description |
 |---------|-------------|
 | `wyscan install` | Run npm install + build + link + check, print setup dashboard |
-| `wyscan scan <path>` | Scan a file or directory |
+| `wyscan scan <path>` | Scan a file or directory for vulnerabilities |
+| `wyscan mcp <path>` | Specialized security scan for MCP servers |
+| `wyscan report <path>` | Generate full evaluation dashboard with policy coverage |
 | `wyscan check` | Verify scanner dependencies and parser initialization |
 | `wyscan tui` | Print the quick command panel |
 | `wyscan version` | Print version |
@@ -139,6 +142,7 @@ npm install && node dist/cli/index.js install
 
 | Flag | Short | Description |
 |------|-------|-------------|
+| `--owasp` | | Generate OWASP Agentic AI mapped report |
 | `--level <severity>` | `-l` | Filter findings to `critical`, `warning`, or `info` (default: `info`) |
 | `--output <file>` | `-o` | Write output to file |
 | `--json` | `-j` | Structured JSON output |
@@ -163,7 +167,11 @@ Exit codes follow the filtered level. `--level critical` ignores warning-only re
 
 ## Detection Model
 
-WyScan reports operations reachable from a detected tool registration with no structural policy gate in the analyzed call path.
+WyScan reports vulnerabilities mapped to the OWASP Agentic AI Top 10:
+- **LLM01 (Prompt Injection)**: User input flows to LLM execution without sanitization.
+- **LLM02 (Sensitive Data)**: Credentials or PII exposed in prompts or tool contexts.
+- **LLM08 (Vector Weaknesses)**: RAG operations without source validation.
+- **LLM09 / AFB04 (Excessive Agency)**: Dangerous operations reachable from a detected tool registration with no structural policy gate in the analyzed call path.
 
 ### Severity
 
@@ -223,7 +231,7 @@ Framework labels come from structural analysis of imports and code shape, not st
 
 ## Benchmarks
 
-Scanned on real production agentic repositories (v1.6.3). All results generated live - no sampling or summarization. Full scan outputs in [`evaluations/`](./evaluations/).
+Scanned on real production agentic repositories (v2.1.0). All results generated live — no sampling or summarization. Full scan outputs in [`evaluations/`](./evaluations/).
 
 | Repository | Language | Files | CEEs | Critical | Warning | Info |
 |------------|----------|------:|-----:|---------:|--------:|-----:|
@@ -250,7 +258,7 @@ wyscan scan ./project --json
 
 ```json
 {
-  "version": "1.6.3",
+  "version": "2.1.0",
   "scanned_path": "/absolute/path",
   "files_analyzed": 34,
   "runtime_ms": 1200,
@@ -389,6 +397,27 @@ WyScan currently does not do any of the following:
 - Support Rust.
 
 ---
+
+## GitHub Actions (CI/CD)
+
+WyScan provides a native GitHub Action for zero-friction CI/CD integration. Add this to your `.github/workflows/wyscan.yml`:
+
+```yaml
+name: WyScan Security
+on: [push, pull_request]
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run WyScan
+        uses: plarix-security/wyscan@v2
+        with:
+          target: '.'
+          mode: 'auto' # Auto-detects MCP servers
+          level: 'warning'
+          fail-on-findings: 'true'
+```
 
 ## GitHub App
 
