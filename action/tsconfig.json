@@ -6,5 +6,6 @@
     "module": "commonjs",
     "moduleResolution": "node"
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts"],
+  "exclude": ["dist", "node_modules"]
 }
