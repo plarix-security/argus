@@ -47,6 +47,8 @@ export interface SemanticInvocationRoot {
   sourceFile: string;
   /** Line number */
   line: number;
+  /** End line number for the registration block */
+  endLine?: number;
 }
 
 export class TypeScriptSemanticIndex {
@@ -256,12 +258,23 @@ function extractLangChainTools(
       // Find func parameter
       const funcArg = call.arguments.find(arg => arg.includes('func:'));
 
-      if (funcArg && call.enclosingFunction) {
-        // Extract function name from func: reference
-        const funcMatch = funcArg.match(/func:\s*([a-zA-Z_][a-zA-Z0-9_]*)/);
-        const toolName = funcMatch ? funcMatch[1] : call.enclosingFunction;
+      if (funcArg) {
+        // Try to get name
+        const nameArg = call.arguments.find(arg => arg.includes('name:'));
+        const nameMatch = nameArg?.match(/name:\s*['"]([^'"]+)['"]/);
+        
+        let toolName = 'langchainTool';
+        if (nameMatch) {
+          toolName = nameMatch[1];
+        } else {
+          const funcMatch = funcArg.match(/func:\s*([a-zA-Z_][a-zA-Z0-9_]*)/);
+          toolName = funcMatch ? funcMatch[1] : (call.enclosingFunction || 'langchainTool');
+        }
 
-        const nodeId = `${filePath}:${toolName}`;
+        const nodeId = call.enclosingFunction
+          ? `${filePath}:${call.enclosingFunction}`
+          : `${filePath}:${toolName}`;
+
         roots.push({
           nodeId,
           toolName,
@@ -584,10 +597,11 @@ function extractMastraTools(
   // Look for createTool calls
   for (const call of parsed.calls) {
     if (call.callee === 'createTool' || call.callee.includes('createTool')) {
-      const nameArg = call.arguments.find(arg => arg.includes('name:'));
-      const toolName = nameArg
-        ? nameArg.match(/name:\s*['"]([^'"]+)['"]/)?.[1] || call.enclosingFunction || 'mastraTool'
-        : call.enclosingFunction || 'mastraTool';
+      // Try to extract tool name from id: or name: in arguments
+      const allArgs = call.arguments.join(' ');
+      const idMatch = allArgs.match(/id:\s*['"]([^'"]+)['"]/);
+      const nameMatch = allArgs.match(/name:\s*['"]([^'"]+)['"]/);
+      const toolName = idMatch?.[1] || nameMatch?.[1] || call.enclosingFunction || 'mastraTool';
 
       const nodeId = call.enclosingFunction
         ? `${filePath}:${call.enclosingFunction}`
@@ -620,21 +634,53 @@ function extractMastraTools(
     }
   }
 
-  // Look for tool assignments
+  // Look for tool assignments (const myTool = createTool({...}))
+  // The AST parser generates synthetic functions like "myTool.execute" for inline handlers
+  const MASTRA_EXEC_PROPS = ['execute', 'handler', 'run'];
   for (const assignment of parsed.assignments) {
-    if (assignment.value.includes('createTool(')) {
+    if (!assignment.value.includes('createTool(')) continue;
+
+    // Check if the AST parser extracted a synthetic function for this tool's execute handler
+    const syntheticFuncName = MASTRA_EXEC_PROPS
+      .map(prop => `${assignment.target}.${prop}`)
+      .find(name => parsed.functions.some(f => f.name === name));
+
+    if (syntheticFuncName) {
+      // Point root directly at the synthetic execute handler function
+      const nodeId = `${filePath}:${syntheticFuncName}`;
+      if (!roots.some(r => r.nodeId === nodeId)) {
+        // Extract tool name from object properties if available
+        let toolName = assignment.target;
+        if (assignment.isObjectLiteral && assignment.objectProperties) {
+          const idProp = assignment.objectProperties.find(p => p.key === 'id' || p.key === 'name');
+          if (idProp?.stringValue) toolName = idProp.stringValue;
+        }
+
+        roots.push({
+          nodeId,
+          toolName,
+          framework: 'mastra',
+          evidence: `Mastra createTool() inline ${syntheticFuncName.split('.').pop()} handler`,
+          sourceFile: filePath,
+          line: assignment.line,
+        });
+      }
+    } else {
+      // Fallback: point at the assignment target
       const nodeId = assignment.enclosingFunction
         ? `${filePath}:${assignment.enclosingFunction}`
         : `${filePath}:${assignment.target}`;
 
-      roots.push({
-        nodeId,
-        toolName: assignment.target,
-        framework: 'mastra',
-        evidence: 'Mastra tool assignment',
-        sourceFile: filePath,
-        line: assignment.line,
-      });
+      if (!roots.some(r => r.nodeId === nodeId)) {
+        roots.push({
+          nodeId,
+          toolName: assignment.target,
+          framework: 'mastra',
+          evidence: 'Mastra tool assignment',
+          sourceFile: filePath,
+          line: assignment.line,
+        });
+      }
     }
   }
 

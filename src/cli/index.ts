@@ -42,6 +42,7 @@ import {
   printTuiQuickPanel,
   printInstallDashboard,
   printAnalysisDashboard,
+  printOwaspReport,
   isTTY,
 } from './formatter';
 
@@ -104,6 +105,7 @@ interface ScanOptions {
   quiet: boolean;
   debug: boolean;
   maxFiles: number | null;
+  owasp?: boolean;
 }
 
 /**
@@ -145,6 +147,11 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
     }
     if (arg === '-s' || arg === '--summary') {
       options.summary = true;
+      i++;
+      continue;
+    }
+    if (arg === '--owasp') {
+      options.owasp = true;
       i++;
       continue;
     }
@@ -243,6 +250,8 @@ function generateJSON(report: AnalysisReport, scannedPath: string): string {
       operation: f.operation || f.codeSnippet.split('(')[0].trim(),
       tool: f.context?.toolName || f.context?.enclosingFunction || null,
       framework: f.context?.framework || null,
+      owasp: f.owasp || null,
+      remediation: f.remediation || null,
       tool_file: f.context?.toolFile || null,
       tool_line: f.context?.toolLine || null,
       call_path: f.context?.callPath || [],
@@ -399,12 +408,15 @@ function printHelp(command?: string): void {
   Usage:
     ${NAME} install            Install/build/link/check local CLI
     ${NAME} scan <path>        Scan a file or directory
+    ${NAME} mcp <path>         MCP server security scan
     ${NAME} report <path>      Evaluation dashboard (metrics, risk matrix, policy coverage)
     ${NAME} check              Verify scanner dependencies
     ${NAME} tui                Show compact command panel
     ${NAME} help [command]     Show help
 
   Supported frameworks:
+    TypeScript/JS: MCP SDK, LangChain.js, OpenAI SDK, Vercel AI SDK, Mastra,
+                   ElizaOS, CrewAI, AutoGen, and more
     Python: LangChain, LangGraph, CrewAI, AutoGen, Smolagents,
             OpenAI Assistants, and decorator-based tool registrations
 
@@ -422,6 +434,7 @@ function printHelp(command?: string): void {
   Examples:
     ${NAME} install
     ${NAME} scan .
+    ${NAME} mcp ./my-mcp-server
     ${NAME} scan ./agents -l critical
     ${NAME} scan . -j > report.json
     ${NAME} report .                       Full evaluation dashboard
@@ -777,12 +790,166 @@ async function runReport(args: string[]): Promise<number> {
   }
 
   if (options.output) {
-    const captured = captureConsoleOutput(() => printAnalysisDashboard(report, resolvedPath));
+    const captured = captureConsoleOutput(() => {
+      if (options.owasp) {
+        printOwaspReport(report, resolvedPath);
+      } else {
+        printAnalysisDashboard(report, resolvedPath);
+      }
+    });
     fs.writeFileSync(options.output, captured);
   } else {
-    printAnalysisDashboard(report, resolvedPath);
+    if (options.owasp) {
+      printOwaspReport(report, resolvedPath);
+    } else {
+      printAnalysisDashboard(report, resolvedPath);
+    }
   }
 
+  return EXIT.CLEAN;
+}
+
+/**
+ * Run MCP scan mode — dedicated MCP server security scanner
+ *
+ * Scans a codebase and reports only findings from MCP SDK tool registrations.
+ * Uses the same underlying analysis engine as `wyscan scan`, but filters
+ * output to MCP-framework findings for focused MCP server auditing.
+ */
+async function runMcp(args: string[]): Promise<number> {
+  const { targetPath, options, error } = parseFlags(args);
+
+  if (error) {
+    printError(error);
+    console.error();
+    console.error('  Run "wyscan help" for usage.');
+    return EXIT.ERROR;
+  }
+
+  const resolvedPath = path.resolve(targetPath || '.');
+
+  if (!fs.existsSync(resolvedPath)) {
+    printError(`Path not found: ${resolvedPath}`);
+    return EXIT.ERROR;
+  }
+
+  // Initialize analyzer
+  let analyzer: AFBAnalyzer;
+  try {
+    analyzer = new AFBAnalyzer(options.maxFiles != null ? { maxFiles: options.maxFiles } : undefined);
+    await analyzer.ensureInitialized();
+  } catch (err) {
+    if (options.debug) {
+      console.error(err);
+    }
+    printError('Scanner initialization failed. Run "wyscan check" to diagnose.', err instanceof Error ? err.message : undefined);
+    return EXIT.ERROR;
+  }
+
+  // Run scan
+  let report: AnalysisReport;
+  const stat = fs.statSync(resolvedPath);
+
+  try {
+    if (stat.isFile()) {
+      const result = analyzer.analyzeFile(resolvedPath);
+      report = {
+        repository: path.basename(path.dirname(resolvedPath)),
+        filesAnalyzed: result.success ? [result.file] : [],
+        totalFindings: result.findings.length,
+        totalCEEs: (result.cees || []).length,
+        findingsBySeverity: {
+          critical: result.findings.filter(f => f.severity === Severity.CRITICAL).length,
+          warning: result.findings.filter(f => f.severity === Severity.WARNING).length,
+          info: result.findings.filter(f => f.severity === Severity.INFO).length,
+          suppressed: result.findings.filter(f => f.severity === Severity.SUPPRESSED).length,
+        },
+        findings: result.findings,
+        cees: result.cees || [],
+        metadata: {
+          scannerVersion: VERSION,
+          timestamp: new Date().toISOString(),
+          totalTimeMs: result.analysisTimeMs,
+          failedFiles: result.success ? [] : [result.file],
+          skippedFiles: [],
+          fileLimitHit: false,
+          fileLimit: undefined,
+          totalFilesDiscovered: 1,
+        },
+      };
+
+      if (!result.success) {
+        printError(`could not parse ${path.basename(result.file)}`, result.error);
+        return EXIT.ERROR;
+      }
+    } else {
+      report = analyzer.analyzeDirectory(resolvedPath);
+    }
+  } catch (err) {
+    if (options.debug) {
+      console.error(err);
+    }
+    printError('MCP scan failed', err instanceof Error ? err.message : undefined);
+    return EXIT.ERROR;
+  }
+
+  // Filter to MCP-framework findings and CEEs only
+  const mcpFindings = report.findings.filter(f => f.context?.framework === 'mcp');
+  const mcpCEEs = report.cees.filter(c => c.framework === 'mcp');
+
+  const mcpReport: AnalysisReport = {
+    ...report,
+    findings: mcpFindings,
+    cees: mcpCEEs,
+    totalFindings: mcpFindings.length,
+    totalCEEs: mcpCEEs.length,
+    findingsBySeverity: {
+      critical: mcpFindings.filter(f => f.severity === Severity.CRITICAL).length,
+      warning: mcpFindings.filter(f => f.severity === Severity.WARNING).length,
+      info: mcpFindings.filter(f => f.severity === Severity.INFO).length,
+      suppressed: mcpFindings.filter(f => f.severity === Severity.SUPPRESSED).length,
+    },
+  };
+
+  const filteredReport = filterReportByLevel(mcpReport, options.level);
+
+  if (options.quiet) {
+    // No output, exit code only
+  } else if (options.json) {
+    const json = generateJSON(filteredReport, resolvedPath);
+    if (options.output) {
+      fs.writeFileSync(options.output, json + '\n');
+    } else {
+      console.log(json);
+    }
+  } else {
+    if (filteredReport.totalFindings === 0) {
+      printHeader();
+      printScanTarget(resolvedPath);
+      console.log();
+      console.log(`  ${isTTY() ? '\x1b[32m' : ''}MCP scan complete. No dangerous operations found.${isTTY() ? '\x1b[0m' : ''}`);
+      if (mcpCEEs.length > 0) {
+        console.log(`  ${mcpCEEs.length} MCP tool registration(s) detected.`);
+      } else {
+        console.log('  No MCP tool registrations detected. Is this an MCP server?');
+      }
+      printFooter(filteredReport);
+    } else {
+      printHeader();
+      console.log(`  MCP Server Security Scan`);
+      printScanTarget(resolvedPath);
+      printSummaryCounts(filteredReport);
+      printFindings(filteredReport.findings, options.level);
+      printFooter(filteredReport);
+    }
+  }
+
+  if (filteredReport.findingsBySeverity.critical > 0) {
+    return EXIT.CRITICAL;
+  }
+  if (filteredReport.findingsBySeverity.warning > 0) {
+    return EXIT.WARNING;
+  }
   return EXIT.CLEAN;
 }
 
@@ -834,6 +1001,11 @@ async function main(): Promise<void> {
 
   if (command === 'report' || command === 'analyze') {
     const code = await runReport(args.slice(1));
+    process.exit(code);
+  }
+
+  if (command === 'mcp') {
+    const code = await runMcp(args.slice(1));
     process.exit(code);
   }
 

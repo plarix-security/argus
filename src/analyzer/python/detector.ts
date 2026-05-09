@@ -37,6 +37,7 @@ import {
   AFBType,
   ExecutionCategory,
   Severity,
+  OWASPLabel,
 } from '../../types';
 
 interface PythonSourceInput {
@@ -445,6 +446,8 @@ function createFindingFromCEE(cee: CEERecord, parsed: ParsedPythonFile): AFBFind
     operation: cee.operation,
     explanation: cee.classificationNote,
     confidence: calculateConfidenceForCEE(cee),
+    owasp: cee.afbType === AFBType.UNAUTHORIZED_ACTION ? OWASPLabel.A4 : undefined,
+    remediation: getRemediationForPython(cee),
     context: {
       enclosingFunction: call?.enclosingFunction,
       enclosingClass: call?.enclosingClass,
@@ -463,6 +466,31 @@ function createFindingFromCEE(cee: CEERecord, parsed: ParsedPythonFile): AFBFind
       changesState: cee.changesState,
     },
   };
+}
+
+/**
+ * Generate per-finding-type remediation guidance for Python findings.
+ */
+function getRemediationForPython(cee: CEERecord): string | undefined {
+  if (!cee.afbType) return undefined;
+
+  switch (cee.category) {
+    case ExecutionCategory.SHELL_EXECUTION:
+      return 'Wrap shell execution in an explicit allowlist check before calling. Example: if cmd not in ALLOWED_COMMANDS: raise PermissionError("Unauthorized command")';
+    case ExecutionCategory.CODE_EXECUTION:
+      return 'Remove eval/exec usage. Replace with a safe interpreter or predefined operation map.';
+    case ExecutionCategory.FILE_OPERATION:
+      if (cee.operation.toLowerCase().includes('delet') || cee.operation.toLowerCase().includes('unlink') || cee.operation.toLowerCase().includes('rm')) {
+        return 'Restrict file deletion to an explicit path allowlist. Example: if not any(path.startswith(p) for p in ALLOWED_PATHS): raise PermissionError("Path not allowed")';
+      }
+      return 'Restrict file operations to a sandboxed directory. Validate all paths against an allowlist before performing writes.';
+    case ExecutionCategory.API_CALL:
+      return 'Validate the target URL against a domain allowlist before making HTTP mutation requests. Block requests to unknown domains.';
+    case ExecutionCategory.DATABASE_OPERATION:
+      return 'Use parameterized queries and restrict database operations to an authorized set of tables/operations.';
+    default:
+      return 'Add an explicit authorization check before this operation. Verify the agent has permission to perform this action.';
+  }
 }
 
 function calculateConfidenceForCEE(cee: CEERecord): number {

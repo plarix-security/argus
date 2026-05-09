@@ -1,0 +1,36 @@
+name: 'Wyscan Security Scanner'
+description: 'Static analysis for OWASP Agentic AI risks in AI agent and MCP server codebases'
+author: 'Plarix'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  target:
+    description: 'Path to scan (file or directory)'
+    required: false
+    default: '.'
+  mode:
+    description: 'Scan mode: auto (detect MCP), scan, or mcp'
+    required: false
+    default: 'auto'
+  level:
+    description: 'Filter findings by severity (critical, warning, info)'
+    required: false
+    default: 'warning'
+  fail-on-findings:
+    description: 'Fail the check if CRITICAL findings are detected'
+    required: false
+    default: 'true'
+
+outputs:
+  findings:
+    description: 'Total number of findings detected'
+  critical:
+    description: 'Number of CRITICAL findings'
+  high:
+    description: 'Number of HIGH/WARNING findings'
+
+runs:
+  using: 'node20'
+  main: 'action/dist/index.js'

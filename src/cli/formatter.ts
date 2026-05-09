@@ -199,35 +199,43 @@ export function printSummaryCounts(report: AnalysisReport): void {
 export function formatFinding(finding: AFBFinding): string {
   const filename = path.basename(finding.file);
   const col = finding.column || 0;
-  const location = `${styled(filename, chalk.white.bold)}${styled(`:${finding.line}:${col}`, chalk.dim)}`;
-  const snippet = formatSnippet(finding.codeSnippet);
-  const description = getDescription(finding);
-  const detailLines: string[] = [];
+  const sevLabel = finding.severity.toUpperCase();
+  const owaspTag = finding.owasp ? ` ${finding.owasp}` : '';
+  const operationDesc = finding.operation || finding.codeSnippet.split('(')[0].trim();
 
-  if (finding.context?.toolFile && finding.context?.toolLine) {
-    detailLines.push(`tool: ${finding.context.toolFile}:${finding.context.toolLine}`);
+  // Build call chain arrow: entry → ... → dangerousOp()
+  let entryArrow = '';
+  if (finding.context?.toolName) {
+    const toolPart = finding.context.framework
+      ? `${finding.context.framework}:${finding.context.toolName}`
+      : finding.context.toolName;
+    const snippet = formatSnippet(finding.codeSnippet);
+    entryArrow = `${toolPart}  →  ${snippet}`;
+  } else {
+    entryArrow = formatSnippet(finding.codeSnippet);
   }
 
-  if (finding.context?.involvesCrossFile) {
-    detailLines.push('path: cross-file');
+  const lines: string[] = [];
+
+  // [CRITICAL] OWASP-A4 — shell execution reachable from tool "run_command"
+  const headerParts = [`[${sevLabel}]`];
+  if (owaspTag) headerParts.push(owaspTag.trim());
+  headerParts.push('—');
+  headerParts.push(operationDesc);
+  if (finding.context?.toolName) {
+    headerParts.push(`from tool "${finding.context.toolName}"`);
   }
+  lines.push(`  ${styled(headerParts.join(' '), sevLabel === 'CRITICAL' ? chalk.red.bold : sevLabel === 'WARNING' ? chalk.yellow.bold : chalk.cyan)}`);
 
-  if (finding.context?.depthLimitHit) {
-    detailLines.push('trace: depth limit hit');
-  }
+  // File: src/tools/executor.ts:47
+  lines.push(`    ${styled('File:', chalk.dim)} ${finding.file}:${finding.line}`);
 
-  if (finding.context?.unresolvedCalls && finding.context.unresolvedCalls.length > 0) {
-    detailLines.push(`unresolved: ${finding.context.unresolvedCalls.slice(0, 3).join(', ')}`);
-  }
+  // Entry: server.tool("run_command", ...) → execSync()
+  lines.push(`    ${styled('Entry:', chalk.dim)} ${entryArrow}`);
 
-  const lines = [
-    `  ${formatSeverityLabel(finding.severity)} ${location}`,
-    `    ${styled(snippet, chalk.white)}`,
-    `    ${styled(description, chalk.gray)}`,
-  ];
-
-  for (const detailLine of detailLines) {
-    lines.push(`    ${styled(detailLine, chalk.dim)}`);
+  // Fix: remediation guidance
+  if (finding.remediation) {
+    lines.push(`    ${styled('Fix:', chalk.green)} ${finding.remediation}`);
   }
 
   return lines.join('\n');
@@ -300,7 +308,7 @@ function getCoverageNotes(report: AnalysisReport): string[] {
 }
 
 /**
- * Print footer with file count and timing
+ * Print footer with file count, timing, and summary line
  */
 export function printFooter(report: AnalysisReport): void {
   const { filesAnalyzed, metadata } = report;
@@ -315,6 +323,18 @@ export function printFooter(report: AnalysisReport): void {
   for (const note of getCoverageNotes(report)) {
     console.log(`  ${styled(note, chalk.dim)}`);
   }
+
+  // Summary line
+  const { findingsBySeverity } = report;
+  const critCount = findingsBySeverity.critical;
+  const highCount = findingsBySeverity.warning;
+  const toolCount = new Set(report.findings.map(f => f.context?.toolName).filter(Boolean)).size;
+  console.log();
+  const summaryParts: string[] = [];
+  if (critCount > 0) summaryParts.push(styled(`${critCount} critical`, chalk.red.bold));
+  if (highCount > 0) summaryParts.push(styled(`${highCount} high`, chalk.yellow.bold));
+  if (summaryParts.length === 0) summaryParts.push(styled('0', chalk.green));
+  console.log(`  ${summaryParts.join(', ')} findings across ${toolCount} tool${toolCount !== 1 ? 's' : ''}. Run ${styled('wyscan report', chalk.white)} for full details.`);
 }
 
 function formatCEE(cee: CEERecord): string {
@@ -598,4 +618,94 @@ export function printAnalysisDashboard(report: AnalysisReport, targetPath: strin
   console.log(`  ${styled('Filter by severity:', chalk.dim)} wyscan scan <path> --level critical`);
   console.log(`  ${styled('plarix.dev', chalk.dim)}`);
   console.log();
+}
+
+/**
+ * Print OWASP Agentic AI Top 10 Report
+ */
+export function printOwaspReport(report: AnalysisReport, targetPath: string): void {
+  // Turn off colors for markdown report
+  const prevIsTTY = process.stdout.isTTY;
+  Object.defineProperty(process.stdout, 'isTTY', { value: false, writable: true });
+
+  const date = new Date().toISOString().split('T')[0];
+  const repoName = report.repository || path.basename(path.resolve(targetPath));
+  const findings = report.findings;
+  
+  const critCount = findings.filter(f => f.severity === Severity.CRITICAL).length;
+  const highCount = findings.filter(f => f.severity === Severity.WARNING).length;
+  const lowCount = findings.filter(f => f.severity === Severity.INFO).length;
+  
+  const score = Math.max(0, 100 - (critCount * 15 + highCount * 8 + lowCount * 3));
+  
+  console.log(`# OWASP Agentic AI Security Report\n`);
+  console.log(`**Project:** ${repoName} | **Scan Date:** ${date} | **Total Findings:** ${findings.length}\n`);
+  console.log(`## Safety Score: ${score}/100\n`);
+  
+  // Group by OWASP
+  const owaspGroups = new Map<string, AFBFinding[]>();
+  for (const f of findings) {
+    if (f.owasp) {
+      if (!owaspGroups.has(f.owasp)) {
+        owaspGroups.set(f.owasp, []);
+      }
+      owaspGroups.get(f.owasp)!.push(f);
+    }
+  }
+
+  // Known OWASP Categories in Wyscan
+  const allOwaspCategories = [
+    { id: 'OWASP-A4', name: 'Excessive Agency / Unauthorized Actions', covered: 'Yes' },
+    { id: 'OWASP-L1', name: 'Prompt Injection', covered: 'Yes' },
+    { id: 'OWASP-L2', name: 'Sensitive Data Exposure in Prompts', covered: 'Yes' },
+    { id: 'OWASP-L8', name: 'Vector/RAG Weakness', covered: 'Yes' },
+    { id: 'OWASP-L3', name: 'Training Data Poisoning', covered: 'No' },
+    { id: 'OWASP-L4', name: 'Model Denial of Service', covered: 'No' },
+    { id: 'OWASP-L5', name: 'Supply Chain Vulnerabilities', covered: 'No' },
+    { id: 'OWASP-L6', name: 'Sensitive Information Disclosure', covered: 'No' },
+    { id: 'OWASP-L7', name: 'Insecure Plugin Design', covered: 'No' },
+    { id: 'OWASP-L9', name: 'Overreliance', covered: 'No' },
+    { id: 'OWASP-L10', name: 'Model Theft', covered: 'No' }
+  ];
+
+  console.log(`## Findings Details\n`);
+  
+  if (owaspGroups.size === 0) {
+    console.log(`*No OWASP-mapped vulnerabilities detected.*\n`);
+  } else {
+    for (const [owaspId, groupFindings] of owaspGroups) {
+      const categoryName = allOwaspCategories.find(c => c.id === owaspId)?.name || 'Unknown Category';
+      console.log(`### ${owaspId} — ${categoryName}\n`);
+      for (const f of groupFindings) {
+        console.log(`- **Severity:** ${f.severity.toUpperCase()}`);
+        console.log(`- **File:** \`${f.file}:${f.line}\``);
+        const snippet = f.codeSnippet.replace(/\\n/g, ' ').substring(0, 100);
+        
+        let callChain = '';
+        if (f.context?.toolName) {
+          const toolPart = f.context.framework ? `${f.context.framework}:${f.context.toolName}` : f.context.toolName;
+          callChain = `${toolPart} -> ${snippet}`;
+        } else {
+          callChain = snippet;
+        }
+        console.log(`- **Call Chain:** \`${callChain}\``);
+        if (f.remediation) {
+          console.log(`- **Remediation:** ${f.remediation}`);
+        }
+        console.log();
+      }
+    }
+  }
+
+  console.log(`## Coverage Summary\n`);
+  console.log(`| Category | Covered by Wyscan | Findings Count |`);
+  console.log(`|----------|-------------------|----------------|`);
+  
+  for (const cat of allOwaspCategories) {
+    const count = owaspGroups.get(cat.id)?.length || 0;
+    console.log(`| ${cat.id} - ${cat.name} | ${cat.covered} | ${count} |`);
+  }
+
+  // Restore TTY
+  Object.defineProperty(process.stdout, 'isTTY', { value: prevIsTTY, writable: true });
 }
