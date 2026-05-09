@@ -1,7 +1,7 @@
 {
   "name": "wyscan",
-  "version": "1.6.3",
-  "description": "Agent Failure Boundary Scanner - Detects AFB04 (Unauthorized Action) boundaries in agentic AI codebases through static analysis",
+  "version": "2.0.0",
+  "description": "Static security scanner for AI agent codebases — detects OWASP Agentic AI Top 10 risks through cross-file call-graph tracing from LLM tool registration points",
   "main": "dist/app.js",
   "bin": {
     "wyscan": "./dist/cli/index.js"
