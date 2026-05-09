@@ -42,6 +42,7 @@ import {
   printTuiQuickPanel,
   printInstallDashboard,
   printAnalysisDashboard,
+  printOwaspReport,
   isTTY,
 } from './formatter';
 
@@ -104,6 +105,7 @@ interface ScanOptions {
   quiet: boolean;
   debug: boolean;
   maxFiles: number | null;
+  owasp?: boolean;
 }
 
 /**
@@ -145,6 +147,11 @@ function parseFlags(args: string[]): { targetPath: string | null; options: ScanO
     }
     if (arg === '-s' || arg === '--summary') {
       options.summary = true;
+      i++;
+      continue;
+    }
+    if (arg === '--owasp') {
+      options.owasp = true;
       i++;
       continue;
     }
@@ -783,10 +790,20 @@ async function runReport(args: string[]): Promise<number> {
   }
 
   if (options.output) {
-    const captured = captureConsoleOutput(() => printAnalysisDashboard(report, resolvedPath));
+    const captured = captureConsoleOutput(() => {
+      if (options.owasp) {
+        printOwaspReport(report, resolvedPath);
+      } else {
+        printAnalysisDashboard(report, resolvedPath);
+      }
+    });
     fs.writeFileSync(options.output, captured);
   } else {
-    printAnalysisDashboard(report, resolvedPath);
+    if (options.owasp) {
+      printOwaspReport(report, resolvedPath);
+    } else {
+      printAnalysisDashboard(report, resolvedPath);
+    }
   }
 
   return EXIT.CLEAN;

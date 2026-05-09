@@ -36,6 +36,7 @@ import {
   Severity,
   OWASPLabel,
 } from '../../types';
+import { runOWASPDetectors } from './owasp-detectors';
 import * as path from 'path';
 
 interface TypeScriptSourceInput {
@@ -163,6 +164,10 @@ export function analyzeTypeScriptFile(
     }
   }
 
+  // Run additional OWASP specific detectors
+  const owaspFindings = runOWASPDetectors(parsed, filePath);
+  findings.push(...owaspFindings);
+
   return {
     file: filePath,
     language,
@@ -259,6 +264,10 @@ export function analyzeTypeScriptFiles(inputs: TypeScriptSourceInput[], onProgre
         findings.push(finding);
       }
     }
+
+    // Run additional OWASP specific detectors
+    const owaspFindings = runOWASPDetectors(parsed, filePath);
+    findings.push(...owaspFindings);
 
     results.push({
       file: filePath,
