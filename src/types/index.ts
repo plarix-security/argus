@@ -8,6 +8,21 @@
  */
 
 /**
+ * OWASP Agentic AI Top 10 risk labels.
+ * Used to tag findings with their corresponding OWASP risk category.
+ */
+export enum OWASPLabel {
+  /** A4: Excessive Agency / Unauthorized Actions */
+  A4 = 'OWASP-A4',
+  /** L1: Prompt Injection */
+  L1 = 'OWASP-L1',
+  /** L2: Sensitive Data Exposure in Prompts */
+  L2 = 'OWASP-L2',
+  /** L8: Vector/RAG Weakness */
+  L8 = 'OWASP-L8',
+}
+
+/**
  * Supported programming languages for analysis.
  * v1.6.3: Python, TypeScript, and JavaScript supported.
  */
@@ -128,6 +143,10 @@ export interface AFBFinding {
   explanation: string;
   /** Confidence level of the detection (0.0 - 1.0) */
   confidence: number;
+  /** OWASP Agentic AI Top 10 label for this finding */
+  owasp?: OWASPLabel;
+  /** One-line remediation guidance specific to the finding type */
+  remediation?: string;
   /** Additional context about the finding */
   context?: {
     /** Function/method name containing this code */

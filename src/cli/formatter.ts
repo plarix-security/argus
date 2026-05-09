@@ -199,35 +199,43 @@ export function printSummaryCounts(report: AnalysisReport): void {
 export function formatFinding(finding: AFBFinding): string {
   const filename = path.basename(finding.file);
   const col = finding.column || 0;
-  const location = `${styled(filename, chalk.white.bold)}${styled(`:${finding.line}:${col}`, chalk.dim)}`;
-  const snippet = formatSnippet(finding.codeSnippet);
-  const description = getDescription(finding);
-  const detailLines: string[] = [];
+  const sevLabel = finding.severity.toUpperCase();
+  const owaspTag = finding.owasp ? ` ${finding.owasp}` : '';
+  const operationDesc = finding.operation || finding.codeSnippet.split('(')[0].trim();
 
-  if (finding.context?.toolFile && finding.context?.toolLine) {
-    detailLines.push(`tool: ${finding.context.toolFile}:${finding.context.toolLine}`);
+  // Build call chain arrow: entry → ... → dangerousOp()
+  let entryArrow = '';
+  if (finding.context?.toolName) {
+    const toolPart = finding.context.framework
+      ? `${finding.context.framework}:${finding.context.toolName}`
+      : finding.context.toolName;
+    const snippet = formatSnippet(finding.codeSnippet);
+    entryArrow = `${toolPart}  →  ${snippet}`;
+  } else {
+    entryArrow = formatSnippet(finding.codeSnippet);
   }
 
-  if (finding.context?.involvesCrossFile) {
-    detailLines.push('path: cross-file');
+  const lines: string[] = [];
+
+  // [CRITICAL] OWASP-A4 — shell execution reachable from tool "run_command"
+  const headerParts = [`[${sevLabel}]`];
+  if (owaspTag) headerParts.push(owaspTag.trim());
+  headerParts.push('—');
+  headerParts.push(operationDesc);
+  if (finding.context?.toolName) {
+    headerParts.push(`from tool "${finding.context.toolName}"`);
   }
+  lines.push(`  ${styled(headerParts.join(' '), sevLabel === 'CRITICAL' ? chalk.red.bold : sevLabel === 'WARNING' ? chalk.yellow.bold : chalk.cyan)}`);
 
-  if (finding.context?.depthLimitHit) {
-    detailLines.push('trace: depth limit hit');
-  }
+  // File: src/tools/executor.ts:47
+  lines.push(`    ${styled('File:', chalk.dim)} ${finding.file}:${finding.line}`);
 
-  if (finding.context?.unresolvedCalls && finding.context.unresolvedCalls.length > 0) {
-    detailLines.push(`unresolved: ${finding.context.unresolvedCalls.slice(0, 3).join(', ')}`);
-  }
+  // Entry: server.tool("run_command", ...) → execSync()
+  lines.push(`    ${styled('Entry:', chalk.dim)} ${entryArrow}`);
 
-  const lines = [
-    `  ${formatSeverityLabel(finding.severity)} ${location}`,
-    `    ${styled(snippet, chalk.white)}`,
-    `    ${styled(description, chalk.gray)}`,
-  ];
-
-  for (const detailLine of detailLines) {
-    lines.push(`    ${styled(detailLine, chalk.dim)}`);
+  // Fix: remediation guidance
+  if (finding.remediation) {
+    lines.push(`    ${styled('Fix:', chalk.green)} ${finding.remediation}`);
   }
 
   return lines.join('\n');
@@ -300,7 +308,7 @@ function getCoverageNotes(report: AnalysisReport): string[] {
 }
 
 /**
- * Print footer with file count and timing
+ * Print footer with file count, timing, and summary line
  */
 export function printFooter(report: AnalysisReport): void {
   const { filesAnalyzed, metadata } = report;
@@ -315,6 +323,18 @@ export function printFooter(report: AnalysisReport): void {
   for (const note of getCoverageNotes(report)) {
     console.log(`  ${styled(note, chalk.dim)}`);
   }
+
+  // Summary line
+  const { findingsBySeverity } = report;
+  const critCount = findingsBySeverity.critical;
+  const highCount = findingsBySeverity.warning;
+  const toolCount = new Set(report.findings.map(f => f.context?.toolName).filter(Boolean)).size;
+  console.log();
+  const summaryParts: string[] = [];
+  if (critCount > 0) summaryParts.push(styled(`${critCount} critical`, chalk.red.bold));
+  if (highCount > 0) summaryParts.push(styled(`${highCount} high`, chalk.yellow.bold));
+  if (summaryParts.length === 0) summaryParts.push(styled('0', chalk.green));
+  console.log(`  ${summaryParts.join(', ')} findings across ${toolCount} tool${toolCount !== 1 ? 's' : ''}. Run ${styled('wyscan report', chalk.white)} for full details.`);
 }
 
 function formatCEE(cee: CEERecord): string {

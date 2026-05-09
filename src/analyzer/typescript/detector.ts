@@ -34,6 +34,7 @@ import {
   AFBType,
   ExecutionCategory,
   Severity,
+  OWASPLabel,
 } from '../../types';
 import * as path from 'path';
 
@@ -373,6 +374,43 @@ function createCEEFromPath(
 }
 
 /**
+ * Map a CEE to its OWASP Agentic AI Top 10 label.
+ * All AFB04 findings map to OWASP-A4 (Excessive Agency / Unauthorized Actions).
+ */
+function mapOWASPLabel(cee: CEERecord): OWASPLabel | undefined {
+  if (cee.afbType === AFBType.UNAUTHORIZED_ACTION) {
+    return OWASPLabel.A4;
+  }
+  return undefined;
+}
+
+/**
+ * Generate per-finding-type remediation guidance.
+ * Returns a concrete, actionable one-liner specific to the finding type.
+ */
+function getRemediation(cee: CEERecord): string | undefined {
+  if (!cee.afbType) return undefined;
+
+  switch (cee.category) {
+    case ExecutionCategory.SHELL_EXECUTION:
+      return 'Wrap shell execution in an explicit allowlist check before calling. Example: if (!ALLOWED_COMMANDS.includes(cmd)) throw new Error("Unauthorized command");';
+    case ExecutionCategory.CODE_EXECUTION:
+      return 'Remove eval/Function constructor usage. Replace with a safe interpreter or predefined operation map.';
+    case ExecutionCategory.FILE_OPERATION:
+      if (cee.operation.toLowerCase().includes('delet') || cee.operation.toLowerCase().includes('unlink') || cee.operation.toLowerCase().includes('rm')) {
+        return 'Restrict file deletion to an explicit path allowlist. Example: if (!ALLOWED_PATHS.some(p => filePath.startsWith(p))) throw new Error("Path not allowed");';
+      }
+      return 'Restrict file operations to a sandboxed directory. Validate all paths against an allowlist before performing writes.';
+    case ExecutionCategory.API_CALL:
+      return 'Validate the target URL against a domain allowlist before making HTTP mutation requests. Block requests to unknown domains.';
+    case ExecutionCategory.DATABASE_OPERATION:
+      return 'Use parameterized queries and restrict database operations to an authorized set of tables/operations.';
+    default:
+      return 'Add an explicit authorization check before this operation. Verify the agent has permission to perform this action.';
+  }
+}
+
+/**
  * Create finding from CEE
  */
 function createFindingFromCEE(cee: CEERecord, parsed: ParsedTypeScriptFile): AFBFinding {
@@ -387,6 +425,8 @@ function createFindingFromCEE(cee: CEERecord, parsed: ParsedTypeScriptFile): AFB
     codeSnippet: cee.codeSnippet,
     category: cee.category,
     confidence: calculateConfidenceForCEE(cee),
+    owasp: mapOWASPLabel(cee),
+    remediation: getRemediation(cee),
     context: {
       toolName: cee.tool,
       framework: cee.framework,
