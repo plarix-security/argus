@@ -1,6 +1,6 @@
 {
   "name": "wyscan",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Static security scanner for AI agent codebases — detects OWASP Agentic AI Top 10 risks through cross-file call-graph tracing from LLM tool registration points",
   "main": "dist/app.js",
   "bin": {
