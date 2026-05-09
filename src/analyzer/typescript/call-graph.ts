@@ -834,6 +834,51 @@ function resolveCallTargetCandidates(
   return candidates;
 }
 
+
+/**
+ * Build a map of function aliases created by wrapper patterns.
+ *
+ * Resolves:
+ * - `const execAsync = promisify(exec)` → execAsync → exec
+ * - `const execAsync = util.promisify(exec)` → execAsync → exec
+ * - `const myFunc = otherFunc` → myFunc → otherFunc (direct alias)
+ * - `const run = child_process.exec` → run → child_process.exec
+ *
+ * Returns a map from alias name to the original function/callee name.
+ */
+function buildFunctionAliasMap(parsed: ParsedTypeScriptFile): Map<string, string> {
+  const aliases = new Map<string, string>();
+
+  for (const assignment of parsed.assignments) {
+    const value = assignment.value.trim();
+
+    // Pattern 1: promisify(func)  or  util.promisify(func)
+    const promisifyMatch = value.match(/^(?:util\.)?promisify\(\s*([a-zA-Z_$][a-zA-Z0-9_$.]*)\s*\)$/);
+    if (promisifyMatch) {
+      aliases.set(assignment.target, promisifyMatch[1]);
+      continue;
+    }
+
+    // Pattern 2: Direct function/identifier alias (no parens, no operators)
+    // e.g., const myExec = exec  or  const run = child_process.exec
+    if (/^[a-zA-Z_$][a-zA-Z0-9_$.]*$/.test(value)) {
+      // Don't alias if the value looks like a type/class name (PascalCase without dots)
+      if (!value.includes('.') && /^[A-Z]/.test(value)) continue;
+      aliases.set(assignment.target, value);
+      continue;
+    }
+
+    // Pattern 3: bind(null, ...) wrapper — e.g., const boundExec = exec.bind(null)
+    const bindMatch = value.match(/^([a-zA-Z_$][a-zA-Z0-9_$.]*)\s*\.bind\(/);
+    if (bindMatch) {
+      aliases.set(assignment.target, bindMatch[1]);
+      continue;
+    }
+  }
+
+  return aliases;
+}
+
 /**
  * Build call graph from parsed files
  */
@@ -856,6 +901,9 @@ export function buildCallGraph(
     // Build variable type map for this file (for constructor/factory call tracking)
     const variableTypeMap = buildVariableTypeMap(parsed, parsed.imports);
 
+    // Build function alias map: resolves wrappers like promisify(exec) and direct aliases
+    const functionAliasMap = buildFunctionAliasMap(parsed);
+
     // Process functions
     for (const func of parsed.functions) {
       const nodeId = func.className
@@ -875,24 +923,74 @@ export function buildCallGraph(
             (func.className && call.enclosingClass === func.className && call.enclosingFunction === func.name)) {
 
           // Try to resolve call identity (now with variable type map)
-          const resolvedIdentity = resolveCallIdentity(call, parsed.imports, files, filePath, config, variableTypeMap);
+          let resolvedIdentity = resolveCallIdentity(call, parsed.imports, files, filePath, config, variableTypeMap);
+
+          // If the callee is an alias (e.g. promisify wrapper), also resolve the original
+          const aliasedOriginal = functionAliasMap.get(call.callee);
+          if (aliasedOriginal && !resolvedIdentity) {
+            // Create a synthetic call with the original callee to resolve identity
+            const syntheticCall: CallSite = {
+              ...call,
+              callee: aliasedOriginal,
+              memberChain: aliasedOriginal.split('.'),
+            };
+            resolvedIdentity = resolveCallIdentity(syntheticCall, parsed.imports, files, filePath, config, variableTypeMap);
+          }
 
           // Check if dangerous
-          const dangerousOp = matchDangerousOperation(call, resolvedIdentity, filePath);
+          let dangerousOp = matchDangerousOperation(call, resolvedIdentity, filePath);
+
+          // If not found as dangerous and we have an alias, try the original callee
+          if (!dangerousOp && aliasedOriginal) {
+            const syntheticCall: CallSite = {
+              ...call,
+              callee: aliasedOriginal,
+              memberChain: aliasedOriginal.split('.'),
+            };
+            const aliasedIdentity = resolveCallIdentity(syntheticCall, parsed.imports, files, filePath, config, variableTypeMap);
+            dangerousOp = matchDangerousOperation(syntheticCall, aliasedIdentity || aliasedOriginal, filePath);
+            if (dangerousOp) {
+              dangerousOp.detectionEvidence = `Alias resolution: ${call.callee} → ${aliasedOriginal}`;
+            }
+          }
+
           if (dangerousOp) {
             dangerousOp.enclosingNodeId = nodeId;
             dangerousOps.push(dangerousOp);
           }
 
-          outgoingCalls.push({
-            targetCandidates: resolveCallTargetCandidates(
-              call,
+          // Resolve call target candidates
+          const candidates = resolveCallTargetCandidates(
+            call,
+            func,
+            parsed.imports,
+            filePath,
+            config,
+            availableFiles
+          );
+
+          // Also add candidates for the aliased original function
+          if (aliasedOriginal) {
+            const syntheticCall: CallSite = {
+              ...call,
+              callee: aliasedOriginal,
+              memberChain: aliasedOriginal.split('.'),
+            };
+            const aliasedCandidates = resolveCallTargetCandidates(
+              syntheticCall,
               func,
               parsed.imports,
               filePath,
               config,
               availableFiles
-            ),
+            );
+            for (const c of aliasedCandidates) {
+              if (!candidates.includes(c)) candidates.push(c);
+            }
+          }
+
+          outgoingCalls.push({
+            targetCandidates: candidates,
             call,
           });
         }
@@ -948,6 +1046,7 @@ export function buildCallGraph(
 
       fileRoots.sort((a, b) => a.line - b.line);
       const variableTypeMap = buildVariableTypeMap(parsed, parsed.imports);
+      const functionAliasMap = buildFunctionAliasMap(parsed);
 
       for (let i = 0; i < fileRoots.length; i++) {
         const root = fileRoots[i];
@@ -964,9 +1063,26 @@ export function buildCallGraph(
           // Call must be after the tool registration and before the next tool registration
           if (call.line < root.line || call.line > maxLine) continue;
 
-          const resolvedIdentity = resolveCallIdentity(call, parsed.imports, files, filePath, config, variableTypeMap);
+          let resolvedIdentity = resolveCallIdentity(call, parsed.imports, files, filePath, config, variableTypeMap);
 
-          const dangerousOp = matchDangerousOperation(call, resolvedIdentity, filePath);
+          // Alias resolution for wrappers like promisify(exec)
+          const aliasedOriginal = functionAliasMap.get(call.callee);
+          if (aliasedOriginal && !resolvedIdentity) {
+            const syntheticCall: CallSite = { ...call, callee: aliasedOriginal, memberChain: aliasedOriginal.split('.') };
+            resolvedIdentity = resolveCallIdentity(syntheticCall, parsed.imports, files, filePath, config, variableTypeMap);
+          }
+
+          let dangerousOp = matchDangerousOperation(call, resolvedIdentity, filePath);
+
+          if (!dangerousOp && aliasedOriginal) {
+            const syntheticCall: CallSite = { ...call, callee: aliasedOriginal, memberChain: aliasedOriginal.split('.') };
+            const aliasedIdentity = resolveCallIdentity(syntheticCall, parsed.imports, files, filePath, config, variableTypeMap);
+            dangerousOp = matchDangerousOperation(syntheticCall, aliasedIdentity || aliasedOriginal, filePath);
+            if (dangerousOp) {
+              dangerousOp.detectionEvidence = `Alias resolution: ${call.callee} → ${aliasedOriginal}`;
+            }
+          }
+
           if (dangerousOp) {
             dangerousOp.enclosingNodeId = root.nodeId;
             dangerousOps.push(dangerousOp);
@@ -984,15 +1100,25 @@ export function buildCallGraph(
             isExported: false,
           };
 
+          const candidates = resolveCallTargetCandidates(
+            call,
+            syntheticFunc,
+            parsed.imports,
+            filePath,
+            config,
+            availableFiles
+          );
+
+          if (aliasedOriginal) {
+            const syntheticCall: CallSite = { ...call, callee: aliasedOriginal, memberChain: aliasedOriginal.split('.') };
+            const aliasedCandidates = resolveCallTargetCandidates(syntheticCall, syntheticFunc, parsed.imports, filePath, config, availableFiles);
+            for (const c of aliasedCandidates) {
+              if (!candidates.includes(c)) candidates.push(c);
+            }
+          }
+
           outgoingCalls.push({
-            targetCandidates: resolveCallTargetCandidates(
-              call,
-              syntheticFunc,
-              parsed.imports,
-              filePath,
-              config,
-              availableFiles
-            ),
+            targetCandidates: candidates,
             call,
           });
         }
