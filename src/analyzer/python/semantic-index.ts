@@ -106,8 +106,26 @@ function matchesFrameworkModule(modulePath: string, targetModule: string): boole
   return false;
 }
 
+function toPosixPath(p: string): string {
+  return p.replace(/\\/g, '/');
+}
+
 function resolveModulePath(modulePath: string, currentFilePath: string, filePathSet: Set<string>, possibleRoots: Set<string>): string | undefined {
   const currentDir = path.dirname(currentFilePath);
+
+  // Cross-platform helper: check if a candidate path matches any file in the set.
+  // On Windows, path.join/normalize convert forward slashes to backslashes,
+  // which breaks matching against virtual Unix-style paths used in tests.
+  const matchInSet = (candidate: string): string | undefined => {
+    const normalized = path.normalize(candidate);
+    if (filePathSet.has(normalized)) return normalized;
+    // Posix fallback: compare with forward slashes
+    const posix = toPosixPath(normalized);
+    for (const filePath of filePathSet) {
+      if (toPosixPath(filePath) === posix) return filePath;
+    }
+    return undefined;
+  };
 
   if (modulePath.startsWith('.')) {
     const dots = modulePath.match(/^\.+/)?.[0].length || 0;
@@ -123,10 +141,8 @@ function resolveModulePath(modulePath: string, currentFilePath: string, filePath
     ];
 
     for (const candidate of candidates) {
-      const normalized = path.normalize(candidate);
-      if (filePathSet.has(normalized)) {
-        return normalized;
-      }
+      const matched = matchInSet(candidate);
+      if (matched) return matched;
     }
   }
 
@@ -139,10 +155,8 @@ function resolveModulePath(modulePath: string, currentFilePath: string, filePath
     ];
 
     for (const candidate of candidates) {
-      const normalized = path.normalize(candidate);
-      if (filePathSet.has(normalized)) {
-        return normalized;
-      }
+      const matched = matchInSet(candidate);
+      if (matched) return matched;
     }
   }
 

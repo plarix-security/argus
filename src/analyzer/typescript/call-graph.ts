@@ -721,6 +721,20 @@ function resolveModulePath(
       }
     }
 
+    // Cross-platform fallback: use posix suffix matching when exact match fails.
+    // This handles virtual Unix-style paths on Windows where path.resolve
+    // produces platform-specific paths that don't match the availableFiles keys.
+    if (availableFiles) {
+      // Build the expected posix-style relative suffix from the module path
+      const posixDir = toPosixPath(currentDir);
+      const posixBase = posixDir + '/' + modulePath.replace(/^\.\//, '');
+      const normalizedBase = toPosixPath(path.normalize(posixBase));
+      const matched = findBySuffix(
+        config.fileExtensions.map(ext => normalizedBase + ext)
+      );
+      if (matched) return matched;
+    }
+
     // If no availableFiles provided, fall back to returning something
     if (!availableFiles) {
       return basePath + config.fileExtensions[0];
