@@ -6,5 +6,10 @@
       "src": "/(.*)",
       "dest": "/api/index.ts"
     }
-  ]
+  ],
+  "functions": {
+    "api/**/*.ts": {
+      "includeFiles": "wasm/**"
+    }
+  }
 }

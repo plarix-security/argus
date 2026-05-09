@@ -1,4 +1,4 @@
-type AppModule = typeof import('../src/app');
+type AppModule = typeof import('../dist/app');
 type App = ReturnType<AppModule['getApp']>;
 type AppRequest = Parameters<App>[0];
 type AppResponse = Parameters<App>[1];
@@ -7,7 +7,7 @@ let appInstance: App | undefined;
 
 function getAppInstance(): App {
   if (!appInstance) {
-    const appModule = require('../src/app') as AppModule;
+    const appModule = require('../dist/app') as AppModule;
     appInstance = appModule.getApp();
   }
   return appInstance;
