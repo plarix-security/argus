@@ -1133,6 +1133,55 @@ function extractImports(rootNode: Parser.SyntaxNode): ImportInfo[] {
     }
   }
 
+  // Dynamic imports: await import('module')
+  const allCalls = findAllNodes(rootNode, ['call_expression']);
+  for (const callNode of allCalls) {
+    const funcNode = callNode.childForFieldName('function');
+    if (funcNode?.type === 'import') {
+      const argsNode = callNode.childForFieldName('arguments');
+      if (argsNode && argsNode.childCount > 1) {
+        const moduleNode = argsNode.child(1);
+        if (moduleNode) {
+          const module = moduleNode.text.replace(/['"]/g, '');
+          
+          let alias: string | undefined;
+          const names: string[] = [];
+          
+          let parent = callNode.parent;
+          if (parent?.type === 'await_expression') {
+            parent = parent.parent;
+          }
+          
+          if (parent?.type === 'variable_declarator') {
+            const nameNode = parent.childForFieldName('name');
+            if (nameNode) {
+              if (nameNode.type === 'identifier') {
+                alias = nameNode.text;
+                names.push(alias);
+              } else if (nameNode.type === 'object_pattern') {
+                for (let i = 0; i < nameNode.childCount; i++) {
+                  const child = nameNode.child(i);
+                  if (child?.type === 'shorthand_property_identifier_pattern') {
+                    names.push(child.text);
+                  }
+                }
+              }
+            }
+          }
+
+          imports.push({
+            module,
+            names,
+            isDefault: false,
+            isNamespace: !!alias && names.length === 1 && names[0] === alias,
+            alias,
+            line: callNode.startPosition.row + 1,
+          });
+        }
+      }
+    }
+  }
+
   return imports;
 }
 
